@@ -18,10 +18,11 @@ from app.models.provider import (
     Provider, ProviderService, ProviderAvailability, ProviderTimeOff,
 )
 from app.models.account import Account, Session
+from app.models.service_request import ServiceRequest
 
 __all__ = [
     "Service", "Customer", "Job", "JobLine", "Appointment", "Payment",
     "ChatSession", "CartItem",
     "Provider", "ProviderService", "ProviderAvailability", "ProviderTimeOff",
-    "Account", "Session",
+    "Account", "Session", "ServiceRequest",
 ]

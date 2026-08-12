@@ -12,7 +12,7 @@ existing bookings rather than a second row that quietly splits their history.
 
 import logging
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
@@ -20,8 +20,9 @@ from app.api.deps import current_account, optional_account
 from app.db.database import get_db
 from app.models.account import Account
 from app.models.customer import Customer
-from app.models.provider import Provider
-from app.services import auth
+from app.models.provider import Provider, ProviderService
+from app.models.service import Service
+from app.services import auth, rate_limit
 
 logger = logging.getLogger("auth")
 
@@ -49,6 +50,17 @@ class ProviderRegisterIn(BaseModel):
     address: str = Field(default="", max_length=400)
     city: str = Field(default="", max_length=120)
     postcode: str = Field(default="", max_length=20)
+    #: What they do, with their own price and duration. Optional at sign up,
+    #: because a business filling in a form should not be blocked by not having
+    #: decided its prices yet; they can add them from the profile afterwards.
+    services: list["ProviderServiceIn"] = Field(default_factory=list)
+
+
+class ProviderServiceIn(BaseModel):
+    service_id: int
+    price: float | None = Field(default=None, ge=0)
+    duration_minutes: int | None = Field(default=None, ge=15, le=600)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class LoginIn(BaseModel):
@@ -190,6 +202,30 @@ def register_provider(payload: ProviderRegisterIn, db: Session = Depends(get_db)
     db.add(provider)
     db.flush()
 
+    # Only services we actually know. A made up id is skipped rather than
+    # refusing the whole application, because losing a registration over one bad
+    # row is worse than a business having to add that service afterwards.
+    known = {
+        row[0] for row in db.query(Service.id).filter(
+            Service.id.in_([s.service_id for s in payload.services] or [0])
+        ).all()
+    }
+    skipped = []
+    for offering in payload.services:
+        if offering.service_id not in known:
+            skipped.append(offering.service_id)
+            continue
+        db.add(ProviderService(
+            provider_id=provider.id,
+            service_id=offering.service_id,
+            price=offering.price,
+            duration_minutes=offering.duration_minutes,
+            notes=offering.notes,
+            active=True,
+        ))
+    if skipped:
+        logger.warning(f"[AUTH] provider {provider.id} listed unknown services: {skipped}")
+
     account = Account(
         email=payload.email.lower(),
         password_hash=auth.hash_password(payload.password),
@@ -209,8 +245,20 @@ def register_provider(payload: ProviderRegisterIn, db: Session = Depends(get_db)
 # ── signing in and out ───────────────────────────────────────────────────────
 
 @router.post("/login", response_model=TokenOut, summary="Sign in")
-def login(payload: LoginIn, db: Session = Depends(get_db)):
+def login(payload: LoginIn, request: Request, db: Session = Depends(get_db)):
     """One endpoint for both roles. The account knows which side it is."""
+    caller = request.client.host if request.client else "unknown"
+
+    wait = rate_limit.check(payload.email, caller)
+    if wait is not None:
+        # 429 with Retry-After, so a browser or a client library knows what to
+        # do rather than treating it as a wrong password.
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Please wait and try again.",
+            headers={"Retry-After": str(wait)},
+        )
+
     account = _existing_account(db, payload.email)
 
     # Deliberately identical for a missing account and a wrong password, and the
@@ -218,11 +266,17 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
     # the same time. Otherwise the response time says which emails exist.
     if account is None:
         auth.hash_password(payload.password)
+        rate_limit.record_failure(payload.email, caller)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Those details do not match an account.")
     if not auth.verify_password(payload.password, account.password_hash):
+        rate_limit.record_failure(payload.email, caller)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Those details do not match an account.")
+
+    # A wrong guess before the right password should not count towards a later
+    # lockout.
+    rate_limit.clear(payload.email, caller)
 
     # Quietly upgrade a hash written when the cost was lower.
     if auth.needs_rehash(account.password_hash):

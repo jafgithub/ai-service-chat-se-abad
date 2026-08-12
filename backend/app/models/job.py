@@ -20,6 +20,12 @@ class Job(Base):
     # kept so a later price change does not rewrite what somebody was quoted.
     provider_id         = Column(Integer, ForeignKey("providers.id"))
     provider_service_id = Column(Integer, ForeignKey("provider_services.id"))
+    # The problem this job came from, in the customer's own words. See
+    # models/service_request.py for why that is a separate record.
+    service_request_id  = Column(Integer, ForeignKey("service_requests.id"))
+    # Stored rather than read from configuration when displaying, so a historic
+    # booking still reads in the currency it was agreed in.
+    currency = Column(String(8))
     status       = Column(
         Enum("pending", "confirmed", "scheduled", "completed", "cancelled"),
         nullable=False,

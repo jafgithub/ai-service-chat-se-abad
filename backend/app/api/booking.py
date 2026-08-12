@@ -21,6 +21,7 @@ from app.models.job import Job
 from app.models.customer import Customer
 from app.models.provider import Provider, ProviderService
 from app.models.service import Service
+from app.models.service_request import ServiceRequest
 from app.api.deps import require_customer
 from app.services import booking_service, calendly
 
@@ -163,23 +164,50 @@ class BookIn(BaseModel):
     #: Where the work is, if different from the address on the account.
     address: str = Field(default="", max_length=400)
     notes: str = Field(default="", max_length=2000)
+    #: The problem this booking answers, when the customer recorded one first.
+    service_request_id: int | None = None
 
 
 class BookedOut(BaseModel):
+    """Everything a confirmation screen needs, so it needs no follow up call.
+
+    The payment fields are carried now and unused until payments move into this
+    flow: amount, currency, the job they belong to and who is owed. Adding them
+    here rather than later means the frontend written against this response does
+    not change shape when payment is switched on.
+    """
+
     job_id: int
     appointment_id: int
     reference: str
+
     provider_id: int
     provider_name: str
+    provider_phone: str | None = None
+    provider_website: str | None = None
+
+    service_id: int
     service_name: str
+
     starts_at: datetime
     ends_at: datetime
     duration_minutes: int
     label: str
+
     price: float
+    currency: str
+    #: "unpaid" until payments are wired in. Never invented: a booking that has
+    #: not been paid for must not read as though it has.
+    payment_status: str = "unpaid"
+
     customer_id: int
     customer_name: str
+    customer_email: str | None = None
+    address: str | None = None
+    notes: str | None = None
+
     status: str
+    service_request_id: int | None = None
 
 
 @router.post("/book", response_model=BookedOut,
@@ -230,10 +258,25 @@ def book(payload: BookIn,
     if payload.address and not customer.address:
         customer.address = payload.address
 
+    request = None
+    if payload.service_request_id:
+        request = (
+            db.query(ServiceRequest)
+            .filter(ServiceRequest.id == payload.service_request_id,
+                    # Scoped to the caller: a request id from somebody else is
+                    # not a way to attach their problem to your booking.
+                    ServiceRequest.customer_id == customer.id)
+            .first()
+        )
+        if request is None:
+            raise HTTPException(status_code=404, detail="Not one of your requests.")
+
     job = Job(
         customer_id=customer.id,
         provider_id=provider.id,
         provider_service_id=offering.id,
+        service_request_id=request.id if request else None,
+        currency=settings.PAYMENT_CURRENCY,
         status="pending",
         total_amount=price,
         items_json=[{
@@ -272,6 +315,10 @@ def book(payload: BookIn,
     job.status = "scheduled"
     job.appointment_date = appointment.starts_at.date()
     job.appointment_time = appointment.starts_at.strftime("%-I:%M %p")
+    if request is not None:
+        request.status = "booked"
+        request.provider_id = provider.id
+        request.job_id = job.id
     db.commit()
 
     logger.info(
@@ -284,20 +331,30 @@ def book(payload: BookIn,
         reference=f"BK-{job.id:05d}",
         provider_id=provider.id,
         provider_name=provider.business_name,
+        provider_phone=provider.phone,
+        provider_website=provider.website,
+        service_id=service.id,
         service_name=service.name or "",
         starts_at=appointment.starts_at,
         ends_at=appointment.ends_at,
         duration_minutes=duration,
         label=appointment.starts_at.strftime("%A %-d %B, %-I:%M %p"),
         price=price,
+        currency=job.currency or settings.PAYMENT_CURRENCY,
+        payment_status="unpaid",
         customer_id=customer.id,
         customer_name=customer.name or "",
+        customer_email=customer.email,
+        address=payload.address or customer.address,
+        notes=payload.notes or None,
         status=appointment.status,
+        service_request_id=request.id if request else None,
     )
 
 
 @router.get("/mine", summary="My bookings")
-def my_bookings(customer: Customer = Depends(require_customer),
+def my_bookings(when: str = Query("all", pattern="^(all|upcoming|past|cancelled)$"),
+                customer: Customer = Depends(require_customer),
                 db: Session = Depends(get_db)):
     """Scoped to the signed-in customer. There is no id to tamper with, because
     the endpoint never takes one."""
@@ -307,9 +364,19 @@ def my_bookings(customer: Customer = Depends(require_customer),
         .outerjoin(Provider, Provider.id == Appointment.provider_id)
         .filter(Job.customer_id == customer.id)
         .order_by(Appointment.starts_at.desc())
-        .limit(100)
+        .limit(200)
         .all()
     )
+
+    now = datetime.utcnow()
+    if when == "upcoming":
+        rows = [r for r in rows
+                if r[0].starts_at >= now and r[0].status not in ("cancelled",)]
+    elif when == "past":
+        rows = [r for r in rows
+                if r[0].starts_at < now or r[0].status == "completed"]
+    elif when == "cancelled":
+        rows = [r for r in rows if r[0].status == "cancelled"]
     return [{
         "reference": f"BK-{j.id:05d}",
         "appointment_id": a.id,
@@ -321,6 +388,13 @@ def my_bookings(customer: Customer = Depends(require_customer),
         "provider_phone": p.phone if p else None,
         "service": (j.items_json or [{}])[0].get("name"),
         "price": float(j.total_amount or 0),
+        "currency": j.currency or settings.PAYMENT_CURRENCY,
+        "starts_at": a.starts_at,
+        "ends_at": a.ends_at,
+        "provider_website": p.website if p else None,
+        "address": None,
+        "notes": j.access_notes,
+        "payment_status": "unpaid",
     } for a, j, p in rows]
 
 
