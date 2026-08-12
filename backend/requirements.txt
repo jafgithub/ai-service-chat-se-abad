@@ -1,0 +1,30 @@
+
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+
+sqlalchemy==2.0.36
+pymysql==1.1.1
+cryptography==43.0.3
+
+
+pydantic==2.10.3
+pydantic-settings==2.6.1
+pydantic[email]
+
+openai==1.57.0
+httpx>=0.27,<0.29
+
+# Payments. Stripe's SDK is here mainly for Webhook.construct_event, which does
+# the signature verification; PayPal is called over httpx and needs no SDK.
+stripe==11.4.0
+
+
+sentence-transformers==3.3.1
+torch==2.5.1 
+
+
+# Headless Chrome, for the in-app store view at /v1/chat only. Needs its browser
+# downloaded separately (`playwright install chromium`), and the feature stays
+# off unless BROWSE_VIEW_ENABLED is set, so an install without it still runs.
+playwright==1.62.0
