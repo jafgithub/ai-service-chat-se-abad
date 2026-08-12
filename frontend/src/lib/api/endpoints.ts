@@ -171,16 +171,33 @@ export const servicesApi = {
 };
 
 /**
- * Payments, untouched.
+ * Payments.
  *
- * Phase G moves payment into the booking flow. Until then this is read only:
- * the review step asks which methods the server can actually take so it can say
- * how payment will work, and nothing here starts a checkout. The shop's
- * checkout took an `order_id`, and a booking creates a job rather than an
- * order, so wiring it up now would mean writing payment logic twice.
+ * The same two endpoints the shop uses, against the same provider code. A
+ * booking creates a job, and `order_id` here is that job's id, which is why
+ * nothing had to be written twice.
+ *
+ * There is no "mark as paid" call and there must never be one. The customer
+ * returning to a success page proves only that they returned to a success page;
+ * the provider's webhook is the only thing that may change a payment status.
  */
 export const paymentsApi = {
+  /** Which methods the server can actually take right now. */
   list: (signal?: AbortSignal) =>
     apiClient.get<{ enabled: boolean; providers: string[] }>(
       "/api/v1/payments/providers", signal),
+
+  /** Start a checkout and get the provider's own page to send the browser to. */
+  checkout: (
+    jobId: number,
+    provider: string,
+    successUrl: string,
+    cancelUrl: string,
+    signal?: AbortSignal
+  ) =>
+    apiClient.post<{ url: string; provider: string; provider_ref: string }>(
+      "/api/v1/payments/checkout",
+      { order_id: jobId, provider, success_url: successUrl, cancel_url: cancelUrl },
+      signal
+    ),
 };

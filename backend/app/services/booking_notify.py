@@ -59,6 +59,8 @@ def send_booking_emails(appointment_id: int) -> None:
         price = float(job.total_amount or 0)
         currency = job.currency or settings.PAYMENT_CURRENCY
         address = customer.address if customer else None
+        method = job.payment_method or "cod"
+        paid = job.payment_status == "paid"
 
         if customer and customer.email:
             try:
@@ -75,6 +77,8 @@ def send_booking_emails(appointment_id: int) -> None:
                     currency=currency,
                     address=address,
                     notes=job.access_notes,
+                    payment_method=method,
+                    paid=paid,
                 )
                 logger.info(f"[EMAIL] {reference} confirmation sent to the customer")
             except Exception as exc:  # noqa: BLE001 - best effort, already booked
@@ -109,6 +113,8 @@ def send_booking_emails(appointment_id: int) -> None:
                 currency=currency,
                 address=address,
                 notes=job.access_notes,
+                payment_method=method,
+                paid=paid,
             )
             logger.info(f"[EMAIL] {reference} notification sent to the provider")
         except Exception as exc:  # noqa: BLE001
@@ -116,6 +122,54 @@ def send_booking_emails(appointment_id: int) -> None:
 
     except Exception as exc:  # noqa: BLE001 - nothing here may reach the caller
         logger.exception(f"[EMAIL] booking emails for appointment {appointment_id} failed: {exc}")
+    finally:
+        db.close()
+
+
+def send_payment_receipt(appointment_id: int) -> None:
+    """The receipt, sent only when a provider's webhook confirms the money moved.
+
+    Never sent from the browser's return trip. A customer arriving back on a
+    success page proves only that they arrived back on a success page.
+    """
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(Appointment, Job)
+            .join(Job, Job.id == Appointment.job_id)
+            .filter(Appointment.id == appointment_id)
+            .first()
+        )
+        if row is None:
+            return
+
+        appointment, job = row
+        customer = db.query(Customer).filter(Customer.id == job.customer_id).first()
+        provider = db.query(Provider).filter(Provider.id == appointment.provider_id).first()
+        reference = _reference(job.id)
+
+        if not (customer and customer.email):
+            logger.warning(f"[EMAIL] {reference} paid, but there is no address to receipt")
+            return
+
+        try:
+            booking_emails.send_receipt(
+                to=customer.email,
+                customer_name=customer.name or "",
+                reference=reference,
+                service_name=_job_name(job),
+                provider_name=provider.business_name if provider else "Your provider",
+                starts_at=appointment.starts_at,
+                price=float(job.total_amount or 0),
+                currency=job.currency or settings.PAYMENT_CURRENCY,
+                method=job.payment_method or "",
+            )
+            logger.info(f"[EMAIL] {reference} receipt sent to the customer")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[EMAIL] {reference} receipt failed: {exc}")
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(f"[EMAIL] receipt for appointment {appointment_id} failed: {exc}")
     finally:
         db.close()
 

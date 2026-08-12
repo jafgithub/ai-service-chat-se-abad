@@ -27,6 +27,7 @@ interface BookingConfirmationProps {
 
 export function BookingConfirmation({ booking, onDone }: BookingConfirmationProps) {
   const paid = booking.payment_status === "paid";
+  const cash = booking.payment_status === "cod";
 
   return (
     <div className="text-center">
@@ -58,8 +59,14 @@ export function BookingConfirmation({ booking, onDone }: BookingConfirmationProp
         <Row label="Price" value={formatMoney(booking.price, booking.currency)} strong />
         <Row
           label="Payment"
-          value={paid ? "Paid" : "Not paid yet"}
-          sub={paid ? undefined : "Settle up with the provider for the work"}
+          value={paid ? "Paid" : cash ? "Cash on the day" : "Not paid yet"}
+          sub={
+            paid
+              ? undefined
+              : cash
+                ? "Settle up with the provider once the work is done"
+                : "You can pay from My bookings, or on the day"
+          }
         />
         {booking.address && <Row label="Address" value={booking.address} />}
       </dl>

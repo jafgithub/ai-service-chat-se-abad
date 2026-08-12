@@ -791,3 +791,150 @@ def test_no_booking_email_uses_a_banned_dash():
     for text in captured:
         assert "—" not in text, "em dash in a booking email"
         assert "–" not in text, "en dash in a booking email"
+
+
+# ── paying for a booking ─────────────────────────────────────────────────────
+
+def _book(client, db, headers, method="cod", price=95):
+    service = a_service(db, name=f"Paid job {method}")
+    provider = a_provider(db, f"Firm {method}", email=f"{method}@example.test")
+    offers(db, provider, service, price=price)
+    slot = LocalCalendar(db, provider.id).free_slots(service.id, 60, days_ahead=7)[0]
+    return client.post("/api/v1/booking/book", json={
+        "provider_id": provider.id, "service_id": service.id,
+        "starts_at": slot.starts_at.isoformat(), "payment_method": method,
+    }, headers=headers)
+
+
+def test_cash_owes_nothing_online(db, client):
+    res = _book(client, db, sign_in_customer(client, "cash@example.com"), "cod")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["payment_method"] == "cod"
+    assert body["payment_status"] == "cod"
+    assert body["payment_due"] is False, "cash must not send anybody to a payment page"
+
+
+def test_choosing_a_card_leaves_the_booking_unpaid_and_due(db, client):
+    """The slot is taken before the money, deliberately. Somebody who abandons a
+    card page still has a provider coming rather than nothing."""
+    res = _book(client, db, sign_in_customer(client, "card@example.com"), "stripe")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["payment_method"] == "stripe"
+    assert body["payment_status"] == "unpaid"
+    assert body["payment_due"] is True
+    assert body["status"] == "booked", "the appointment stands whatever the payment does"
+
+
+def test_a_made_up_payment_method_is_refused(db, client):
+    service = a_service(db)
+    provider = a_provider(db, "Whatever")
+    offers(db, provider, service)
+    headers = sign_in_customer(client, "madeup@example.com")
+    slot = LocalCalendar(db, provider.id).free_slots(service.id, 60, days_ahead=7)[0]
+
+    res = client.post("/api/v1/booking/book", json={
+        "provider_id": provider.id, "service_id": service.id,
+        "starts_at": slot.starts_at.isoformat(), "payment_method": "bank transfer",
+    }, headers=headers)
+    assert res.status_code == 422
+
+
+def test_a_cash_booking_cannot_start_a_checkout(db, client):
+    """It is settled with the provider, so there is nothing here to pay."""
+    booked = _book(client, db, sign_in_customer(client, "nocheckout@example.com"), "cod").json()
+
+    res = client.post("/api/v1/payments/checkout",
+                      json={"order_id": booked["job_id"], "provider": "stripe"})
+    assert res.status_code == 409
+    assert "cash" in res.json()["detail"].lower()
+
+
+def test_an_already_paid_booking_cannot_be_paid_again(db, client):
+    from app.models.job import Job
+
+    booked = _book(client, db, sign_in_customer(client, "twice@example.com"), "stripe").json()
+    job = db.query(Job).filter(Job.id == booked["job_id"]).first()
+    job.payment_status = "paid"
+    db.commit()
+
+    res = client.post("/api/v1/payments/checkout",
+                      json={"order_id": job.id, "provider": "stripe"})
+    assert res.status_code == 409, "paying twice would take the money twice"
+
+
+def test_a_scheduled_booking_may_still_start_a_checkout(db, client, monkeypatch):
+    """The guard that nearly blocked this: the shop refuses checkout unless the
+    job is "pending", and a booking is "scheduled" from the moment it is made,
+    because the slot is genuinely taken whether or not the money has arrived."""
+    from app.services import payments as payments_module
+
+    class FakeSession:
+        url = "https://example.test/pay/abc"
+        provider_ref = "sess_abc"
+
+    class FakeProvider:
+        name = "stripe"
+        def is_configured(self):
+            return True
+        def create_checkout(self, **kwargs):
+            return FakeSession()
+
+    monkeypatch.setattr(payments_module, "get", lambda name: FakeProvider())
+
+    booked = _book(client, db, sign_in_customer(client, "scheduled@example.com"), "stripe").json()
+    res = client.post("/api/v1/payments/checkout",
+                      json={"order_id": booked["job_id"], "provider": "stripe"})
+
+    assert res.status_code == 200, res.json()
+    assert res.json()["url"] == FakeSession.url
+
+
+def test_the_confirmation_email_says_how_it_will_be_paid(monkeypatch):
+    """Three different truths, and one line for all of them would be wrong twice.
+    Somebody paying by card who reads "you settle up with the provider" turns up
+    expecting to pay again."""
+    from app.services import booking_emails
+
+    seen = {}
+    monkeypatch.setattr(booking_emails, "_send",
+                        lambda to, subject, html: seen.update(html=html))
+
+    common = dict(
+        to="a@example.com", customer_name="Alex", reference="BK-1",
+        service_name="Leak found and fixed", provider_name="Quickfix Drains",
+        provider_phone="1", starts_at=datetime(2026, 8, 12, 17, 0),
+        duration_minutes=60, price=110.0, currency="USD", address="X", notes=None,
+    )
+
+    booking_emails.send_customer_confirmation(**common, payment_method="cod")
+    assert "settle up with Quickfix Drains" in seen["html"]
+
+    booking_emails.send_customer_confirmation(**common, payment_method="stripe")
+    assert "has not completed yet" in seen["html"]
+
+    booking_emails.send_customer_confirmation(**common, payment_method="stripe", paid=True)
+    assert "Paid in full" in seen["html"]
+    assert "settle up" not in seen["html"], "a paid booking must not ask for money again"
+
+
+def test_the_provider_is_told_whether_to_collect(monkeypatch):
+    from app.services import booking_emails
+
+    seen = {}
+    monkeypatch.setattr(booking_emails, "_send",
+                        lambda to, subject, html: seen.update(html=html))
+
+    common = dict(
+        to="firm@example.com", provider_name="Quickfix Drains", reference="BK-1",
+        service_name="Leak", customer_name="Alex", customer_email="a@example.com",
+        customer_phone="1", starts_at=datetime(2026, 8, 12, 17, 0),
+        duration_minutes=60, price=110.0, currency="USD", address="X", notes=None,
+    )
+
+    booking_emails.send_provider_notification(**common, payment_method="cod")
+    assert "Collect $110.00 on the day" in seen["html"]
+
+    booking_emails.send_provider_notification(**common, payment_method="stripe", paid=True)
+    assert "Do not collect anything" in seen["html"]

@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 
 import { paymentsApi } from "@/lib/api";
-import type { Account, ProviderOffer, ServiceResult, Slot } from "@/lib/api";
+import type { Account, PaymentMethod, ProviderOffer, ServiceResult, Slot } from "@/lib/api";
 import { formatDuration, formatWhen } from "@/lib/datetime";
 import { formatMoney } from "@/lib/service";
 import { Field } from "@/components/ui/Field";
+import { cn } from "@/lib/utils";
 
 /**
  * The last screen before anything is committed.
@@ -32,35 +33,47 @@ interface BookingReviewProps {
   onAddressChange: (value: string) => void;
   notes: string;
   onNotesChange: (value: string) => void;
+  method: PaymentMethod;
+  onMethodChange: (method: PaymentMethod) => void;
   /** Set when the booking attempt failed, so the reason sits with the button. */
   failure?: string;
 }
 
-const METHOD_NAMES: Record<string, string> = {
-  cod: "cash on the day",
-  stripe: "card",
-  paypal: "PayPal",
+/** How each method is described to somebody who has never heard of "stripe".
+ *  The same three the shop offers, worded for a visit rather than a delivery. */
+const METHODS: Record<PaymentMethod, { title: string; hint: string; icon: string }> = {
+  cod:    { title: "Cash on the day", hint: "Pay the provider when the work is done", icon: "💵" },
+  stripe: { title: "Card",            hint: "Also Apple Pay and Google Pay",          icon: "💳" },
+  paypal: { title: "PayPal",          hint: "Also Venmo",                             icon: "🅿️" },
 };
 
 export function BookingReview({
-  service, offer, slot, account, address, onAddressChange, notes, onNotesChange, failure,
+  service, offer, slot, account, address, onAddressChange, notes, onNotesChange,
+  method, onMethodChange, failure,
 }: BookingReviewProps) {
-  const [methods, setMethods] = useState<string[]>([]);
+  /* Cash is always offered: it needs no provider, and if the server has it
+     switched off the booking call says so rather than us guessing here. The
+     online ones depend on what is configured, so a deployment with no Stripe
+     keys simply does not show a card option instead of showing one that fails
+     at the last step. */
+  const [available, setAvailable] = useState<PaymentMethod[]>(["cod"]);
 
   useEffect(() => {
     let dropped = false;
     paymentsApi
       .list()
       .then(({ enabled, providers }) => {
-        if (!dropped && enabled) setMethods(providers);
+        if (dropped || !enabled) return;
+        const online = providers.filter(
+          (p): p is PaymentMethod => p === "stripe" || p === "paypal",
+        );
+        setAvailable(["cod", ...online]);
       })
-      // Silent: how payment will work is worth saying when we know, and not
-      // worth an error message when we do not.
+      // Silent: cash still works, and an error about payment methods on a
+      // screen that has not asked for money yet is noise.
       .catch(() => {});
     return () => { dropped = true; };
   }, []);
-
-  const online = methods.filter((m) => m !== "cod").map((m) => METHOD_NAMES[m] ?? m);
 
   return (
     <div className="space-y-4">
@@ -110,19 +123,55 @@ export function BookingReview({
 
       <section>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-          Payment
+          How you will pay
         </h3>
-        <div className="rounded-card border border-line bg-surface-sunken px-3 py-2.5">
-          <p className="text-sm text-ink">
-            Nothing is taken now. You settle up with {offer.business_name} for the
-            work itself.
-          </p>
-          {online.length > 0 && (
-            <p className="mt-1 text-xs text-ink-muted">
-              Paying by {online.join(" or ")} through this app is coming shortly.
-            </p>
-          )}
+
+        <div className="space-y-2">
+          {available.map((id) => {
+            const option = METHODS[id];
+            const chosen = method === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onMethodChange(id)}
+                aria-pressed={chosen}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-control border px-3 py-2.5 text-left transition-colors",
+                  chosen
+                    ? "border-brand-500 bg-brand-50"
+                    : "border-line bg-surface hover:bg-surface-hover"
+                )}
+              >
+                <span className="text-xl" aria-hidden>{option.icon}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-ink">{option.title}</span>
+                  <span className="block text-xs text-ink-muted">{option.hint}</span>
+                </span>
+                <span
+                  className={cn(
+                    "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border",
+                    chosen ? "border-brand-500 bg-brand-500 text-white" : "border-line-strong"
+                  )}
+                  aria-hidden
+                >
+                  {chosen && (
+                    <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" clipRule="evenodd"
+                            d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.3 3.3 6.8-6.8a1 1 0 0 1 1.4 0z" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
+
+        <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+          {method === "cod"
+            ? `Nothing is taken now. You settle up with ${offer.business_name} once the work is done.`
+            : "Your time is held either way. We will take you to their secure payment page next, and you can still pay on the day if you change your mind."}
+        </p>
       </section>
 
       {failure && (

@@ -169,6 +169,10 @@ class BookIn(BaseModel):
     notes: str = Field(default="", max_length=2000)
     #: The problem this booking answers, when the customer recorded one first.
     service_request_id: int | None = None
+    #: How they intend to pay. Cash is settled with the provider on the day and
+    #: needs nothing further; the other two send the customer to that provider's
+    #: own page, and the booking is held meanwhile.
+    payment_method: str = Field(default="cod", pattern="^(cod|stripe|paypal)$")
 
 
 class BookedOut(BaseModel):
@@ -199,9 +203,14 @@ class BookedOut(BaseModel):
 
     price: float
     currency: str
-    #: "unpaid" until payments are wired in. Never invented: a booking that has
-    #: not been paid for must not read as though it has.
+    #: What was chosen: cod, stripe or paypal.
+    payment_method: str = "cod"
+    #: "cod", "unpaid" or "paid". Never invented: only the payment provider's
+    #: own webhook may set this to paid, because a browser arriving back on a
+    #: success page proves nothing.
     payment_status: str = "unpaid"
+    #: True when the customer still has to be sent to a payment page.
+    payment_due: bool = False
 
     customer_id: int
     customer_name: str
@@ -317,6 +326,10 @@ def book(payload: BookIn,
         raise HTTPException(status_code=409, detail=str(exc))
 
     job.status = "scheduled"
+    job.payment_method = payload.payment_method
+    # Cash is settled with the provider, so there is nothing outstanding here.
+    # Anything else is unpaid until that provider's webhook says otherwise.
+    job.payment_status = "cod" if payload.payment_method == "cod" else "unpaid"
     job.appointment_date = appointment.starts_at.date()
     job.appointment_time = appointment.starts_at.strftime("%-I:%M %p")
     if request is not None:
@@ -351,7 +364,9 @@ def book(payload: BookIn,
         label=appointment.starts_at.strftime("%A %-d %B, %-I:%M %p"),
         price=price,
         currency=job.currency or settings.PAYMENT_CURRENCY,
-        payment_status="unpaid",
+        payment_method=job.payment_method,
+        payment_status=job.payment_status,
+        payment_due=job.payment_status == "unpaid",
         customer_id=customer.id,
         customer_name=customer.name or "",
         customer_email=customer.email,
@@ -404,7 +419,8 @@ def my_bookings(when: str = Query("all", pattern="^(all|upcoming|past|cancelled)
         "provider_website": p.website if p else None,
         "address": None,
         "notes": j.access_notes,
-        "payment_status": "unpaid",
+        "payment_method": j.payment_method or "cod",
+        "payment_status": j.payment_status or "unpaid",
     } for a, j, p in rows]
 
 

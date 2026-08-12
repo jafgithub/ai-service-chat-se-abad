@@ -227,7 +227,11 @@ def test_the_booking_response_carries_everything_a_confirmation_needs(client, db
                   "customer_email", "status"):
         assert field in body, f"the confirmation screen needs {field}"
     assert body["reference"].startswith("BK-")
-    assert body["payment_status"] == "unpaid", "never claim money has been taken"
+    # "cod" for a booking settled on the day, "unpaid" for one on its way to a
+    # payment page. Never "paid": only a provider's webhook may say that, and no
+    # money has moved at this point either way.
+    assert body["payment_status"] in ("cod", "unpaid"), "never claim money has been taken"
+    assert body["payment_method"] in ("cod", "stripe", "paypal")
 
 
 def test_the_response_reports_the_provider_s_terms_not_the_service_s(client, db):

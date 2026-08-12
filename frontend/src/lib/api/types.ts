@@ -201,6 +201,10 @@ export interface ServiceRequest {
   created_at: string;
 }
 
+/** Cash is settled with the provider on the day. The other two send the
+ *  customer to that provider's own page, and the booking is held meanwhile. */
+export type PaymentMethod = "cod" | "stripe" | "paypal";
+
 export interface BookIn {
   provider_id: number;
   service_id: number;
@@ -208,6 +212,7 @@ export interface BookIn {
   address?: string;
   notes?: string;
   service_request_id?: number | null;
+  payment_method?: PaymentMethod;
 }
 
 /** Everything the confirmation screen needs, so it makes no second call.
@@ -232,7 +237,12 @@ export interface Booked {
 
   price: number;
   currency: string;
+  payment_method: string;
+  /** "cod", "unpaid" or "paid". Only the payment provider's webhook may make
+   *  it "paid": coming back to a success page proves nothing. */
   payment_status: string;
+  /** True when the customer still has to be sent to a payment page. */
+  payment_due: boolean;
 
   customer_id: number;
   customer_name: string;
@@ -260,6 +270,7 @@ export interface BookingSummary {
   currency: string;
   address?: string | null;
   notes?: string | null;
+  payment_method?: string;
   payment_status: string;
 }
 

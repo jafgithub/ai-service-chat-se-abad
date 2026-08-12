@@ -55,6 +55,11 @@ class Job(Base):
     # also written into `notes`, which does sync. This column exists for the
     # admin page, where querying a real field beats parsing free text.
     payment_method = Column(String(20))
+    # Separate from `status`, which is the booking's own lifecycle. A visit can
+    # be scheduled and unpaid, scheduled and paid, or cancelled after being
+    # paid, and one column cannot say both. "cod" means it will be settled on
+    # the day, which is neither paid nor a debt we are chasing.
+    payment_status = Column(String(20), default="unpaid")
     created_at   = Column(DateTime, server_default=func.now())
 
     customer = relationship("Customer", back_populates="orders")

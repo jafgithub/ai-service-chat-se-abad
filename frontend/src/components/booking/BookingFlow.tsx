@@ -2,8 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 
-import { ApiError, bookingApi, providersApi, requestsApi } from "@/lib/api";
-import type { Booked, ProviderOffer, ServiceResult, Slot } from "@/lib/api";
+import { ApiError, bookingApi, paymentsApi, providersApi, requestsApi } from "@/lib/api";
+import type { Booked, PaymentMethod, ProviderOffer, ServiceResult, Slot } from "@/lib/api";
 import { useResource } from "@/hooks/useResource";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthPanel } from "@/components/auth/AuthPanel";
@@ -16,6 +16,10 @@ import { SlotPicker } from "./SlotPicker";
 import { BookingReview } from "./BookingReview";
 import { BookingConfirmation } from "./BookingConfirmation";
 import { formatWhen } from "@/lib/datetime";
+
+/** The deployment prefix, so a payment provider sends the browser back to this
+ *  application rather than to the shop that shares the host. */
+const BASE = "/plumber";
 
 /**
  * Service chosen, everything else to go.
@@ -71,6 +75,7 @@ export function BookingFlow({
   const [slot, setSlot] = useState<Slot | null>(null);
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("cod");
 
   const [requestId, setRequestId] = useState<number | null>(serviceRequestId ?? null);
   const [booking, setBooking] = useState<Booked | null>(null);
@@ -116,10 +121,43 @@ export function BookingFlow({
         address: address.trim() || undefined,
         notes: notes.trim() || undefined,
         service_request_id: attached ?? undefined,
+        payment_method: method,
       });
+      onBooked?.(result);
+
+      /* Paying online means leaving this site, so the appointment is made
+         first and the payment page comes after. Deliberately that way round:
+         the slot is genuinely taken either way, and somebody who abandons a
+         card page still has a plumber coming rather than nothing. */
+      if (result.payment_due) {
+        const back = `${window.location.origin}${BASE}/bookings`;
+        try {
+          const { url } = await paymentsApi.checkout(
+            result.job_id,
+            method,
+            `${back}?paid=${result.job_id}`,
+            `${back}?payment_cancelled=${result.job_id}`,
+          );
+          // Everything in React is about to be discarded by a full navigation,
+          // and that is fine: the booking is already on the server and shows up
+          // under My bookings whether or not they come back.
+          window.location.assign(url);
+          return;
+        } catch (err) {
+          // The booking stands. Say so, and let them pay from My bookings.
+          setBooking({ ...result, payment_status: "unpaid" });
+          setStep("done");
+          setFailure(
+            err instanceof ApiError
+              ? `Booked, but we could not open the payment page: ${err.detail}`
+              : "Booked, but we could not reach the payment page."
+          );
+          return;
+        }
+      }
+
       setBooking(result);
       setStep("done");
-      onBooked?.(result);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
@@ -140,13 +178,18 @@ export function BookingFlow({
       placingRef.current = false;
       setPlacing(false);
     }
-  }, [offer, slot, service.id, address, notes, ensureRequest, onBooked]);
+  }, [offer, slot, service.id, address, notes, method, ensureRequest, onBooked]);
 
   // ── each step ──────────────────────────────────────────────────────────────
 
   if (step === "done" && booking) {
     return (
       <Sheet title="Booked" onClose={onClose}>
+        {failure && (
+          <p role="alert" className="mb-3 rounded-control border border-warn/30 bg-warn-soft px-3 py-2 text-sm text-warn">
+            {failure}
+          </p>
+        )}
         <BookingConfirmation booking={booking} onDone={onClose} />
       </Sheet>
     );
@@ -163,7 +206,9 @@ export function BookingFlow({
         footer={
           signedIn ? (
             <Button onClick={confirm} disabled={placing} size="lg" className="w-full">
-              {placing ? "Booking…" : "Book appointment"}
+              {placing
+                ? (method === "cod" ? "Booking…" : "Taking you to pay…")
+                : (method === "cod" ? "Book appointment" : "Book and pay")}
             </Button>
           ) : undefined
         }
@@ -178,6 +223,8 @@ export function BookingFlow({
             onAddressChange={setAddress}
             notes={notes}
             onNotesChange={setNotes}
+            method={method}
+            onMethodChange={setMethod}
             failure={failure}
           />
         ) : status === "loading" ? (

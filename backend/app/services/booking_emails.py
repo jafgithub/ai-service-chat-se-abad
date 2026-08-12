@@ -110,9 +110,24 @@ def send_customer_confirmation(
     currency: str,
     address: str | None,
     notes: str | None,
+    payment_method: str = "cod",
+    paid: bool = False,
 ) -> None:
     """What the customer keeps. The reference and the time carry the message."""
     when = _when(starts_at)
+
+    # Says what is actually true of this booking rather than one line for all
+    # three cases. Somebody paying by card who reads "you settle up with the
+    # provider" will turn up expecting to pay twice.
+    if paid:
+        payment_line = f"Paid in full, {_money(price, currency)}. Nothing to settle on the day."
+    elif payment_method == "cod":
+        payment_line = (f"Nothing has been charged. You settle up with {provider_name} "
+                        f"for the work itself, {_money(price, currency)}.")
+    else:
+        method_name = "card" if payment_method == "stripe" else "PayPal"
+        payment_line = (f"Payment by {method_name} has not completed yet. You can pay from "
+                        f"My bookings, or settle up with {provider_name} on the day.")
 
     body = f"""
         <p style="margin:0 0 18px;font-size:15px;line-height:1.55">
@@ -139,7 +154,7 @@ def send_customer_confirmation(
         </table>
 
         <p style="margin:20px 0 0;font-size:14px;line-height:1.55;color:#6b7280">
-          Nothing has been charged. You settle up with {provider_name} for the work itself.
+          {payment_line}
         </p>
         <p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#6b7280">
           Need to change or cancel it? Sign in and open My bookings, or ring them on the
@@ -166,9 +181,24 @@ def send_provider_notification(
     currency: str,
     address: str | None,
     notes: str | None,
+    payment_method: str = "cod",
+    paid: bool = False,
 ) -> None:
     """What the provider needs in order to turn up: where, when, and who to ring."""
     when = _when(starts_at)
+
+    # Whether to ask for money at the door is the one operational fact a
+    # provider needs from this email, so it is stated rather than implied.
+    if paid:
+        collect_line = (f"<strong>Already paid online, {_money(price, currency)}. "
+                        "Do not collect anything.</strong>")
+    elif payment_method == "cod":
+        collect_line = (f"<strong>Collect {_money(price, currency)} on the day.</strong> "
+                        "Nothing has been paid through us.")
+    else:
+        method_name = "card" if payment_method == "stripe" else "PayPal"
+        collect_line = (f"They chose to pay by {method_name} and it has not completed yet. "
+                        f"If it has not by the time you attend, collect {_money(price, currency)}.")
 
     # The address is the one thing that decides whether this job can happen, so
     # it is called out rather than sitting in the middle of a table.
@@ -205,13 +235,64 @@ def send_provider_notification(
         </table>
 
         <p style="margin:20px 0 0;font-size:14px;line-height:1.55;color:#6b7280">
-          This time is already blocked out in your diary. Nothing has been paid through
-          us, so take payment for the work as you normally would.
+          This time is already blocked out in your diary. {collect_line}
         </p>"""
 
     _send(to, f"New booking: {service_name}, {when} ({reference})",
           _shell("New booking", f"{reference} · {when}", body,
                  f"{BRAND} · sent because a customer booked one of your times"))
+
+
+def send_receipt(
+    *,
+    to: str,
+    customer_name: str,
+    reference: str,
+    service_name: str,
+    provider_name: str,
+    starts_at: datetime,
+    price: float,
+    currency: str,
+    method: str,
+) -> None:
+    """Sent only when a payment provider says the money moved.
+
+    Never sent optimistically. The customer's browser coming back to a success
+    page proves nothing, so this is triggered by the webhook and by nothing
+    else.
+    """
+    when = _when(starts_at)
+    method_name = {"stripe": "card", "paypal": "PayPal"}.get(method, method)
+
+    body = f"""
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.55">
+          Hi <strong>{customer_name or "there"}</strong>, your payment has gone through.
+          Nothing else to do: <strong>{provider_name}</strong> will see you on
+          <strong>{when}</strong>.
+        </p>
+
+        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;
+                    padding:16px;margin:0 0 20px;text-align:center">
+          <span style="color:#065f46;font-size:12px;letter-spacing:1px">PAID BY {method_name.upper()}</span><br>
+          <strong style="color:#065f46;font-size:22px">{_money(price, currency)}</strong>
+        </div>
+
+        <table style="width:100%;border-collapse:collapse">
+          {_row("Reference", reference)}
+          {_row("Service", service_name)}
+          {_row("Provider", provider_name)}
+          {_row("When", when, strong=True)}
+          {_row("Paid", _money(price, currency), strong=True)}
+          {_row("Method", method_name)}
+        </table>
+
+        <p style="margin:20px 0 0;font-size:14px;line-height:1.55;color:#6b7280">
+          Keep this as your receipt. Quote {reference} if you need to change anything.
+        </p>"""
+
+    _send(to, f"Receipt: {_money(price, currency)} for {service_name} ({reference})",
+          _shell("Payment received", f"{reference} · {when}", body,
+                 f"{BRAND} · this is your receipt"))
 
 
 def send_cancellation(

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { ApiError, bookingApi } from "@/lib/api";
+import { ApiError, bookingApi, paymentsApi } from "@/lib/api";
 import type { BookingSummary } from "@/lib/api";
 import { useResource } from "@/hooks/useResource";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -31,10 +31,48 @@ const TABS: { id: Tab; label: string }[] = [
  * server. Filtering here would also quietly redefine "cancelled", which is a
  * status rather than a date.
  */
+/**
+ * Coming back from Stripe or PayPal.
+ *
+ * Read once, after mount, and taken straight back out of the address bar so a
+ * refresh or a shared link cannot replay it. Deliberately says the payment is
+ * "being confirmed" rather than "paid": the browser arriving here proves only
+ * that the browser arrived here, and the row below shows the real status the
+ * moment the provider's webhook lands.
+ */
+const NOTHING = { paid: false, cancelled: false };
+
+function useReturnFromPayment(): { paid: boolean; cancelled: boolean } {
+  // Read during the first render rather than in an effect, and remembered, so
+  // there is no second render pass and no state written from a side effect.
+  // A lazy initializer is safe here because it only runs in the browser: the
+  // page is a client component and this hook is not reached during the static
+  // prerender.
+  const [state] = useState(() => {
+    if (typeof window === "undefined") return NOTHING;
+    const params = new URLSearchParams(window.location.search);
+    const paid = params.has("paid");
+    const cancelled = params.has("payment_cancelled");
+    if (!paid && !cancelled) return NOTHING;
+
+    // Taken straight back out, so a refresh or a shared link cannot replay it.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("paid");
+    url.searchParams.delete("payment_cancelled");
+    window.history.replaceState({}, "", url.toString());
+
+    return { paid, cancelled };
+  });
+
+  return state;
+}
+
 export default function BookingsPage() {
   const { status, expired } = useAuth();
+  const returned = useReturnFromPayment();
   const [tab, setTab] = useState<Tab>("upcoming");
   const [cancelling, setCancelling] = useState<number | null>(null);
+  const [paying, setPaying] = useState<number | null>(null);
   // A cancellation that failed. Kept apart from the load failure, because one
   // means "we could not show your bookings" and the other means "your booking
   // is still on", and they must not read the same.
@@ -45,6 +83,31 @@ export default function BookingsPage() {
     [tab],
     { enabled: status === "signed-in" }
   );
+
+  /** Pay for one that was booked without paying, or where the card page was
+   *  abandoned. The same checkout the booking flow uses. */
+  const pay = async (row: BookingSummary) => {
+    if (paying) return;
+    setPaying(row.job_id);
+    setActionFailure("");
+    try {
+      const back = `${window.location.origin}/plumber/bookings`;
+      const provider = row.payment_method === "paypal" ? "paypal" : "stripe";
+      const checkout = await paymentsApi.checkout(
+        row.job_id, provider,
+        `${back}?paid=${row.job_id}`,
+        `${back}?payment_cancelled=${row.job_id}`,
+      );
+      window.location.assign(checkout.url);
+    } catch (err) {
+      setActionFailure(
+        err instanceof ApiError
+          ? `${err.detail} Your booking is unaffected.`
+          : "We could not reach the payment page. Your booking is unaffected."
+      );
+      setPaying(null);
+    }
+  };
 
   const cancel = async (row: BookingSummary) => {
     if (cancelling) return;
@@ -109,6 +172,20 @@ export default function BookingsPage() {
         ))}
       </div>
 
+      {returned.paid && (
+        <p role="status" className="mb-3 rounded-control border border-positive/30 bg-positive-soft px-3 py-2.5 text-sm text-positive">
+          Thanks. Your payment is being confirmed, and the booking below updates
+          as soon as it is. Your appointment was already held either way.
+        </p>
+      )}
+      {returned.cancelled && (
+        <p role="status" className="mb-3 rounded-control border border-warn/30 bg-warn-soft px-3 py-2.5 text-sm text-warn">
+          That payment was not completed and you have not been charged. Your
+          appointment still stands: pay below whenever you like, or settle up
+          with the provider on the day.
+        </p>
+      )}
+
       {actionFailure && (
         <p role="alert" className="mb-3 rounded-control border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
           {actionFailure}
@@ -151,8 +228,13 @@ export default function BookingsPage() {
 
                 <div className="flex-shrink-0 text-right">
                   <p className="text-sm font-bold text-ink">{formatMoney(row.price, row.currency)}</p>
-                  <p className="text-[11px] text-ink-faint">
-                    {row.payment_status === "paid" ? "Paid" : "Not paid yet"}
+                  <p className={cn(
+                    "text-[11px]",
+                    row.payment_status === "paid" ? "font-semibold text-positive" : "text-ink-faint"
+                  )}>
+                    {row.payment_status === "paid"
+                      ? "Paid"
+                      : row.payment_status === "cod" ? "Cash on the day" : "Not paid yet"}
                   </p>
                 </div>
               </div>
@@ -179,6 +261,14 @@ export default function BookingsPage() {
                 )}
                 {/* Only shown where the backend would actually allow it. An
                     action that always fails is worse than no action. */}
+                {/* Only where there is genuinely something to pay. A cash
+                    booking has nothing outstanding here, and a paid one must
+                    never be offered a second chance to pay. */}
+                {row.payment_status === "unpaid" && row.status !== "cancelled" && (
+                  <Button size="sm" onClick={() => pay(row)} disabled={paying === row.job_id}>
+                    {paying === row.job_id ? "Opening…" : `Pay ${formatMoney(row.price, row.currency)}`}
+                  </Button>
+                )}
                 {row.status !== "cancelled" && row.status !== "completed" && (
                   <Button
                     size="sm"
