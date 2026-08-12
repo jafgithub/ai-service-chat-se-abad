@@ -92,115 +92,6 @@ def for_service(service_id: int, db: Session = Depends(get_db)):
     )
 
 
-class ProviderDetailOut(BaseModel):
-    id: int
-    business_name: str
-    contact_name: str | None = None
-    description: str | None = None
-    website: str | None = None
-    phone: str | None = None
-    email: str | None = None
-    city: str | None = None
-    postcode: str | None = None
-    status: str
-    services: list[dict]
-
-
-@router.get("/{provider_id}", response_model=ProviderDetailOut,
-            summary="One provider, and what they offer")
-def provider_detail(provider_id: int, db: Session = Depends(get_db)):
-    provider = db.query(Provider).filter(Provider.id == provider_id).first()
-    if provider is None or provider.status != "active":
-        # Same answer for missing and not-yet-approved, so the endpoint is not a
-        # way to enumerate pending applications.
-        raise HTTPException(status_code=404, detail="No such provider.")
-
-    rows = (
-        db.query(ProviderService, Service)
-        .join(Service, Service.id == ProviderService.service_id)
-        .filter(ProviderService.provider_id == provider.id,
-                ProviderService.active.is_(True))
-        .all()
-    )
-    return ProviderDetailOut(
-        id=provider.id,
-        business_name=provider.business_name,
-        contact_name=provider.contact_name,
-        description=provider.description,
-        website=provider.website,
-        phone=provider.phone,
-        email=provider.email,
-        city=provider.city,
-        postcode=provider.postcode,
-        status=provider.status,
-        services=[{
-            "provider_service_id": ps.id,
-            "service_id": service.id,
-            "name": service.name,
-            "price": float(ps.price) if ps.price is not None else float(service.price or 0),
-            "duration_minutes": ps.duration_minutes or service.duration_minutes or 60,
-            "notes": ps.notes,
-        } for ps, service in rows],
-    )
-
-
-class AvailabilityOut(BaseModel):
-    provider_id: int
-    service_id: int
-    duration_minutes: int
-    slots: list[dict]
-
-
-@router.get("/{provider_id}/availability", response_model=AvailabilityOut,
-            summary="When this provider could attend")
-def provider_availability(
-    provider_id: int,
-    service_id: int = Query(..., ge=1),
-    days_ahead: int = Query(0, ge=0, le=60),
-    db: Session = Depends(get_db),
-):
-    provider = db.query(Provider).filter(Provider.id == provider_id).first()
-    if provider is None or provider.status != "active":
-        raise HTTPException(status_code=404, detail="No such provider.")
-
-    service = db.query(Service).filter(Service.id == service_id).first()
-    if service is None:
-        raise HTTPException(status_code=404, detail="We do not know that service.")
-
-    offering = (
-        db.query(ProviderService)
-        .filter(ProviderService.provider_id == provider_id,
-                ProviderService.service_id == service_id,
-                ProviderService.active.is_(True))
-        .first()
-    )
-    if offering is None:
-        raise HTTPException(status_code=404,
-                            detail="That provider does not offer that service.")
-
-    booking_service.release_expired(db)
-    duration = int(offering.duration_minutes or service.duration_minutes or 60)
-
-    try:
-        slots = booking_service.available_slots(
-            db, service, provider_id, duration_minutes=duration,
-            days_ahead=days_ahead or settings.BOOKING_DAYS_AHEAD,
-        )
-    except booking_service.BookingError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-
-    return AvailabilityOut(
-        provider_id=provider_id,
-        service_id=service_id,
-        duration_minutes=duration,
-        slots=[{
-            "starts_at": s.starts_at,
-            "ends_at": s.ends_at,
-            "label": s.label,
-        } for s in slots],
-    )
-
-
 # ── a provider managing themselves ───────────────────────────────────────────
 
 class ProfileIn(BaseModel):
@@ -468,3 +359,122 @@ def list_providers(status_filter: str | None = Query(default=None, alias="status
         "id": p.id, "business_name": p.business_name, "email": p.email,
         "city": p.city, "status": p.status, "created_at": p.created_at,
     } for p in query.order_by(Provider.id.desc()).limit(200).all()]
+
+
+# ── looking up one provider by id ────────────────────────────────────────────
+#
+# These live at the bottom on purpose. FastAPI matches routes in the order they
+# are declared, and `/{provider_id}/availability` happily matches
+# `/me/availability`: it takes "me" as the id, fails to parse it as an integer,
+# and answers 422. That is exactly what was happening, so a provider could never
+# read their own working week while the page that showed it looked broken for a
+# reason nobody could see. Anything with a literal first segment has to be
+# declared before the parameterised form that could swallow it.
+
+class ProviderDetailOut(BaseModel):
+    id: int
+    business_name: str
+    contact_name: str | None = None
+    description: str | None = None
+    website: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    city: str | None = None
+    postcode: str | None = None
+    status: str
+    services: list[dict]
+
+
+@router.get("/{provider_id}", response_model=ProviderDetailOut,
+            summary="One provider, and what they offer")
+def provider_detail(provider_id: int, db: Session = Depends(get_db)):
+    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if provider is None or provider.status != "active":
+        # Same answer for missing and not-yet-approved, so the endpoint is not a
+        # way to enumerate pending applications.
+        raise HTTPException(status_code=404, detail="No such provider.")
+
+    rows = (
+        db.query(ProviderService, Service)
+        .join(Service, Service.id == ProviderService.service_id)
+        .filter(ProviderService.provider_id == provider.id,
+                ProviderService.active.is_(True))
+        .all()
+    )
+    return ProviderDetailOut(
+        id=provider.id,
+        business_name=provider.business_name,
+        contact_name=provider.contact_name,
+        description=provider.description,
+        website=provider.website,
+        phone=provider.phone,
+        email=provider.email,
+        city=provider.city,
+        postcode=provider.postcode,
+        status=provider.status,
+        services=[{
+            "provider_service_id": ps.id,
+            "service_id": service.id,
+            "name": service.name,
+            "price": float(ps.price) if ps.price is not None else float(service.price or 0),
+            "duration_minutes": ps.duration_minutes or service.duration_minutes or 60,
+            "notes": ps.notes,
+        } for ps, service in rows],
+    )
+
+
+class AvailabilityOut(BaseModel):
+    provider_id: int
+    service_id: int
+    duration_minutes: int
+    slots: list[dict]
+
+
+@router.get("/{provider_id}/availability", response_model=AvailabilityOut,
+            summary="When this provider could attend")
+def provider_availability(
+    provider_id: int,
+    service_id: int = Query(..., ge=1),
+    days_ahead: int = Query(0, ge=0, le=60),
+    db: Session = Depends(get_db),
+):
+    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if provider is None or provider.status != "active":
+        raise HTTPException(status_code=404, detail="No such provider.")
+
+    service = db.query(Service).filter(Service.id == service_id).first()
+    if service is None:
+        raise HTTPException(status_code=404, detail="We do not know that service.")
+
+    offering = (
+        db.query(ProviderService)
+        .filter(ProviderService.provider_id == provider_id,
+                ProviderService.service_id == service_id,
+                ProviderService.active.is_(True))
+        .first()
+    )
+    if offering is None:
+        raise HTTPException(status_code=404,
+                            detail="That provider does not offer that service.")
+
+    booking_service.release_expired(db)
+    duration = int(offering.duration_minutes or service.duration_minutes or 60)
+
+    try:
+        slots = booking_service.available_slots(
+            db, service, provider_id, duration_minutes=duration,
+            days_ahead=days_ahead or settings.BOOKING_DAYS_AHEAD,
+        )
+    except booking_service.BookingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    return AvailabilityOut(
+        provider_id=provider_id,
+        service_id=service_id,
+        duration_minutes=duration,
+        slots=[{
+            "starts_at": s.starts_at,
+            "ends_at": s.ends_at,
+            "label": s.label,
+        } for s in slots],
+    )

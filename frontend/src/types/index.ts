@@ -1,4 +1,4 @@
-export interface ProductCategory {
+export interface ServiceCategory {
   id: string;
   title: string;
   description: string;
@@ -12,20 +12,6 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-}
-
-export interface OrderDetails {
-  name: string;
-  phone: string;
-  email: string;
-  items: OrderItem[];
-  category?: string;
-}
-
-export interface OrderItem {
-  product: string;
-  quantity: number;
-  unit: string;
 }
 
 export interface Step {

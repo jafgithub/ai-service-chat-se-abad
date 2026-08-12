@@ -1,38 +1,30 @@
-import { apiClient, apiBase } from "./client";
+import { apiClient } from "./client";
 import type {
-  AdoptResponse,
-  ExternalProduct,
-  ProductDetail,
-  BrowseStore,
+  Account,
+  Availability,
+  Booked,
+  BookIn,
+  BookingSummary,
   ChatRequest,
   ChatResponse,
-  CartOut,
+  CustomerRegisterIn,
+  Discovery,
+  MyServiceRow,
+  ProviderAppointment,
+  ProviderDetail,
+  ProviderProfile,
+  ProviderRegisterIn,
+  Service,
+  ServiceRequest,
+  ServiceRequestIn,
+  TokenOut,
   VoiceResponse,
-  PlaceOrderRequest,
-  PlaceOrderResponse,
-  Product,
+  WorkingDay,
 } from "./types";
 
 export const chatApi = {
   send: (payload: ChatRequest, signal?: AbortSignal) =>
     apiClient.post<ChatResponse>("/api/v1/chat", payload, signal),
-};
-
-export const cartApi = {
-  get: (sessionId: string, signal?: AbortSignal) =>
-    apiClient.get<CartOut>(`/api/v1/cart?session_id=${encodeURIComponent(sessionId)}`, signal),
-
-  add: (sessionId: string, itemId: number, quantity = 1, signal?: AbortSignal) =>
-    apiClient.post<CartOut>("/api/v1/cart/items", { session_id: sessionId, item_id: itemId, quantity }, signal),
-
-  setQuantity: (sessionId: string, itemId: number, quantity: number, signal?: AbortSignal) =>
-    apiClient.patch<CartOut>(`/api/v1/cart/items/${itemId}?session_id=${encodeURIComponent(sessionId)}`, { quantity }, signal),
-
-  remove: (sessionId: string, itemId: number, signal?: AbortSignal) =>
-    apiClient.del<CartOut>(`/api/v1/cart/items/${itemId}?session_id=${encodeURIComponent(sessionId)}`, signal),
-
-  clear: (sessionId: string, signal?: AbortSignal) =>
-    apiClient.del<CartOut>(`/api/v1/cart?session_id=${encodeURIComponent(sessionId)}`, signal),
 };
 
 export const voiceApi = {
@@ -55,92 +47,140 @@ export const voiceApi = {
   },
 };
 
-export const shoppingApi = {
-  /** Whether off-catalog search is switched on at all. */
-  status: (signal?: AbortSignal) =>
-    apiClient.get<{ enabled: boolean; provider: string | null; sample: boolean }>(
-      "/api/v1/shopping/status", signal),
+// ── signing in ───────────────────────────────────────────────────────────────
 
-  search: (q: string, signal?: AbortSignal) =>
-    apiClient.get<ExternalProduct[]>(`/api/v1/shopping/search?q=${encodeURIComponent(q)}`, signal),
+export const authApi = {
+  registerCustomer: (payload: CustomerRegisterIn, signal?: AbortSignal) =>
+    apiClient.postAnonymous<TokenOut>("/api/v1/auth/register/customer", payload, signal),
 
-  /** One product with every store selling it. Costs a provider search the
-   *  first time a product is opened, and nothing after. */
-  product: (sourceId: string, signal?: AbortSignal) =>
-    apiClient.get<ProductDetail>(
-      `/api/v1/shopping/product/${encodeURIComponent(sourceId)}`, signal),
+  registerProvider: (payload: ProviderRegisterIn, signal?: AbortSignal) =>
+    apiClient.postAnonymous<TokenOut>("/api/v1/auth/register/provider", payload, signal),
 
-  /** The retailer's own page, rendered on our server so it can be framed.
-   *
-   *  A URL rather than a fetch: the iframe loads it. Used only by the browser
-   *  view at /v1/chat; the ordinary chat never calls it. */
-  browseUrl: (vendorUrl: string, frameWidth?: number) =>
-    `${apiBase}/api/v1/browse/page?u=${encodeURIComponent(vendorUrl)}` +
-    // The width decides which layout the store is asked for. Squeezing a
-    // desktop page into a phone keeps the four-across product grid and makes
-    // every card unreadable.
-    (frameWidth ? `&w=${Math.round(frameWidth)}` : ""),
+  login: (email: string, password: string, signal?: AbortSignal) =>
+    apiClient.postAnonymous<TokenOut>("/api/v1/auth/login", { email, password }, signal),
 
-  /** The stores a shopper can browse from inside the app, with each one's
-   *  search already pointed at their words. */
-  stores: (q: string, signal?: AbortSignal) =>
-    apiClient.get<BrowseStore[]>(
-      `/api/v1/browse/stores?q=${encodeURIComponent(q)}`, signal),
+  logout: (signal?: AbortSignal) =>
+    apiClient.post<{ status: string }>("/api/v1/auth/logout", {}, signal),
 
-  /** Bring an external product into the catalog and put it in the cart. */
-  adopt: (
-    sessionId: string,
-    product: ExternalProduct,
-    query: string,
+  me: (signal?: AbortSignal) => apiClient.get<Account>("/api/v1/auth/me", signal),
+};
+
+// ── finding somebody who can do it ───────────────────────────────────────────
+
+export const providersApi = {
+  /** Open: choosing who to call should not need an account. */
+  forService: (serviceId: number, signal?: AbortSignal) =>
+    apiClient.get<Discovery>(`/api/v1/providers/for-service/${serviceId}`, signal),
+
+  detail: (providerId: number, signal?: AbortSignal) =>
+    apiClient.get<ProviderDetail>(`/api/v1/providers/${providerId}`, signal),
+
+  /** The backend is the source of truth for what is free. Nothing about
+   *  availability is worked out in the browser. */
+  availability: (providerId: number, serviceId: number, daysAhead?: number, signal?: AbortSignal) =>
+    apiClient.get<Availability>(
+      `/api/v1/providers/${providerId}/availability?service_id=${serviceId}` +
+        (daysAhead ? `&days_ahead=${daysAhead}` : ""),
+      signal
+    ),
+};
+
+// ── the customer's own things ────────────────────────────────────────────────
+
+export const requestsApi = {
+  create: (payload: ServiceRequestIn, signal?: AbortSignal) =>
+    apiClient.post<ServiceRequest>("/api/v1/requests", payload, signal),
+
+  mine: (signal?: AbortSignal) =>
+    apiClient.get<ServiceRequest[]>("/api/v1/requests", signal),
+
+  close: (id: number, outcomeNote = "", signal?: AbortSignal) =>
+    apiClient.post<ServiceRequest>(`/api/v1/requests/${id}/close`,
+      { outcome_note: outcomeNote }, signal),
+};
+
+export const bookingApi = {
+  book: (payload: BookIn, signal?: AbortSignal) =>
+    apiClient.post<Booked>("/api/v1/booking/book", payload, signal),
+
+  mine: (when: "all" | "upcoming" | "past" | "cancelled" = "all", signal?: AbortSignal) =>
+    apiClient.get<BookingSummary[]>(`/api/v1/booking/mine?when=${when}`, signal),
+
+  cancel: (appointmentId: number, signal?: AbortSignal) =>
+    apiClient.post<{ status: string; reference: string }>(
+      `/api/v1/booking/${appointmentId}/cancel`, {}, signal),
+};
+
+// ── a provider running their own business ────────────────────────────────────
+// Every one of these reads the provider from the token, so none of them takes
+// an id. There is nothing here for one business to point at another's.
+
+export const providerMeApi = {
+  profile: (signal?: AbortSignal) =>
+    apiClient.get<ProviderProfile>("/api/v1/providers/me/profile", signal),
+
+  saveProfile: (payload: Partial<ProviderProfile>, signal?: AbortSignal) =>
+    apiClient.patch<{ status: string; provider_status: string }>(
+      "/api/v1/providers/me/profile", payload, signal),
+
+  services: (signal?: AbortSignal) =>
+    apiClient.get<MyServiceRow[]>("/api/v1/providers/me/services", signal),
+
+  saveService: (
+    payload: { service_id: number; price?: number | null; duration_minutes?: number | null; notes?: string | null; active?: boolean },
     signal?: AbortSignal
   ) =>
-    apiClient.post<AdoptResponse>(
-      "/api/v1/shopping/adopt",
-      { session_id: sessionId, product, query },
-      signal
-    ),
+    apiClient.put<{ provider_service_id: number; status: string }>(
+      "/api/v1/providers/me/services", payload, signal),
+
+  withdrawService: (providerServiceId: number, signal?: AbortSignal) =>
+    apiClient.del<{ status: string }>(
+      `/api/v1/providers/me/services/${providerServiceId}`, signal),
+
+  hours: (signal?: AbortSignal) =>
+    apiClient.get<WorkingDay[]>("/api/v1/providers/me/availability", signal),
+
+  saveHours: (weekday: number, opensAt: string, closesAt: string, signal?: AbortSignal) =>
+    apiClient.put<{ status: string }>("/api/v1/providers/me/availability",
+      { weekday, opens_at: opensAt, closes_at: closesAt }, signal),
+
+  closeDay: (weekday: number, signal?: AbortSignal) =>
+    apiClient.del<{ status: string }>(
+      `/api/v1/providers/me/availability/${weekday}`, signal),
+
+  addTimeOff: (startsAt: string, endsAt: string, reason: string, signal?: AbortSignal) =>
+    apiClient.post<{ id: number; status: string }>("/api/v1/providers/me/time-off",
+      { starts_at: startsAt, ends_at: endsAt, reason: reason || null }, signal),
+
+  appointments: (upcomingOnly: boolean, signal?: AbortSignal) =>
+    apiClient.get<ProviderAppointment[]>(
+      `/api/v1/providers/me/appointments?upcoming_only=${upcomingOnly}`, signal),
 };
 
-export const paymentsApi = {
-  /** Which methods the server can actually take money with right now. */
-  list: (signal?: AbortSignal) =>
-    apiClient.get<{ enabled: boolean; providers: string[] }>("/api/v1/payments/providers", signal),
+// ── the catalogue of services ────────────────────────────────────────────────
 
-  /** Start a checkout and get the provider's hosted page to redirect to. */
-  checkout: (orderId: number, provider: string, signal?: AbortSignal) =>
-    apiClient.post<{ url: string; provider: string; provider_ref: string }>(
-      "/api/v1/payments/checkout",
-      { order_id: orderId, provider },
-      signal
-    ),
-};
-
-export const ordersApi = {
-  place: (payload: PlaceOrderRequest, signal?: AbortSignal) =>
-    apiClient.post<PlaceOrderResponse>("/api/v1/orders", payload, signal),
-
-  /**
-   * Fetch an order the shopper already placed, by the idempotency key their
-   * browser generated for it. Used on the way back from a payment provider,
-   * where the URL carries the order id but the page has lost everything else.
-   */
-  byKey: (idempotencyKey: string, signal?: AbortSignal) =>
-    apiClient.get<PlaceOrderResponse>(
-      `/api/v1/orders/by-key/${encodeURIComponent(idempotencyKey)}`,
-      signal
-    ),
-};
-
-export const productsApi = {
+export const servicesApi = {
+  /** Everything the platform knows how to book. Used by provider registration,
+   *  where a business ticks what it does. */
   list: (category?: string, signal?: AbortSignal) => {
     const path = category
-      ? `/api/v1/products?category=${encodeURIComponent(category)}`
-      : "/api/v1/products";
-    return apiClient.get<Product[]>(path, signal);
+      ? `/api/v1/services?category=${encodeURIComponent(category)}`
+      : "/api/v1/services";
+    return apiClient.get<Service[]>(path, signal);
   },
 };
 
-export const partnersApi = {
-  submit: (payload: { name: string; email: string; phone?: string; address?: string }) =>
-    apiClient.post<{ id: number; message: string }>("/api/v1/partners", payload),
+/**
+ * Payments, untouched.
+ *
+ * Phase G moves payment into the booking flow. Until then this is read only:
+ * the review step asks which methods the server can actually take so it can say
+ * how payment will work, and nothing here starts a checkout. The shop's
+ * checkout took an `order_id`, and a booking creates a job rather than an
+ * order, so wiring it up now would mean writing payment logic twice.
+ */
+export const paymentsApi = {
+  list: (signal?: AbortSignal) =>
+    apiClient.get<{ enabled: boolean; providers: string[] }>(
+      "/api/v1/payments/providers", signal),
 };

@@ -20,6 +20,8 @@ class ProductOut(BaseModel):
     price_per_unit: float
     stock: float
     image_url: Optional[str]
+    duration_minutes: Optional[int] = None
+    emergency: bool = False
     is_active: bool
 
     class Config:
@@ -39,6 +41,11 @@ def _enrich_and_serialize(products: list[Service], db: Session) -> list[dict]:
             "price_per_unit": float(p.price),
             "stock":          float(p.stock or 0),
             "image_url":      serialized_image(p),
+            # The guide figures. A provider registering picks from this list and
+            # sets their own price and duration against each one, so they need
+            # to see what the service usually is before they differ from it.
+            "duration_minutes": p.duration_minutes,
+            "emergency":      bool(p.emergency),
             "is_active":      bool(p.status),
         })
     return result

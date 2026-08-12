@@ -1,6 +1,6 @@
-import type { ProductCategory, Step } from "@/types";
+import type { ServiceCategory, Step } from "@/types";
 
-export const PRODUCT_CATEGORIES: ProductCategory[] = [
+export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: "home",
     title: "Home & Repairs",

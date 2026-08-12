@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+
 import { BRAND_NAME } from "@/constants";
 import { Button } from "@/components/ui/Button";
+import { AccountMenu } from "@/components/layout/AccountMenu";
 import { cn } from "@/lib/utils";
 
 interface NavbarProps {
-  onStartOrdering: () => void;
-  onPartnerClick: () => void;
+  onStart: () => void;
 }
 
 const NAV_LINKS = [
@@ -16,7 +18,7 @@ const NAV_LINKS = [
   { label: "Contact", href: "#footer" },
 ];
 
-export function Navbar({ onStartOrdering, onPartnerClick }: NavbarProps) {
+export function Navbar({ onStart }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -62,15 +64,19 @@ export function Navbar({ onStartOrdering, onPartnerClick }: NavbarProps) {
               {link.label}
             </button>
           ))}
-          <button
-            onClick={onPartnerClick}
+          {/* The provider's way in. It has to be visible from the front page:
+              a marketplace with no obvious door for the people who do the work
+              only ever fills up one side. */}
+          <Link
+            href="/provider/register"
             className="text-sm font-medium text-brand-600 hover:text-orange-700 border border-brand-300 hover:border-orange-500 rounded-full px-4 py-1.5 transition-colors"
           >
-            Want to be partner with us?
-          </button>
-          <Button size="sm" onClick={onStartOrdering}>
-            Start Ordering
+            Service provider
+          </Link>
+          <Button size="sm" onClick={onStart}>
+            Find a service
           </Button>
+          <AccountMenu />
         </div>
 
         <button
@@ -95,14 +101,22 @@ export function Navbar({ onStartOrdering, onPartnerClick }: NavbarProps) {
               {link.label}
             </button>
           ))}
-          <button
-            onClick={() => { setMenuOpen(false); onPartnerClick(); }}
+          <Link
+            href="/provider/register"
+            onClick={() => setMenuOpen(false)}
             className="text-left text-base font-medium text-brand-600 hover:text-orange-700 py-1"
           >
-            Become a Partner
-          </button>
-          <Button size="sm" onClick={() => { setMenuOpen(false); onStartOrdering(); }} className="mt-2">
-            Start Ordering
+            Service provider
+          </Link>
+          <Link
+            href="/login"
+            onClick={() => setMenuOpen(false)}
+            className="text-left text-base font-medium text-ink-muted hover:text-brand-500 py-1"
+          >
+            Sign in
+          </Link>
+          <Button size="sm" onClick={() => { setMenuOpen(false); onStart(); }} className="mt-2">
+            Find a service
           </Button>
         </div>
       )}

@@ -329,6 +329,8 @@ def _search_products_db(
                 "stock":          float(p.stock or 0),
                 "image_url":      serialized_image(p),
                 "owner_email":    getattr(p, "_owner_email", None),
+                "duration_minutes": p.duration_minutes,
+                "emergency":      bool(p.emergency),
                 "similarity":     round(final, 4),
             })
     else:
@@ -348,6 +350,8 @@ def _search_products_db(
                 "stock":          float(p.stock or 0),
                 "image_url":      serialized_image(p),
                 "owner_email":    getattr(p, "_owner_email", None),
+                "duration_minutes": p.duration_minutes,
+                "emergency":      bool(p.emergency),
                 "similarity":     round(score, 4),
             })
 

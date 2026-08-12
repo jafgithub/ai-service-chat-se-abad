@@ -12,7 +12,7 @@ export function HowItWorks() {
             How It Works
           </h2>
           <p className="max-w-xl mx-auto text-lg text-ink-muted">
-            Three simple steps stand between you and your completed order.
+            Three steps between a problem and somebody booked to fix it.
           </p>
         </div>
 
@@ -48,7 +48,7 @@ export function HowItWorks() {
           <div className="inline-flex items-center gap-3 bg-brand-50 border border-orange-100 rounded-card px-6 py-4">
             <span className="text-2xl">⚡</span>
             <p className="text-ink-muted font-medium">
-              Most orders are placed in under{" "}
+              Most bookings are made in under{" "}
               <span className="text-brand-500 font-bold">3 minutes</span>
             </p>
           </div>

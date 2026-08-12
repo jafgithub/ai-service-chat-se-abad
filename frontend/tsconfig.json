@@ -11,6 +11,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // The tests are run by node's own runner, which strips types rather than
+    // compiling, and it requires the real ".ts" on every import. Harmless with
+    // noEmit: nothing is ever written out from this config.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [

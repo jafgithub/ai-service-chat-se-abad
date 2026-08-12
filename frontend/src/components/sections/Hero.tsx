@@ -3,11 +3,11 @@
 import { Button } from "@/components/ui/Button";
 
 interface HeroProps {
-  onStartOrdering: () => void;
-  onPartnerClick: () => void;
+  onStart: () => void;
+  onProviderClick: () => void;
 }
 
-export function Hero({ onStartOrdering, onPartnerClick }: HeroProps) {
+export function Hero({ onStart, onProviderClick }: HeroProps) {
   return (
     <section
       id="hero"
@@ -42,18 +42,18 @@ export function Hero({ onStartOrdering, onPartnerClick }: HeroProps) {
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-orange-200 rounded-full px-4 py-2 text-sm font-medium text-orange-700 mb-8 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-          AI-Powered Ordering — Available 24/7
+          Describe it, book it. Any hour of the day.
         </div>
         {/* `text-balance` plus a break at every size. The break used to be
-            hidden below `sm`, which left "Book a Plumber. Just" as the shortest
-            line the heading could make; "Smarter." is an inline-block so it
+            hidden below `sm`, which left the first half as the shortest line the
+            heading could make; the highlighted word is an inline-block so it
             cannot break inside, and at 48px that line is wider than a phone.
             The whole centred column grew with it and the buttons ran off the
             right edge of every screen narrower than about 480px. */}
         <h1 className="mb-6 text-balance text-4xl font-extrabold leading-tight tracking-tight text-gray-900 sm:text-6xl lg:text-7xl">
-          Order{" "}
+          Book{" "}
           <span className="relative inline-block">
-            <span className="relative z-10 text-orange-500">Smarter.</span>
+            <span className="relative z-10 text-orange-500">Anyone.</span>
             <span
               className="absolute inset-x-0 bottom-1 h-3 bg-orange-200 rounded-full -z-0"
               aria-hidden
@@ -63,12 +63,13 @@ export function Hero({ onStartOrdering, onPartnerClick }: HeroProps) {
           Just Ask.
         </h1>
         <p className="max-w-2xl mx-auto text-lg sm:text-xl text-gray-600 leading-relaxed mb-10">
-          Chat or speak to our AI — find products, get pricing, and place your
-          order in minutes. No app downloads, no waiting in line.
+          Tell the assistant what has gone wrong. It finds the service, shows you
+          who does it and what they charge, and books a time. No app to download,
+          no waiting on hold.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Button size="lg" onClick={onStartOrdering} className="w-full sm:w-auto">
-            <span>Start Ordering</span>
+          <Button size="lg" onClick={onStart} className="w-full sm:w-auto">
+            <span>Describe your problem</span>
             <svg
               className="w-5 h-5"
               fill="none"
@@ -83,12 +84,12 @@ export function Hero({ onStartOrdering, onPartnerClick }: HeroProps) {
               />
             </svg>
           </Button>
-          <Button variant="outline" size="lg" className="w-full sm:w-auto" onClick={onPartnerClick}>
-            Want to be partner with us?
+          <Button variant="outline" size="lg" className="w-full sm:w-auto" onClick={onProviderClick}>
+            Register as a provider
           </Button>
         </div>
         <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-          {["Instant order confirmation", "Email receipt included", "Voice & text support"].map(
+          {["Real appointment times", "Emailed confirmation", "Voice and text"].map(
             (item) => (
               <div key={item} className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">

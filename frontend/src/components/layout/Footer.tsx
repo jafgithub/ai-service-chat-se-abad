@@ -1,21 +1,35 @@
+import Link from "next/link";
+
 import { BRAND_NAME, BRAND_TAGLINE } from "@/constants";
 
 const FOOTER_LINKS = {
-  Company: [
-    { label: "About Us", href: "#" },
-    { label: "How It Works", href: "#how-it-works" },
-    { label: "Services", href: "#services" },
+  Customers: [
+    { label: "How it works", href: "#how-it-works" },
+    { label: "What we cover", href: "#services" },
+    { label: "My bookings", href: "/bookings" },
+    { label: "My requests", href: "/requests" },
+  ],
+  Providers: [
+    { label: "Register your business", href: "/provider/register" },
+    { label: "Provider sign in", href: "/provider/login" },
+    { label: "Dashboard", href: "/provider/dashboard" },
   ],
   Support: [
-    { label: "Contact Us", href: "#" },
+    // The FAQ is the reserved slot for the knowledge base: Phase F answers
+    // these from the handbook through the existing RAG. Left pointing nowhere
+    // rather than shipped as a page with nothing behind it.
     { label: "FAQs", href: "#" },
-    { label: "Order Tracking", href: "#" },
-  ],
-  Legal: [
-    { label: "Privacy Policy", href: "#" },
-    { label: "Terms of Service", href: "#" },
+    { label: "Contact us", href: "#" },
+    { label: "Privacy policy", href: "#" },
   ],
 };
+
+/** Anything starting with a slash is a page of ours, and has to go through
+ *  `Link` so the deployment's basePath is applied. The `#` ones are anchors on
+ *  this page, or placeholders. */
+function isRoute(href: string): boolean {
+  return href.startsWith("/");
+}
 
 export function Footer() {
   return (
@@ -51,12 +65,21 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {links.map((link) => (
                   <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="text-sm hover:text-orange-400 transition-colors duration-200"
-                    >
-                      {link.label}
-                    </a>
+                    {isRoute(link.href) ? (
+                      <Link
+                        href={link.href}
+                        className="text-sm hover:text-orange-400 transition-colors duration-200"
+                      >
+                        {link.label}
+                      </Link>
+                    ) : (
+                      <a
+                        href={link.href}
+                        className="text-sm hover:text-orange-400 transition-colors duration-200"
+                      >
+                        {link.label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -68,7 +91,7 @@ export function Footer() {
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 text-sm">
             <span className="flex items-center gap-2">
               <span className="text-orange-400">📧</span>
-              orders@smartmarket.com
+              bookings@serviceassistant.app
             </span>
             <span className="flex items-center gap-2">
               <span className="text-orange-400">📞</span>
@@ -76,14 +99,14 @@ export function Footer() {
             </span>
             <span className="flex items-center gap-2">
               <span className="text-orange-400">📍</span>
-              Market Square, City Center
+              Serving your area
             </span>
           </div>
         </div>
 
         <div className="border-t border-gray-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-muted">
           <p>© {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.</p>
-          <p>Powered by AI — built for speed.</p>
+          <p>Find a service. Book a time. Done.</p>
         </div>
       </div>
     </footer>

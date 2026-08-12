@@ -3,41 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChatMessage } from "./ChatMessage";
-import { ProductCard } from "./ProductCard";
-import { CartDrawer } from "./CartDrawer";
-import { CustomerInfoForm, type DeliverySlot } from "./CustomerInfoForm";
-import { OrderConfirmation } from "./OrderConfirmation";
-import { SourcedPanel } from "./SourcedPanel";
-import { VendorProductModal } from "./VendorProductModal";
-import { StoreBrowserModal } from "./StoreBrowserModal";
-import { VisitingStoreBar } from "./VisitingStoreBar";
+import { ServiceCard } from "@/components/booking/ServiceCard";
+import { BookingFlow } from "@/components/booking/BookingFlow";
+import { AccountMenu } from "@/components/layout/AccountMenu";
 
-import { useCart } from "@/hooks/useCart";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { getSessionId, resetSessionId } from "@/lib/session";
-import { clearPendingOrder, readPendingOrder, rememberPendingOrder } from "@/lib/pendingOrder";
-import { chatApi, ordersApi, paymentsApi, shoppingApi, voiceApi, ApiError } from "@/lib/api";
-import type { ProductResult, CustomerIn, PlaceOrderResponse, ExternalProduct, PaymentMethod } from "@/lib/api";
-import { BRAND_NAME, PRODUCT_CATEGORIES } from "@/constants";
+import { getSessionId } from "@/lib/session";
+import { chatApi, requestsApi, voiceApi, ApiError } from "@/lib/api";
+import type { Booked, ServiceResult } from "@/lib/api";
+import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { cn } from "@/lib/utils";
-
-/** Whether to look outside our own list. Never, here: a booking is with this
- *  firm or it is nothing, and the backend serves no such endpoint. */
-const OFF_CATALOGUE_SEARCH = false;
 
 interface ChatPageProps {
   scope?: string;
   onBack: () => void;
-  /**
-   * Show the retailer's own page inside the product popup, instead of drawing
-   * it from the detail we hold. Set only by /v1/chat. Everything else on the
-   * page behaves identically either way.
-   */
-  browserView?: boolean;
 }
-
-type ChatStep = "chat" | "checkout" | "confirmed";
 
 // ── Voice turn tuning (all milliseconds) ─────────────────────────────────────
 // The microphone stays open for the whole conversation; these decide when one
@@ -61,35 +43,19 @@ const NOISE_MARGIN = 1.6;          // speech has to beat the room by this much
 const NOISE_HEADROOM = 6;          // plus a fixed margin, for a very quiet room
 const MIN_SILENCE_LEVEL = 10;      // never go below the original fixed value
 
-// ── How many results to put on screen at once ────────────────────────────────
-// The grid used to render every match. A search for "milk" returns 412 products
-// and "chicken" returns 634, so the browser was mounting 634 cards and firing
-// 634 image requests for a reply whose text said "here are the best 5". Nothing
-// is hidden: "Show more" reveals the next page, and the true total is stated.
+// How many results to put on screen at once. Nothing is hidden: "Show more"
+// reveals the next page and the true total is stated.
 const PAGE_SIZE = 24;
 
-// ── Sorting ──────────────────────────────────────────────────────────────────
-// Relevance is the catalog's own similarity score, which is the order the
-// search already returns, so it costs nothing to keep as the default. Price
-// ascending is the other one the client asked for.
+// Relevance is the order the search already returns, so it costs nothing to
+// keep as the default. Price is a guide figure here, which is why the label
+// says so: the provider sets the real one.
 const SORT_OPTIONS = [
-  { id: "relevance", label: "Relevance" },
-  { id: "price_asc", label: "Lowest price" },
+  { id: "relevance", label: "Best match" },
+  { id: "price_asc", label: "Lowest guide price" },
 ] as const;
 
 type SortBy = (typeof SORT_OPTIONS)[number]["id"];
-
-// ── When to look outside our own catalog ─────────────────────────────────────
-// The client's rule: our own catalog first, and only when it comes back with
-// nothing at all do we spend a paid search.
-//
-// Worth knowing how rarely that fires. The catalog keeps anything scoring above
-// 0.35 against 25,631 products, so almost any phrase matches something:
-// "wedding dress" returns 67 products and "titanium bicycle frame" returns one.
-// Genuine empties do happen ("mortgage refinancing" returns none) but they are
-// the exception, which is exactly why the manual button below exists. That
-// button is the main way a shopper reaches the extended stores, and the
-// automatic path is the safety net.
 
 function TypingIndicator() {
   return (
@@ -112,78 +78,46 @@ function TypingIndicator() {
 
 function getCategoryInfo(scope: string | undefined) {
   if (!scope) return null;
-  return PRODUCT_CATEGORIES.find((c) => c.chatScope === scope) ?? null;
+  return SERVICE_CATEGORIES.find((c) => c.chatScope === scope) ?? null;
 }
 
-export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) {
+/**
+ * The assistant, and what it finds.
+ *
+ * What it was: describe a product, see products, add them to a cart, check out.
+ * What it is: describe a problem, see the services that answer it, pick one,
+ * and the booking flow takes over from there.
+ *
+ * The conversation itself is untouched, deliberately. The voice loop, the
+ * phrase matching and the reference resolution ("book item 2") are the parts of
+ * this product that took the longest to get right, and none of them care
+ * whether the thing being matched is a tin of tomatoes or a blocked drain.
+ */
+export function ChatPage({ scope, onBack }: ChatPageProps) {
   const [sessionId, setSessionId] = useState("");
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
-  const [products, setProducts] = useState<ProductResult[]>([]);
-  // How many of `products` are on screen. Reset by the effect below whenever a
-  // new set of results arrives, so page 3 of "milk" never carries into "bread".
+  const [services, setServices] = useState<ServiceResult[]>([]);
+  // How many of `services` are on screen. Reset whenever a new set arrives, so
+  // page 3 of one search never carries into the next.
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   // What the results are answering, so the panel can say so.
   const [resultsFor, setResultsFor] = useState("");
-  // The eleven stores, browsable in a frame. Only /v1/chat offers this.
-  const [browsingStores, setBrowsingStores] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
-  // How many matched in total. `products` holds only the best 100 the server
-  // sends, so this is what the header reports.
   const [totalMatches, setTotalMatches] = useState(0);
-  /* Which set of results the pane is showing. Two horizontal rails were tried
-     first and were poor: sideways scanning is slower than a grid, awkward with
-     a mouse, and stacking two of them wasted the desktop's vertical space. A
-     toggle gives each set the whole pane and a proper grid, and the extended
-     results are one click away instead of below a page of cards. */
-  const [resultsTab, setResultsTab] = useState<"ours" | "others">("ours");
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [step, setStep] = useState<ChatStep>("chat");
-  const [cartOpen, setCartOpen] = useState(false);
-  const [placingOrder, setPlacingOrder] = useState(false);
-  // A ref, not the state above: state updates are batched, so a second submit
-  // can arrive before `placingOrder` has flipped. Money is involved, so the
-  // guard has to be synchronous.
-  const placingOrderRef = useRef(false);
-  const [confirmedOrder, setConfirmedOrder] = useState<PlaceOrderResponse | null>(null);
-  // Set when we come back from a provider. The order number is in the URL, so it
-  // is known even in the rare case where the order itself cannot be fetched.
-  const [paidOrderId, setPaidOrderId] = useState<number | null>(null);
-  // True while the webhook has not landed yet, so the screen can say "confirming"
-  // rather than claim an order is placed before the server agrees.
-  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
-  // Set by the return-trip effect, consumed by init(). See both for why.
-  const cancelledNoticeRef = useRef<string | null>(null);
 
+  // The service being booked, and the problem it answers. Both drive the sheet.
+  const [booking, setBooking] = useState<ServiceResult | null>(null);
+  const [requestId, setRequestId] = useState<number | null>(null);
+  // The customer's own words, kept so the recorded request says what they said
+  // rather than the name of whatever service happened to match. State rather
+  // than a ref because the booking sheet reads it while rendering.
+  const [problem, setProblem] = useState("");
 
-  // Products we do not stock, found elsewhere. Kept apart from `products` so
-  // they are never mistaken for our own inventory.
-  const [sourced, setSourced] = useState<ExternalProduct[]>([]);
-  const [sourcedQuery, setSourcedQuery] = useState("");
-  const [sourcedLoading, setSourcedLoading] = useState(false);
-  const [adoptingId, setAdoptingId] = useState<string | null>(null);
-  const [adoptedIds, setAdoptedIds] = useState<string[]>([]);
-  /* Whether the configured provider invents its results. Fetched once: the
-     panel has to say so, and the "Request this" button has to be withheld,
-     because a fabricated product that reaches the catalog is orderable. One
-     did ("Organic Banks, 100g", $12.99). */
-  const [shoppingSample, setShoppingSample] = useState(false);
-  /* The product a shopper left to look at on a retailer's own site. Our Add to
-     Cart cannot be drawn on top of their page (they forbid being embedded), so
-     it waits here instead and is one click away when they switch back. */
-  const [visitingProduct, setVisitingProduct] = useState<ExternalProduct | null>(null);
-  /* The vendor product whose page is open in our popup. */
-  const [openProduct, setOpenProduct] = useState<ExternalProduct | null>(null);
-  useEffect(() => {
-    let dropped = false;
-    shoppingApi
-      .status()
-      .then((st) => { if (!dropped) setShoppingSample(Boolean(st.sample)); })
-      .catch(() => {});
-    return () => { dropped = true; };
-  }, []);
+  const auth = useAuth();
 
   // Voice loop plumbing
   const voiceActiveRef = useRef(false);   // continuous mode on/off (read inside async callbacks)
@@ -196,142 +130,48 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const cart = useCart(sessionId);
   const geo = useGeolocation();
   const category = getCategoryInfo(scope);
 
-  const STORAGE_KEY = "chat_messages";
-  const PRODUCTS_KEY = "chat_products";
+  /* Named for this product, not the shop it grew out of. The old keys are
+     deliberately abandoned rather than migrated: what they hold is a grocery
+     conversation ("What products are you looking for today?") with a basket of
+     tinned goods beside it, and restoring that into a booking assistant is
+     worse than starting fresh. A browser that has both simply ignores the old
+     pair, which fall out of localStorage on their own. */
+  const STORAGE_KEY = "sa_conversation";
+  const RESULTS_KEY = "sa_services";
 
   const addMessage = useCallback((role: "user" | "assistant", content: string) => {
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, content, timestamp: new Date() }]);
   }, []);
 
-  /** Look outside our catalog, but only when our own results are weak.
+  /**
+   * Picking a service, which is where booking starts.
    *
-   * "No results at all" turns out to be the wrong test. The search keeps
-   * anything scoring above 0.35, and against a 25,631 line grocery catalog that
-   * returns something for almost any query: "wedding dress" comes back with 63
-   * products. So weakness is judged two ways, and either is enough:
-   *
-   *   - barely anything matched at all, or
-   *   - the single best match is poor
-   *
-   * Measured for calibration: "milk" tops out at 0.494 and "chicken breast" at
-   * 0.61, both genuine. "titanium bicycle frame" returns one row at 0.369.
-   *
-   * Off-catalog results cost a third-party call, so this deliberately does not
-   * fire on every message. */
-  const findElsewhere = useCallback(async (
-    query: string,
-    own: ProductResult[],
-    intent?: string | null,
-  ) => {
-    /* Only a genuine product search. Every other kind of message returns no
-       products, which looks exactly like "we stock nothing like this" and used
-       to send "add item 2 to cart", "checkout" and "show me my cart" off to the
-       paid search. Measured against the live server, cart messages are most of
-       a session, so this was the difference between a search allowance lasting
-       a month and lasting a week. */
-    if (intent && intent !== "search") {
-      setSourced([]);
-      return;
-    }
+   * The problem is recorded here rather than at the end, and that is the whole
+   * argument for keeping requests apart from bookings: most of these never
+   * become an appointment, and those are the ones the office needs to see. It
+   * needs an account, so for somebody signed out the description travels into
+   * the flow and is written the moment they sign in.
+   */
+  const chooseService = useCallback((service: ServiceResult) => {
+    setBooking(service);
+    setRequestId(null);
 
-    if (!query.trim() || own.length > 0) {
-      // We stock something. Show ours, spend nothing.
-      setSourced([]);
-      return;
-    }
-    // This system has no off-catalogue search: there is no equivalent of buying
-    // a jar from another shop when what you need is somebody to attend. The
-    // calls are left in place rather than torn out, because the shop and this
-    // share a component, and gated here so nothing is requested that the
-    // backend does not serve.
-    if (!OFF_CATALOGUE_SEARCH) {
-      setSourced([]);
-      return;
-    }
-    setSourcedLoading(true);
-    setSourcedQuery(query);
-    try {
-      const found = await shoppingApi.search(query);
-      setSourced(found);
-      /* Our own catalog found nothing, so "Our store" is an empty screen. If
-         other stores turned something up, that is the only useful thing on the
-         page and the shopper should not have to discover a tab to see it. */
-      if (found.length > 0) setResultsTab("others");
-    } catch {
-      // Nothing to show is a fine outcome here: the panel simply stays hidden
-      // rather than putting an error in front of the shopper.
-      setSourced([]);
-    } finally {
-      setSourcedLoading(false);
-    }
-  }, []);
-
-  /** The "search our extended stores" button.
-   *
-   * Deliberately bypasses the automatic rule. Our catalog matches something for
-   * almost any phrase, so the automatic path fires rarely; this is how a shopper
-   * who can see our results and still is not satisfied reaches the wider search.
-   * It is a press, so spending a search here is the shopper's own choice. */
-  const searchExtendedStores = useCallback(async (query: string) => {
-    if (!OFF_CATALOGUE_SEARCH) return;
-    const q = query.trim();
-    if (!q || sourcedLoading) return;
-    setSourcedLoading(true);
-    setSourcedQuery(q);
-    // Switch to that view before the request finishes, so the shopper sees the
-    // loading state rather than pressing a button and watching nothing happen.
-    setResultsTab("others");
-    try {
-      setSourced(await shoppingApi.search(q));
-    } catch {
-      setSourced([]);
-      addMessage(
-        "assistant",
-        "I could not reach the extended stores just now. Please try again shortly.",
-      );
-    } finally {
-      setSourcedLoading(false);
-    }
-  }, [sourcedLoading, addMessage]);
-
-  /** Bring an off-catalog product into the catalog and the cart. */
-  const adoptProduct = useCallback(async (product: ExternalProduct) => {
-    if (adoptingId) return;
-    setAdoptingId(product.source_id);
-    try {
-      const res = await shoppingApi.adopt(
-        // Whatever the caller chose travels with it: the popup sends the store,
-        // its price and its page, so the product is stored as the shopper saw
-        // it rather than as the search first quoted it.
-        sessionId || getSessionId(), product, sourcedQuery,
-      );
-      cart.applyServerCart(res.cart);
-      setAdoptedIds((prev) => [...prev, product.source_id]);
-      addMessage(
-        "assistant",
-        `Added **${res.product.name}** to your cart. We do not stock this one, so we will source it for you and confirm the price before you pay.`
-      );
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.detail : "Could not add that item.";
-      addMessage("assistant", `❌ ${msg}`);
-    } finally {
-      setAdoptingId(null);
-    }
-  }, [adoptingId, sessionId, sourcedQuery, cart, addMessage]);
+    if (auth.status !== "signed-in" || !problem.trim()) return;
+    requestsApi
+      .create({ description: problem.trim(), service_id: service.id })
+      .then((created) => setRequestId(created.id))
+      // Not fatal, and deliberately silent. Failing to file the paperwork must
+      // not stop somebody booking a plumber; the booking carries on without it.
+      .catch(() => {});
+  }, [auth.status, problem]);
 
   // ── Continuous voice ───────────────────────────────────────────
   // The whole turn runs on the server: it hears the clip, works out what was
-  // meant, searches or updates the cart, and sends back the spoken reply. The
-  // browser only records and plays.
-  //
-  // Speak the assistant's reply. Plays the audio the server generated; if the
-  // provider is unavailable it returns no audio and the browser's own voice
-  // stands in, so a speech outage never costs the reply itself. Resolves when
-  // playback ends so the loop can take the next turn.
+  // meant, searches, and sends back the spoken reply. The browser only records
+  // and plays.
   const speak = useCallback((dataUrl: string, text: string) => new Promise<void>((resolve) => {
     setIsSpeaking(true);
     const done = () => { setIsSpeaking(false); resolve(); };
@@ -458,9 +298,32 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
     recorder.start();
   }), []);
 
+  /** What the assistant did, applied to the screen.
+   *
+   *  "added" is the interesting one. The intent engine still calls choosing a
+   *  service "adding", because that is the phrase the matcher was built around,
+   *  but what the customer said was "book item 2" and what they want next is a
+   *  provider. So the action opens the booking flow rather than filling a
+   *  basket. */
+  const applyAction = useCallback((
+    action: { type: string; items?: { item_id: number }[] } | null,
+    found: ServiceResult[],
+  ) => {
+    if (!action) return;
+    if (action.type !== "added" && action.type !== "checkout") return;
+
+    const wantedId = action.items?.[0]?.item_id;
+    const target =
+      (wantedId != null ? found.find((s) => s.id === wantedId) : undefined) ??
+      // A "checkout" with nothing named means "get on with it", and the only
+      // sensible reading is the best match on screen.
+      found[0];
+    if (target) chooseService(target);
+  }, [chooseService]);
+
   // One turn: record → POST the audio to /voice → play the spoken reply → loop.
-  // A single request covers speech-to-text, intent, search or cart and the reply,
-  // so what the assistant heard and what it answered can never disagree.
+  // A single request covers speech-to-text, intent, the search and the reply, so
+  // what the assistant heard and what it answered can never disagree.
   const voiceTurn = useCallback(async () => {
     if (!voiceActiveRef.current) return;
 
@@ -472,7 +335,6 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
     }
 
     setIsLoading(true);
-    let goCheckout = false;
     try {
       const res = await voiceApi.send(clip, {
         sessionId: sessionId || getSessionId(),
@@ -491,30 +353,27 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
       addMessage("user", heard);
       addMessage("assistant", res.reply);
       if (res.services.length > 0) {
-        setProducts(res.services);
+        setProblem(heard);
+        setServices(res.services);
         setTotalMatches(res.total_services ?? res.services.length);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(heard);
-        setResultsTab("ours");
       } else if (res.action === null) {
-        setProducts([]);
+        setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(heard);
       }
-      cart.applyServerCart(res.cart);
-      void findElsewhere(heard, res.services, res.intent);
-      goCheckout = res.action?.type === "checkout";
-      // Speak the short version: long product lists are shown, not read out.
+      applyAction(res.action, res.services.length > 0 ? res.services : services);
+      // Speak the short version: long lists are shown, not read out.
       await speak(res.audio ?? "", res.speech || res.reply);
     } catch {
       setIsLoading(false);
       addMessage("assistant", "Sorry, I couldn't process that. Please try again.");
     }
 
-    if (goCheckout) { setStep("checkout"); stopVoice(); return; }
     if (voiceActiveRef.current) voiceTurnRef.current();      // keep the conversation going
-  }, [recordUtterance, speak, stopVoice, sessionId, scope, geo.position, addMessage, cart, findElsewhere]);
+  }, [recordUtterance, speak, sessionId, scope, geo.position, addMessage, applyAction, services]);
 
   // Keep the ref pointed at the freshest turn fn so the loop always recurses correctly.
   useEffect(() => { voiceTurnRef.current = voiceTurn; }, [voiceTurn]);
@@ -547,134 +406,28 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
           const parsed = JSON.parse(saved) as ChatMessageType[];
           if (parsed.length > 0) {
             setMessages(parsed.map((m) => ({ ...m, timestamp: new Date(m.timestamp) })));
-            const savedProducts = localStorage.getItem(PRODUCTS_KEY);
-            if (savedProducts) setProducts(JSON.parse(savedProducts));
+            const savedResults = localStorage.getItem(RESULTS_KEY);
+            if (savedResults) setServices(JSON.parse(savedResults));
             inputRef.current?.focus();
             return;
           }
         } catch {
           localStorage.removeItem(STORAGE_KEY);
-          localStorage.removeItem(PRODUCTS_KEY);
+          localStorage.removeItem(RESULTS_KEY);
         }
       }
 
       const greeting = scope
-        ? `Hi! 👋 I'm here to help you with **${scope}**. What are you looking for today?`
-        : "Hi! 👋 I'm your booking assistant. What do you need?";
+        ? `Hi 👋 I can help with **${scope}**. What has gone wrong?`
+        : "Hi 👋 I'm your booking assistant. Tell me what needs doing and I will find someone who does it.";
       setMessages([{ id: crypto.randomUUID(), role: "assistant", content: greeting, timestamp: new Date() }]);
       inputRef.current?.focus();
     }
-    init().then(() => {
-      // A cancelled payment, if there was one. Appended after init has settled
-      // so it survives the setMessages that seeds the conversation.
-      const notice = cancelledNoticeRef.current;
-      if (notice) {
-        cancelledNoticeRef.current = null;
-        addMessage("assistant", notice);
-      }
-    });
+    void init();
     // Stop any voice/audio when leaving the page.
     return () => stopVoice();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  /** Coming back from Stripe or PayPal.
-   *
-   * The provider sends the shopper to `/chat?paid={order_id}` (or `?cancelled=`),
-   * which used to be a dead end: nothing read the parameter, so someone who had
-   * just paid landed on an empty chat page with their basket still full and no
-   * sign the order existed. They could easily pay twice.
-   *
-   * The order id alone is not enough to fetch the order, deliberately, so the
-   * idempotency key stashed before the redirect is what does the lookup.
-   *
-   * The setState calls below are flagged by react-hooks/set-state-in-effect,
-   * and an effect really is the right place for them. The tidier alternative,
-   * a lazy useState initializer, would run during the static prerender at build
-   * time, where `window` does not exist and the query string is not knowable;
-   * seeding state from it would be a hydration mismatch. Reading the URL after
-   * mount is the "subscribe to an external system" case the rule allows for. */
-  useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
-    const params = new URLSearchParams(window.location.search);
-    const paid = params.get("paid");
-    const cancelled = params.get("cancelled");
-    if (!paid && !cancelled) return;
-
-    // Take the parameter back out of the URL first, so a refresh or a shared
-    // link does not replay a confirmation for an order that is long finished.
-    const url = new URL(window.location.href);
-    url.searchParams.delete("paid");
-    url.searchParams.delete("cancelled");
-    window.history.replaceState({}, "", url.toString());
-
-    const pending = readPendingOrder();
-
-    if (cancelled) {
-      clearPendingOrder();
-      // Handed to the init effect rather than appended here. init() finishes by
-      // calling setMessages([greeting]), which replaces the whole list, so a
-      // message added at this point would simply vanish a moment later.
-      cancelledNoticeRef.current =
-        "No problem, that payment was cancelled and you have not been charged. " +
-        "Your booking is exactly as you left it whenever you want to try again.";
-      return;
-    }
-
-    const orderId = Number(paid);
-    if (!Number.isFinite(orderId) || orderId <= 0) return;
-
-    setPaidOrderId(orderId);
-    setStep("confirmed");
-    // The basket belongs to the order now. The server already emptied it when
-    // the order was created; this clears what the page is still holding.
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(PRODUCTS_KEY);
-
-    // Without the key we can still name the order, just not itemise it.
-    if (!pending || pending.orderId !== orderId) {
-      clearPendingOrder();
-      return;
-    }
-
-    let cancelledFetch = false;
-
-    /* The redirect usually beats the webhook back, so the order is often still
-       `pending` for a second or two after the shopper arrives. Poll briefly
-       rather than either lying about the status or showing a spinner forever. */
-    const poll = async (attempt = 0) => {
-      if (cancelledFetch) return;
-      try {
-        const order = await ordersApi.byKey(pending.idempotencyKey);
-        if (cancelledFetch) return;
-        setConfirmedOrder(order);
-
-        if (order.status === "pending" && attempt < 6) {
-          setAwaitingConfirmation(true);
-          setTimeout(() => poll(attempt + 1), 1500);
-          return;
-        }
-        // Either confirmed, or the webhook is taking longer than we will wait.
-        // The money is taken either way, so say so plainly and stop polling.
-        setAwaitingConfirmation(order.status === "pending");
-        clearPendingOrder();
-      } catch {
-        if (cancelledFetch) return;
-        // A lookup failure must not hide the fact that they paid.
-        clearPendingOrder();
-      }
-    };
-    void poll();
-
-    return () => { cancelledFetch = true; };
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, []);
-
-  // Hydrate the server cart once we know the session id.
-  useEffect(() => {
-    if (sessionId) cart.refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -685,8 +438,8 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
   }, [messages]);
 
   useEffect(() => {
-    if (products.length > 0) localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
-  }, [products]);
+    if (services.length > 0) localStorage.setItem(RESULTS_KEY, JSON.stringify(services));
+  }, [services]);
 
   // ── Text chat ──────────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string) => {
@@ -704,27 +457,23 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
         longitude: geo.position?.longitude,
       });
       addMessage("assistant", response.reply);
-      // A search that found nothing has to clear the last one. Leaving the
-      // previous results up meant the assistant said "I couldn't find anything
-      // matching that" while the panel beside it still read "Results for milk"
-      // and showed 24 cartons of milk. Only a *search* clears them: adding to
-      // the cart also returns an empty product list, and that must leave the
-      // results the shopper is picking from alone.
+      // A search that found nothing has to clear the last one, or the assistant
+      // says "I couldn't find anything" beside a panel still listing results for
+      // the previous question. Only a *search* clears them: choosing a service
+      // also returns an empty list, and that must leave what is on screen alone.
       if (response.services.length > 0) {
-        setProducts(response.services);
+        setProblem(text.trim());
+        setServices(response.services);
         setTotalMatches(response.total_services ?? response.services.length);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(text.trim());
-        setResultsTab("ours");
       } else if (response.action === null) {
-        setProducts([]);
+        setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(text.trim());
       }
-      cart.applyServerCart(response.cart);
-      if (response.action?.type === "checkout") setStep("checkout");
-      void findElsewhere(text.trim(), response.services, response.intent);
+      applyAction(response.action, response.services.length > 0 ? response.services : services);
     } catch (err) {
       const msg = err instanceof ApiError
         ? `Sorry, something went wrong: ${err.detail}`
@@ -733,129 +482,42 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, scope, geo.position, sessionId, addMessage, cart, findElsewhere]);
+  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, services]);
 
-  const handlePlaceOrder = useCallback(async (
-    customer: CustomerIn,
-    delivery: DeliverySlot,
-    method: PaymentMethod,
-  ) => {
-    // Guard the whole handler, not just the button: React can batch state, and a
-    // fast double tap or an Enter keypress would otherwise fire this twice.
-    if (placingOrderRef.current) return;
-    placingOrderRef.current = true;
+  const onBooked = useCallback((made: Booked) => {
+    addMessage(
+      "assistant",
+      `Done. **${made.provider_name}** will attend on ${made.label}. ` +
+      `Your reference is **${made.reference}**.`
+    );
+  }, [addMessage]);
 
-    setPlacingOrder(true);
-
-    // Generated once per attempt and reused on retry, so a duplicate request
-    // returns the order that already exists instead of placing a second one.
-    const idempotencyKey = crypto.randomUUID();
-
-    try {
-      const order = await ordersApi.place(
-        sessionId
-          ? {
-              customer, session_id: sessionId, ...delivery,
-              idempotency_key: idempotencyKey, payment_method: method,
-            }
-          : {
-              customer,
-              items: cart.items.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
-              ...delivery,
-              idempotency_key: idempotencyKey,
-              payment_method: method,
-            }
-      );
-
-      // An order that still needs paying is not finished. Send the shopper to
-      // the provider; the order is only confirmed once their webhook says so.
-      // Cash comes back already confirmed, so there is nothing to redirect to.
-      if (order.status === "pending") {
-        // The shopper's own choice, not providers[0]. That line always resolved
-        // to Stripe, which meant PayPal was configured, paid for, and reachable
-        // by nobody.
-        const { url } = await paymentsApi.checkout(order.order_id, method);
-        // Everything in React is about to be discarded by a full navigation.
-        // The key is the one thing the return trip needs to identify what was
-        // bought, so it goes somewhere that survives leaving the site.
-        rememberPendingOrder(order.order_id, idempotencyKey);
-        // The cart is deliberately NOT cleared here: if they abandon the
-        // payment page they should come back to their basket intact.
-        window.location.href = url;
-        return;
-      }
-
-      setConfirmedOrder(order);
-      cart.clearCart();
-      localStorage.removeItem("chat_messages");
-      localStorage.removeItem("chat_products");
-      setStep("confirmed");
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.detail : "Order failed. Please try again.";
-      addMessage("assistant", `❌ ${msg}`);
-      setStep("chat");
-    } finally {
-      placingOrderRef.current = false;
-      setPlacingOrder(false);
-    }
-  }, [cart, sessionId, addMessage]);
-
-  /** Start over with an empty conversation and an empty cart.
-   *
-   * A full reload rather than resetting state piecemeal: the session id keys the
-   * server-side cart and the conversation memory, so a new one has to be issued
-   * and every hook has to pick it up. Reloading is the only way to be sure the
-   * previous order leaves no trace behind. */
-  const startNewOrder = useCallback(() => {
-    stopVoice();
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(PRODUCTS_KEY);
-    clearPendingOrder();
-    resetSessionId();
-    window.location.href = "/chat";
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* Deliberately not the three category names: the results pane already offers
-     those as cards, and showing the same three chips twice on one screen made
-     the page look like it had one idea. These prompt the thing the product is
-     actually for, which is asking in your own words. */
+  /* Deliberately not the category names: the results pane already offers those
+     as cards, and showing the same set twice on one screen made the page look
+     like it had one idea. These prompt the thing the product is actually for,
+     which is describing a problem in your own words. */
   const quickReplies = scope
-    ? ["What do you have?", "What are the prices?", "Show me everything"]
+    ? ["What does that involve?", "What does it usually cost?", "Show me everything"]
     : ["My kitchen sink is blocked", "My dog needs his vaccinations", "I need an end of tenancy clean"];
-  const totalQty = cart.items.reduce((s, i) => s + i.quantity, 0);
+
   const micActive = isListening || isSpeaking;
-  /* Sorting is applied before paging, so "lowest price" means the cheapest of
-     all 634 matches rather than the cheapest of the 24 on screen. Sorting the
-     visible slice instead would reorder a page and quietly hide the actual
-     cheapest product, which is the opposite of what the control promises.
 
-     A copy, because Array.sort mutates and `products` is state. */
-  const sortedProducts = useMemo(() => {
-    if (sortBy !== "price_asc") return products;   // relevance is the given order
-    return [...products].sort((a, b) => a.price_per_unit - b.price_per_unit);
-  }, [products, sortBy]);
+  /* Sorted before paging, so "lowest" means the cheapest of everything that
+     matched rather than the cheapest of the 24 on screen. A copy, because
+     Array.sort mutates and this is state. */
+  const sortedServices = useMemo(() => {
+    if (sortBy !== "price_asc") return services;
+    return [...services].sort((a, b) => a.price_per_unit - b.price_per_unit);
+  }, [services, sortBy]);
 
-  const visible = sortedProducts.slice(0, visibleCount);
-  const hasMore = sortedProducts.length > visibleCount;
-
-  // The same ordering for the extended-store panel, so one control governs
-  // everything on screen rather than half of it.
-  const sortedSourced = useMemo(() => {
-    if (sortBy !== "price_asc") return sourced;
-    return [...sourced].sort((a, b) => a.price - b.price);
-  }, [sourced, sortBy]);
-  // A search ran and matched nothing, as opposed to nobody having searched yet.
+  const visible = sortedServices.slice(0, visibleCount);
+  const hasMore = sortedServices.length > visibleCount;
+  // A search ran and matched nothing, as opposed to nobody having asked yet.
   // The two look identical in state and must not read the same on screen.
-  const searchedAndFoundNothing = products.length === 0 && resultsFor !== "";
-  // Whether the shopper can usefully press "search our extended stores": there
-  // has to be something to search for.
-  const canSearchExtended = resultsFor.trim().length > 0;
+  const searchedAndFoundNothing = services.length === 0 && resultsFor !== "";
 
   /* Defined once, rendered twice: pinned under the conversation on a wide
-     screen, and as a shared footer under both tabs on a phone. On a phone it
-     has to sit outside the panes, or switching to Results would take the text
-     box and the microphone away with it. */
+     screen, and as a shared footer on a phone. */
   const composer = (
     <div className="flex-shrink-0 border-t border-line bg-surface px-4 py-3">
       <form
@@ -869,19 +531,19 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
           aria-label={micActive ? "Stop voice conversation" : "Start voice conversation"}
           aria-pressed={micActive}
           className={cn(
-      "relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors",
-      micActive
-        ? "border-danger bg-danger text-white"
-        : "border-line bg-surface text-ink-muted hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600"
+            "relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors",
+            micActive
+              ? "border-danger bg-danger text-white"
+              : "border-line bg-surface text-ink-muted hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600"
           )}
         >
           {micActive && (
-      <span className="absolute inset-0 animate-ping rounded-full bg-danger/30" aria-hidden />
+            <span className="absolute inset-0 animate-ping rounded-full bg-danger/30" aria-hidden />
           )}
           <svg className="relative h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-      <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
-      <path d="M19 10a7 7 0 0 1-14 0" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-      <path d="M12 19v3M9 22h6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+            <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
+            <path d="M19 10a7 7 0 0 1-14 0" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+            <path d="M12 19v3M9 22h6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
           </svg>
         </button>
 
@@ -902,10 +564,8 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
           aria-label="Send"
           className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-brand-500 text-white transition-colors hover:bg-brand-600 disabled:bg-line-strong disabled:text-ink-faint"
         >
-          {/* A plain arrow. The paper plane this replaced collapsed into
-        something that read as a warning triangle at 20px. */}
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M13 6l6 6-6 6" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M13 6l6 6-6 6" />
           </svg>
         </button>
       </form>
@@ -914,8 +574,8 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
         {micActive
           ? "Voice conversation active. Tap the mic to stop."
           : geo.isRequesting
-      ? "Finding your location…"
-      : "Ask by voice or type. You will get an email confirmation."}
+            ? "Finding your location…"
+            : "Ask by voice or type. You will get an email confirmation."}
       </p>
     </div>
   );
@@ -923,17 +583,8 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
   return (
     // h-dvh rather than h-screen: `vh` measures the viewport with the mobile
     // address bar hidden, which pushed the composer under the browser chrome.
-    // Paired with viewportFit "cover" in layout.tsx, the padding keeps the
-    // composer clear of the iOS home indicator.
     <div className="flex h-dvh flex-col overflow-hidden bg-surface-sunken pb-[env(safe-area-inset-bottom)]">
 
-      {/* A plain white bar. This was a hot orange-to-rose gradient, which made
-          the chrome the loudest thing on screen and left nothing to promote the
-          one action that matters on each page. */}
-      {/* The brand bar, restored at the client's request. It is the one coloured
-          surface in the app: the cart drawer, the checkout sheet and the product
-          buttons stay calm, which is what the redesign was actually fixing. A
-          coloured header on its own was never the problem. */}
       <header className="z-30 flex-shrink-0 bg-gradient-to-r from-brand-500 to-rose-500">
         <div className="flex h-16 items-center gap-3 px-4">
           <button
@@ -956,39 +607,16 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
               {category && <span className="font-normal text-white/75"> · {category.title}</span>}
             </p>
             <div className="mt-0.5 flex items-center gap-1.5">
-              {/* White rather than green: a status colour on a coloured bar reads
-                  as a warning light, and white keeps it legible. */}
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 rounded-full bg-white",
-                  micActive && "animate-pulse"
-                )}
-              />
+              <span className={cn("h-1.5 w-1.5 rounded-full bg-white", micActive && "animate-pulse")} />
               <span className="text-xs text-white/85">
                 {micActive ? (isSpeaking ? "Speaking" : "Listening") : "Online"}
               </span>
             </div>
           </div>
 
-          <button
-            onClick={() => setCartOpen(true)}
-            className={cn(
-              "relative flex h-10 items-center gap-2 rounded-control px-3 text-sm font-semibold transition-colors",
-              // Inverted when it has something in it, so the cart is still the
-              // loudest thing on the bar rather than blending into the gradient.
-              totalQty > 0
-                ? "bg-white text-brand-600 hover:bg-white/90"
-                : "text-white/90 hover:bg-white/15 hover:text-white"
-            )}
-            aria-label={totalQty > 0 ? `Open cart, ${totalQty} items` : "Open cart"}
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            {totalQty > 0 && <span className="tabular-nums">{totalQty}</span>}
-          </button>
+          {/* Where the cart used to be. */}
+          <AccountMenu onBrand />
         </div>
-
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -997,31 +625,21 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
         <div className="flex w-full flex-shrink-0 flex-col border-r border-line bg-surface lg:w-[440px] xl:w-[500px]">
 
           {/* Phone only: results swipe sideways above the conversation, so both
-              are on screen at once. A vertical grid here had to be capped by
-              height, which sliced the second row through the middle; a sideways
-              row simply runs off the edge, which is what invites the swipe. */}
-          {(products.length > 0 || isLoading || canSearchExtended) && (
+              are on screen at once. */}
+          {(services.length > 0 || isLoading) && (
             <div className="flex-shrink-0 border-b border-line bg-surface-sunken lg:hidden">
               <div className="flex items-baseline justify-between px-4 pb-1.5 pt-2.5">
                 <p className="text-xs font-medium text-ink">
-                  {/* The true total, not how many were sent. The server caps the
-                      list at 100; saying "100 matches" would understate a
-                      1,118-match search. */}
                   {isLoading
-                    ? "Searching…"
-                    : `${totalMatches || products.length} match${(totalMatches || products.length) === 1 ? "" : "es"}`}
+                    ? "Looking…"
+                    : `${totalMatches || services.length} service${(totalMatches || services.length) === 1 ? "" : "s"}`}
                 </p>
-                {/* Sorting on a phone is the same two choices, as a single
-                    toggle: there is no room for a segmented control, and with
-                    two options a toggle says everything a control would. */}
-                {!isLoading && products.length > 1 && (
+                {!isLoading && services.length > 1 && (
                   <button
-                    onClick={() =>
-                      setSortBy((v) => (v === "relevance" ? "price_asc" : "relevance"))
-                    }
+                    onClick={() => setSortBy((v) => (v === "relevance" ? "price_asc" : "relevance"))}
                     className="text-[11px] font-semibold text-brand-600"
                   >
-                    {sortBy === "relevance" ? "Sort: Relevance" : "Sort: Lowest price"}
+                    {sortBy === "relevance" ? "Best match" : "Lowest guide price"}
                   </button>
                 )}
               </div>
@@ -1033,73 +651,29 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
                   ? [1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className="h-60 w-[150px] flex-shrink-0 animate-pulse rounded-card border border-line bg-surface"
+                        className="h-56 w-[150px] flex-shrink-0 animate-pulse rounded-card border border-line bg-surface"
                       />
                     ))
                   : (
                     <>
-                      {visible.map((product) => {
-                        const cartItem = cart.items.find((i) => i.product.id === product.id);
-                        return (
-                          <div key={product.id} className="w-[150px] flex-shrink-0 snap-start">
-                            <ProductCard
-                              product={product}
-                              quantity={cartItem?.quantity ?? 0}
-                              onAdd={cart.addItem}
-                              onRemove={cart.removeItem}
-                              onUpdateQty={cart.updateQty}
-                              compact
-                            />
-                          </div>
-                        );
-                      })}
+                      {visible.map((service) => (
+                        <div key={service.id} className="w-[150px] flex-shrink-0 snap-start">
+                          <ServiceCard service={service} onChoose={chooseService} compact />
+                        </div>
+                      ))}
 
-                      {/* Paging lives at the end of the row, so everything stays
-                          reachable without a second screen to switch to. */}
                       {hasMore && (
                         <button
                           onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
                           className="flex w-[130px] flex-shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-card border border-dashed border-line-strong bg-surface text-sm font-medium text-ink-muted"
                         >
                           <span className="text-lg" aria-hidden>+</span>
-                          Show {Math.min(PAGE_SIZE, sortedProducts.length - visibleCount)} more
+                          Show {Math.min(PAGE_SIZE, sortedServices.length - visibleCount)} more
                         </button>
                       )}
                     </>
                   )}
               </div>
-
-              {canSearchExtended && (
-                <div className="px-4 pb-3">
-                  <button
-                    onClick={() => searchExtendedStores(resultsFor)}
-                    disabled={sourcedLoading}
-                    className="w-full rounded-control border border-dashed border-brand-300 bg-brand-50 px-3 py-2 text-[11px] font-semibold leading-snug text-brand-700 disabled:opacity-60"
-                  >
-                    {sourcedLoading
-                      ? "Searching our extended stores…"
-                      : "Still not finding it? Search our extended stores"}
-                  </button>
-                </div>
-              )}
-
-              {/* The extended results, on a phone. The desktop copy lives in the
-                  results pane, which is hidden below `lg`, so without this the
-                  button would fetch and the shopper would see nothing happen. */}
-              {(sourced.length > 0 || sourcedLoading) && (
-                <div className="max-h-[46vh] overflow-y-auto border-t border-line bg-surface px-4 pb-3">
-                  <SourcedPanel
-                    query={sourcedQuery}
-                    products={sortedSourced}
-                    loading={sourcedLoading}
-                    adoptingId={adoptingId}
-                    adoptedIds={adoptedIds}
-                    onAdd={adoptProduct}
-                    sample={shoppingSample}
-                    onOpenProduct={setOpenProduct}
-                  />
-                </div>
-              )}
             </div>
           )}
 
@@ -1125,145 +699,61 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
             <div ref={messagesEndRef} />
           </div>
 
-          {visitingProduct && (
-            <VisitingStoreBar
-              product={visitingProduct}
-              busy={adoptingId === visitingProduct.source_id}
-              added={adoptedIds.includes(visitingProduct.source_id)}
-              onAdd={adoptProduct}
-              onDismiss={() => setVisitingProduct(null)}
-            />
-          )}
-
           {composer}
         </div>
 
-        {/* ── Results ──────────────────────────────────────────────────── */}
+        {/* ── What we can do about it ──────────────────────────────────── */}
         <div className="hidden flex-1 flex-col overflow-hidden bg-surface-sunken lg:flex">
 
-          <div className="flex flex-shrink-0 flex-col gap-3 border-b border-line bg-surface px-6 py-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">
-                  {products.length > 0
-                    ? resultsFor
-                      ? `Results for “${resultsFor}”`
-                      : "Results"
-                    : searchedAndFoundNothing
-                      ? `No matches for “${resultsFor}”`
-                      : "Services"}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-muted">
-                  {resultsTab === "others"
-                    ? sourcedLoading
-                      ? "Searching stores beyond ours…"
-                      : `${sourced.length} from other stores`
-                    : products.length > 0
-                      ? totalMatches > products.length
-                        ? `${totalMatches} matches, showing the best ${products.length}`
-                        : `${products.length} match${products.length === 1 ? "" : "es"}`
-                      : searchedAndFoundNothing
-                        ? "We do not stock anything like that"
-                        : "Ask the assistant, or pick a category to start"}
-                </p>
-              </div>
-
-              {/* Browsing the named stores directly, rather than only the
-                  products a search happened to surface. */}
-              {browserView && canSearchExtended && (
-                <button
-                  onClick={() => setBrowsingStores(true)}
-                  className="flex flex-shrink-0 items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-hover"
-                >
-                  🏪 Browse stores
-                </button>
-              )}
-
-              {/* Gated on whichever list is actually on screen. Keying it to our
-                  own results meant the Other stores tab could never be sorted,
-                  even with results sitting in it. */}
-              {(resultsTab === "others" ? sourced.length : products.length) > 1 && (
-                <div className="flex flex-shrink-0 items-center gap-1 rounded-control border border-line p-0.5">
-                  {SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setSortBy(opt.id)}
-                      aria-pressed={sortBy === opt.id}
-                      className={cn(
-                        "h-8 rounded-[0.5rem] px-3 text-xs font-medium transition-colors",
-                        sortBy === opt.id
-                          ? "bg-brand-50 text-brand-700"
-                          : "text-ink-muted hover:bg-surface-hover"
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+          <div className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-6 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">
+                {services.length > 0
+                  ? resultsFor
+                    ? `For “${resultsFor}”`
+                    : "Services"
+                  : searchedAndFoundNothing
+                    ? `Nothing matches “${resultsFor}”`
+                    : "Services"}
+              </p>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                {services.length > 0
+                  ? totalMatches > services.length
+                    ? `${totalMatches} match, showing the closest ${services.length}`
+                    : `${services.length} service${services.length === 1 ? "" : "s"} could cover this`
+                  : searchedAndFoundNothing
+                    ? "Nobody on the platform lists anything like that"
+                    : "Describe the problem, or start from a category"}
+              </p>
             </div>
 
-            {/* Both sets of results, one click apart. Our own stock is the
-                default, so the client's products are never behind someone
-                else's. */}
-            {canSearchExtended && (
-              <div className="flex items-center gap-2">
-                <div className="flex flex-1 gap-1 rounded-control border border-line p-0.5">
+            {services.length > 1 && (
+              <div className="flex flex-shrink-0 items-center gap-1 rounded-control border border-line p-0.5">
+                {SORT_OPTIONS.map((opt) => (
                   <button
-                    onClick={() => setResultsTab("ours")}
-                    aria-pressed={resultsTab === "ours"}
+                    key={opt.id}
+                    onClick={() => setSortBy(opt.id)}
+                    aria-pressed={sortBy === opt.id}
                     className={cn(
-                      "h-9 flex-1 rounded-[0.5rem] text-xs font-semibold transition-colors",
-                      resultsTab === "ours"
+                      "h-8 rounded-[0.5rem] px-3 text-xs font-medium transition-colors",
+                      sortBy === opt.id
                         ? "bg-brand-50 text-brand-700"
                         : "text-ink-muted hover:bg-surface-hover"
                     )}
                   >
-                    Our store{totalMatches > 0 ? ` (${totalMatches})` : ""}
+                    {opt.label}
                   </button>
-                  <button
-                    onClick={() => {
-                      // Fetch on first use; afterwards the toggle just switches.
-                      if (sourced.length === 0 && !sourcedLoading) {
-                        searchExtendedStores(resultsFor);
-                      } else {
-                        setResultsTab("others");
-                      }
-                    }}
-                    aria-pressed={resultsTab === "others"}
-                    className={cn(
-                      "h-9 flex-1 rounded-[0.5rem] text-xs font-semibold transition-colors",
-                      resultsTab === "others"
-                        ? "bg-brand-50 text-brand-700"
-                        : "text-ink-muted hover:bg-surface-hover"
-                    )}
-                  >
-                    🌐 Other stores{sourced.length > 0 ? ` (${sourced.length})` : ""}
-                  </button>
-                </div>
+                ))}
               </div>
             )}
           </div>
 
           <div className="chat-scroll flex-1 overflow-y-auto px-5 py-5">
-            {resultsTab === "others" ? (
-              /* The whole pane, not a strip at the bottom of a long page. */
-              <SourcedPanel
-                query={sourcedQuery}
-                products={sortedSourced}
-                loading={sourcedLoading}
-                adoptingId={adoptingId}
-                adoptedIds={adoptedIds}
-                onAdd={adoptProduct}
-                sample={shoppingSample}
-                onBackToOurs={() => setResultsTab("ours")}
-                onOpenProduct={setOpenProduct}
-              />
-            ) : isLoading ? (
+            {isLoading ? (
               <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                   <div key={i} className="overflow-hidden rounded-card border border-line bg-surface">
-                    <div className="h-32 w-full animate-pulse bg-surface-hover" />
+                    <div className="h-24 w-full animate-pulse bg-surface-hover" />
                     <div className="space-y-2 p-3">
                       <div className="h-3 w-3/4 animate-pulse rounded bg-surface-hover" />
                       <div className="h-3 w-1/2 animate-pulse rounded bg-surface-hover" />
@@ -1272,22 +762,12 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
                   </div>
                 ))}
               </div>
-            ) : products.length > 0 ? (
+            ) : services.length > 0 ? (
               <>
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
-                  {visible.map((product) => {
-                    const cartItem = cart.items.find((i) => i.product.id === product.id);
-                    return (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        quantity={cartItem?.quantity ?? 0}
-                        onAdd={cart.addItem}
-                        onRemove={cart.removeItem}
-                        onUpdateQty={cart.updateQty}
-                      />
-                    );
-                  })}
+                  {visible.map((service) => (
+                    <ServiceCard key={service.id} service={service} onChoose={chooseService} />
+                  ))}
                 </div>
 
                 {hasMore && (
@@ -1296,38 +776,34 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
                       onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
                       className="h-11 rounded-control border border-line bg-surface px-6 text-sm font-medium text-ink transition-colors hover:bg-surface-hover"
                     >
-                      Show {Math.min(PAGE_SIZE, sortedProducts.length - visibleCount)} more
+                      Show {Math.min(PAGE_SIZE, sortedServices.length - visibleCount)} more
                     </button>
                     <p className="text-xs text-ink-faint">
-                      {sortedProducts.length - visibleCount} more to see
+                      {sortedServices.length - visibleCount} more to see
                     </p>
                   </div>
                 )}
               </>
             ) : (
-              /* The arrival state. This was a magnifying glass in the middle of
-                 two thirds of an empty screen; now it is somewhere to start. */
-              <div className={cn(
-                "flex flex-col",
-                sourced.length === 0 && !sourcedLoading ? "h-full justify-center" : "py-4"
-              )}>
+              /* The arrival state: somewhere to start rather than an empty pane. */
+              <div className={cn("flex h-full flex-col justify-center")}>
                 <div className="mx-auto w-full max-w-2xl">
                   <h2 className="text-base font-semibold text-ink">
                     {searchedAndFoundNothing
                       ? `Nothing here matches “${resultsFor}”`
-                      : "What do you need help with?"}
+                      : "What needs doing?"}
                   </h2>
                   <p className="mt-1 text-sm text-ink-muted">
                     {searchedAndFoundNothing
-                      ? "Try different words, or start from a category."
-                      : "Describe it in your own words, or start with a category."}
+                      ? "Try describing it differently, or start from a category."
+                      : "Describe it in your own words, or start from a category."}
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    {PRODUCT_CATEGORIES.map((cat) => (
+                    {SERVICE_CATEGORIES.map((cat) => (
                       <button
                         key={cat.id}
-                        onClick={() => sendMessage(`Show me ${cat.title}`)}
+                        onClick={() => sendMessage(`I need help with ${cat.title}`)}
                         className="group flex flex-col items-start gap-2 rounded-card border border-line bg-surface p-4 text-left transition-shadow hover:shadow-card-hover"
                       >
                         <span className="flex h-11 w-11 items-center justify-center rounded-control bg-brand-50 text-2xl">
@@ -1360,79 +836,17 @@ export function ChatPage({ scope, onBack, browserView = false }: ChatPageProps) 
                 </div>
               </div>
             )}
-
           </div>
-
-          {!cart.isEmpty && (
-            <div className="flex flex-shrink-0 items-center justify-between gap-4 border-t border-line bg-surface px-6 py-3">
-              <div>
-                <p className="text-xs text-ink-muted">
-                  {totalQty} item{totalQty !== 1 ? "s" : ""} in your cart
-                </p>
-                <p className="text-lg font-bold leading-tight tabular-nums text-ink">
-                  ${cart.total.toFixed(2)}
-                </p>
-              </div>
-              <button
-                onClick={() => setCartOpen(true)}
-                className="h-11 rounded-control bg-brand-500 px-6 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
-              >
-                Review cart
-              </button>
-            </div>
-          )}
         </div>
-
       </div>
 
-      <CartDrawer
-        isOpen={cartOpen}
-        onClose={() => setCartOpen(false)}
-        items={cart.items}
-        subtotal={cart.subtotal}
-        tax={cart.tax}
-        total={cart.total}
-        onUpdateQty={cart.updateQty}
-        onRemove={cart.removeItem}
-        onConfirmOrder={() => setStep("checkout")}
-      />
-
-      {browsingStores && (
-        <StoreBrowserModal query={resultsFor} onClose={() => setBrowsingStores(false)} />
-      )}
-
-      {openProduct && (
-        <VendorProductModal
-          product={openProduct}
-          browserView={browserView}
-          sample={shoppingSample}
-          adding={adoptingId === openProduct.source_id}
-          added={adoptedIds.includes(openProduct.source_id)}
-          onAdd={(p) => { void adoptProduct(p); setOpenProduct(null); }}
-          onClose={() => setOpenProduct(null)}
-        />
-      )}
-
-      {step === "checkout" && (
-        <CustomerInfoForm
-          items={cart.items}
-          subtotal={cart.subtotal}
-          tax={cart.tax}
-          total={cart.total}
-          position={geo.position}
-          onSubmit={handlePlaceOrder}
-          onCancel={() => setStep("chat")}
-          isLoading={placingOrder}
-        />
-      )}
-
-      {step === "confirmed" && (confirmedOrder || paidOrderId !== null) && (
-        <OrderConfirmation
-          order={confirmedOrder}
-          orderId={confirmedOrder?.order_id ?? (paidOrderId as number)}
-          awaitingConfirmation={awaitingConfirmation}
-          paid={paidOrderId !== null}
-          onStartNewOrder={startNewOrder}
+      {booking && (
+        <BookingFlow
+          service={booking}
+          serviceRequestId={requestId}
+          problem={problem}
+          onClose={() => setBooking(null)}
+          onBooked={onBooked}
         />
       )}
     </div>

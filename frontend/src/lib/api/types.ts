@@ -1,3 +1,7 @@
+// The shapes the backend actually returns. Every one of these was read off
+// `backend/API.md` and the endpoint that serves it, not guessed: a field name
+// invented here becomes a blank space on screen with nothing to say it is wrong.
+
 export interface ChatRequest {
   message: string;
   session_id?: string;
@@ -6,7 +10,10 @@ export interface ChatRequest {
   longitude?: number;
 }
 
-export interface ProductResult {
+/** One service the assistant matched. Not the booking target: price and
+ *  duration below are the service's guide figures, and the provider's own
+ *  replace them the moment one is chosen. */
+export interface ServiceResult {
   id: number;
   name: string;
   category: string;
@@ -15,36 +22,16 @@ export interface ProductResult {
   price_per_unit: number;
   stock: number;
   image_url: string | null;
+  /** Roughly how long a visit takes. Null when the service does not say. */
+  duration_minutes?: number | null;
+  /** Attended out of hours. */
+  emergency?: boolean;
   similarity: number;
 }
 
-// ── Server-side cart ─────────────────────────────────────────────
-export interface CartLine {
-  item_id: number;
-  name: string;
-  unit: string;
-  unit_price: number;
-  quantity: number;
-  subtotal: number;
-  image_url: string | null;
-  /** From our own items table. No provider call is made to fill these. */
-  description?: string | null;
-  category?: string | null;
-  /** Present only for products sourced from outside our catalog. */
-  seller?: string | null;
-  product_url?: string | null;
-}
-
-export interface CartOut {
-  session_id: string;
-  items: CartLine[];
-  subtotal?: number; // goods only, before tax
-  tax?: number;
-  total: number;     // subtotal + tax — what the customer pays
-  count: number;
-}
-
-// Structured action the assistant performed (so the UI can react).
+/** What the assistant did, so the interface can follow. `added` means the
+ *  customer chose a service ("book item 2"), which is the cue to go and find
+ *  providers for it. */
 export interface ChatAction {
   type: "added" | "removed" | "quantity" | "checkout";
   items?: { item_id: number; name: string; quantity?: number }[];
@@ -53,84 +40,288 @@ export interface ChatAction {
 export interface ChatResponse {
   session_id: string;
   reply: string;
-  speech?: string;   // short text to speak aloud (long lists aren't read out)
-  services: ProductResult[];
-  /** Everything that matched. `products` carries only the best 100 of them. */
+  speech?: string;
+  services: ServiceResult[];
   total_services?: number;
-  cart: CartOut;
   action: ChatAction | null;
-  /** How the message was understood: "search", "add_to_cart", "view_cart"... */
   intent?: string | null;
 }
 
 export interface VoiceResponse {
   session_id: string;
   transcript: string;
-  reply: string;   // shown on screen, may be a long product list
-  speech: string;  // what to read out, e.g. "Here is the list." for a long one
-  audio: string;   // base64 audio data URL ('' when the browser should speak instead)
-  services: ProductResult[];
-  /** Everything that matched. `products` carries only the best 100 of them. */
+  reply: string;
+  speech: string;
+  /** base64 audio data URL; empty when the browser should speak instead. */
+  audio: string;
+  services: ServiceResult[];
   total_services?: number;
-  cart: CartOut;
   action: ChatAction | null;
   intent?: string | null;
 }
 
-export interface CustomerIn {
+// ── who is signed in ─────────────────────────────────────────────────────────
+
+export type Role = "customer" | "provider" | "admin";
+
+/** Returned by both registrations and by login. Carries enough for the
+ *  interface to know where to send somebody without a second call. */
+export interface TokenOut {
+  token: string;
+  role: Role;
+  name: string;
+  customer_id?: number | null;
+  provider_id?: number | null;
+  provider_status?: string | null;
+}
+
+export interface Account {
+  account_id: number;
+  email: string;
+  role: Role;
+  name: string;
+  customer_id?: number | null;
+  provider_id?: number | null;
+  /** pending | active | suspended | rejected. Only providers have one. */
+  provider_status?: string | null;
+}
+
+export interface CustomerRegisterIn {
   name: string;
   email: string;
+  password: string;
   phone?: string;
-  latitude?: number;
-  longitude?: number;
   address?: string;
 }
 
-export interface OrderItemIn {
-  product_id: number;
-  quantity: number;
+export interface ProviderRegisterIn {
+  business_name: string;
+  contact_name?: string;
+  email: string;
+  password: string;
+  phone?: string;
+  website?: string;
+  description?: string;
+  address?: string;
+  city?: string;
+  postcode?: string;
+  services?: { service_id: number; price?: number | null; duration_minutes?: number | null }[];
 }
 
-export type PaymentMethod = "cod" | "stripe" | "paypal";
+// ── finding somebody ─────────────────────────────────────────────────────────
 
-export interface PlaceOrderRequest {
-  customer: CustomerIn;
-  session_id?: string;
-  items?: OrderItemIn[];
-  notes?: string;
-  delivery_date?: string;  // "YYYY-MM-DD"
-  delivery_time?: string;  // e.g. "5:00 PM EST"
-  delivery_notes?: string; // free text from the customer, optional
-  /** Makes a retried or double-submitted order return the original. */
-  idempotency_key?: string;
-  /** Cash confirms the order at once; the others redirect to the provider. */
-  payment_method?: PaymentMethod;
+/** One provider's offer of one service. `price` and `duration_minutes` are
+ *  theirs, which is the whole reason the booking target is a provider and a
+ *  service together rather than a service on its own. */
+export interface ProviderOffer {
+  provider_id: number;
+  business_name: string;
+  description?: string | null;
+  website?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  price: number;
+  duration_minutes: number;
+  provider_service_id: number;
+  next_available?: string | null;
+  next_available_label?: string | null;
 }
 
-export interface OrderItemOut {
-  product_id: number;
-  product_name: string;
-  quantity: number;
-  unit: string;
-  unit_price: number;
-  subtotal: number;
+export interface Discovery {
+  service_id: number;
+  service_name: string;
+  /** How the list is ordered. Shown to the customer so the order is explained
+   *  rather than mysterious. The backend decides it; nothing re-sorts here. */
+  ranked_by: string;
+  providers: ProviderOffer[];
 }
 
-export interface PlaceOrderResponse {
-  order_id: number;
-  customer_id: number;
-  total_amount: number; // subtotal + tax
-  subtotal?: number;
-  tax?: number;
+export interface ProviderServiceRow {
+  provider_service_id: number;
+  service_id: number;
+  name: string;
+  price: number;
+  duration_minutes: number;
+  notes?: string | null;
+}
+
+export interface ProviderDetail {
+  id: number;
+  business_name: string;
+  contact_name?: string | null;
+  description?: string | null;
+  website?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  city?: string | null;
+  postcode?: string | null;
   status: string;
-  items: OrderItemOut[];
-  delivery_date?: string | null;
-  delivery_time?: string | null;
-  delivery_notes?: string | null;
-  payment_method?: string | null;
+  services: ProviderServiceRow[];
 }
 
-export interface Product {
+export interface Slot {
+  /** Naive UTC, no offset. Formatted for the reader by lib/datetime. */
+  starts_at: string;
+  ends_at: string;
+  label: string;
+}
+
+export interface Availability {
+  provider_id: number;
+  service_id: number;
+  duration_minutes: number;
+  slots: Slot[];
+}
+
+// ── the problem, and the booking ─────────────────────────────────────────────
+
+export type Urgency = "whenever" | "this_week" | "urgent";
+
+export interface ServiceRequestIn {
+  description: string;
+  service_id?: number | null;
+  address?: string;
+  postcode?: string;
+  urgency?: Urgency;
+  session_id?: string;
+}
+
+export interface ServiceRequest {
+  id: number;
+  description: string;
+  status: string;
+  urgency: string;
+  address?: string | null;
+  postcode?: string | null;
+  service_id?: number | null;
+  service_name?: string | null;
+  provider_id?: number | null;
+  provider_name?: string | null;
+  job_id?: number | null;
+  created_at: string;
+}
+
+export interface BookIn {
+  provider_id: number;
+  service_id: number;
+  starts_at: string;
+  address?: string;
+  notes?: string;
+  service_request_id?: number | null;
+}
+
+/** Everything the confirmation screen needs, so it makes no second call.
+ *  `payment_status` is "unpaid" until Phase G and is never inferred. */
+export interface Booked {
+  job_id: number;
+  appointment_id: number;
+  reference: string;
+
+  provider_id: number;
+  provider_name: string;
+  provider_phone?: string | null;
+  provider_website?: string | null;
+
+  service_id: number;
+  service_name: string;
+
+  starts_at: string;
+  ends_at: string;
+  duration_minutes: number;
+  label: string;
+
+  price: number;
+  currency: string;
+  payment_status: string;
+
+  customer_id: number;
+  customer_name: string;
+  customer_email?: string | null;
+  address?: string | null;
+  notes?: string | null;
+
+  status: string;
+  service_request_id?: number | null;
+}
+
+export interface BookingSummary {
+  reference: string;
+  appointment_id: number;
+  job_id: number;
+  status: string;
+  starts_at: string;
+  ends_at: string;
+  label: string;
+  provider_name?: string | null;
+  provider_phone?: string | null;
+  provider_website?: string | null;
+  service?: string | null;
+  price: number;
+  currency: string;
+  address?: string | null;
+  notes?: string | null;
+  payment_status: string;
+}
+
+// ── a provider running their own business ────────────────────────────────────
+
+export interface ProviderProfile {
+  id: number;
+  business_name: string;
+  contact_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  description?: string | null;
+  address?: string | null;
+  city?: string | null;
+  postcode?: string | null;
+  travel_radius_miles?: number | null;
+  requires_approval?: boolean | null;
+  status: string;
+}
+
+/** What a provider offers. `price` and `duration_minutes` are null when they
+ *  have not set their own, in which case the guide figures apply and are shown
+ *  beside them so the difference is visible. */
+export interface MyServiceRow {
+  provider_service_id: number;
+  service_id: number;
+  name: string;
+  price: number | null;
+  duration_minutes: number | null;
+  guide_price: number;
+  guide_duration: number | null;
+  notes?: string | null;
+  active: boolean;
+}
+
+export interface WorkingDay {
+  id: number;
+  /** 0 is Monday. */
+  weekday: number;
+  opens_at: string;
+  closes_at: string;
+}
+
+export interface ProviderAppointment {
+  appointment_id: number;
+  job_id: number;
+  status: string;
+  starts_at: string;
+  ends_at: string;
+  label: string;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  address?: string | null;
+  notes?: string | null;
+}
+
+// ── still the shop's, kept for the admin pages and for Phase G ───────────────
+
+/** One entry in the catalogue of things that can be booked, with the guide
+ *  figures a provider sets their own terms against. */
+export interface Service {
   id: number;
   name: string;
   category: string;
@@ -139,84 +330,7 @@ export interface Product {
   price_per_unit: number;
   stock: number;
   image_url: string | null;
+  duration_minutes?: number | null;
+  emergency?: boolean;
   is_active: boolean;
-}
-
-/** A product found outside our own catalog. */
-export interface ExternalProduct {
-  source_id: string;
-  name: string;
-  price: number;
-  currency?: string;
-  image_url?: string | null;
-  /** The retailer's own page. Where "Show More" sends the shopper. */
-  product_url?: string | null;
-  seller?: string | null;
-  description?: string;
-  rating?: number | null;
-  reviews?: number | null;
-  /** Came from our own store of past results, so no search was spent. */
-  stored?: boolean;
-  /** The provider is returning invented sample data, not real listings. */
-  sample?: boolean;
-  /** The store the shopper chose in the popup, recorded against the product. */
-  vendor_url?: string | null;
-}
-
-export interface StoreOffer {
-  name: string;
-  /** The retailer's own product page, not Google's comparison page. */
-  url: string;
-  price?: number | null;
-  price_text?: string;
-}
-
-/** A vendor product as we render it, because their page cannot be embedded. */
-export interface ProductDetail {
-  source_id: string;
-  title: string;
-  brand?: string | null;
-  rating?: number | null;
-  reviews?: number | null;
-  description: string;
-  images: string[];
-  stores: StoreOffer[];
-  review_snippets: string[];
-  best_url?: string | null;
-  best_store?: string | null;
-  best_price?: number | null;
-  /** False when the retailer detail could not be fetched. */
-  resolved: boolean;
-}
-
-export interface AdoptResponse {
-  product: ProductResult;
-  created: boolean;
-  cart: CartOut;
-  /** It is orderable at once; search picks it up after the next index rebuild. */
-  searchable_in_seconds: number;
-}
-
-
-/** One of the stores the shopper can browse from inside the app. */
-export interface BrowseStore {
-  key: string;
-  name: string;
-  home: string;
-  /** Their search, already carrying the shopper's words. */
-  search_url: string;
-  /**
-   * Whether their pages can actually be drawn inside ours. Measured, not
-   * guessed: several of these refuse automated visitors, and one serves an
-   * international page because the server is not in the United States. False
-   * does not hide the store; it means we go straight to a card with a link out
-   * rather than spinning first.
-   */
-  renders: boolean;
-  /**
-   * Whether that store's own search produces products in our frame. Several
-   * draw perfectly and still search empty, because their results are fetched
-   * by scripts we strip. Those open at the catalogue, and the panel says so.
-   */
-  searches: boolean;
 }

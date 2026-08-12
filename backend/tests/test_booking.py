@@ -18,7 +18,8 @@ from app.core.config import settings
 from app.db.database import Base, get_db
 from app.main import app
 from app.models.appointment import Appointment
-from app.models.provider import Provider, ProviderAvailability, ProviderService
+from app.models.provider import (Provider, ProviderAvailability, ProviderService,
+                                 ProviderTimeOff)
 from app.models.service import Service
 from app.services import booking_service, discovery
 from app.services.calendly.local_provider import LocalCalendar
@@ -278,9 +279,23 @@ def test_a_provider_with_no_price_falls_back_to_the_guide(db):
 def test_ranking_puts_the_soonest_first_then_the_cheapest(db, monkeypatch):
     monkeypatch.setattr(settings, "PROVIDER_RANKING", "soonest")
     service = a_service(db)
-    later = a_provider(db, "Opens Later", opens=14, closes=17)
+    later = a_provider(db, "Opens Later", opens=8, closes=17)
     sooner_dear = a_provider(db, "Sooner Dear", opens=8, closes=17)
     sooner_cheap = a_provider(db, "Sooner Cheap", opens=8, closes=17)
+
+    # "Later" used to mean opening at 14:00 against the others' 8:00, and that
+    # made the test depend on the hour it was run at: after two in the afternoon
+    # all three have the same next free slot, the tie falls to price, and this
+    # provider is the cheapest, so it came first and the assertion failed. It
+    # passed every morning. Two days blocked out makes "later" true at any hour.
+    db.add(ProviderTimeOff(
+        provider_id=later.id,
+        starts_at=datetime.utcnow() - timedelta(hours=1),
+        ends_at=datetime.utcnow() + timedelta(days=2),
+        reason="Away, so genuinely cannot come sooner",
+    ))
+    db.commit()
+
     offers(db, later, service, price=10)
     offers(db, sooner_dear, service, price=200)
     offers(db, sooner_cheap, service, price=50)
@@ -558,3 +573,38 @@ def test_a_provider_cannot_approve_themselves(client, db):
     provider = db.query(Provider).filter(Provider.id == provider_id).one()
     assert provider.business_name == "Renamed"
     assert provider.status == "pending", "status is not a field they can set"
+
+
+# ── route ordering ───────────────────────────────────────────────────────────
+
+def test_a_provider_can_read_their_own_week(db, client):
+    """`/me/availability` must not be swallowed by `/{provider_id}/availability`.
+
+    FastAPI matches routes in declaration order, and for a while the
+    parameterised one came first: it took "me" as the id, failed to parse it as
+    an integer, and answered 422. Nothing crashed and no test noticed, because
+    saving hours used a different verb and worked fine. The only symptom was a
+    provider whose own hours page would not load.
+    """
+    headers, provider_id = sign_in_provider(client, "week@example.com")
+
+    saved = client.put("/api/v1/providers/me/availability",
+                       json={"weekday": 0, "opens_at": "09:00:00", "closes_at": "17:00:00"},
+                       headers=headers)
+    assert saved.status_code == 200
+
+    mine = client.get("/api/v1/providers/me/availability", headers=headers)
+    assert mine.status_code == 200, mine.json()
+    assert isinstance(mine.json(), list), "a 422 body is a dict, and that was the bug"
+    assert [row["weekday"] for row in mine.json()] == [0]
+
+
+def test_the_by_id_availability_route_still_works(db, client):
+    """The move must not have broken the customer-facing one."""
+    service = a_service(db)
+    provider = a_provider(db, "Still Reachable")
+    offers(db, provider, service)
+
+    res = client.get(f"/api/v1/providers/{provider.id}/availability?service_id={service.id}")
+    assert res.status_code == 200
+    assert res.json()["slots"]

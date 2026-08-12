@@ -21,6 +21,12 @@ class ServiceResult(BaseModel):
     price_per_unit: float
     stock: float
     image_url: Optional[str]
+    #: How long a visit for this usually takes, and whether it is attended out
+    #: of hours. Both belong to the service rather than to any one provider, so
+    #: the card describes them as a guide; the provider's own figures replace
+    #: them once one is chosen.
+    duration_minutes: Optional[int] = None
+    emergency: bool = False
     similarity: float
 
 

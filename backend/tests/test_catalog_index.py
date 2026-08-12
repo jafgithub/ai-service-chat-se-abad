@@ -43,7 +43,7 @@ def make_index(vectors, prices=None, categories=None):
 
     meta = [
         (i + 1, f"Product {i + 1}", f"desc {i + 1}", float(prices[i]), 10.0,
-         None, None, None, categories[i], None)
+         None, None, None, categories[i], None, 60, False)
         for i in range(n)
     ]
     return CatalogIndex(matrix, meta, np.asarray(codes, dtype=np.int32), names, 0.0)
@@ -166,7 +166,7 @@ def test_result_shape_matches_the_api_contract():
     r = index.search(v.tolist(), None, None, 0.0)[0]
     assert set(r) == {"id", "name", "category", "description", "unit",
                       "price_per_unit", "stock", "image_url", "owner_email",
-                      "similarity"}
+                      "duration_minutes", "emergency", "similarity"}
     assert r["category"] == "Dairy"
     assert r["price_per_unit"] == 4.25
     assert r["unit"] == "unit"
@@ -184,19 +184,20 @@ def sqlite_catalog(monkeypatch):
         c.execute(text("CREATE TABLE stores (id INT, email TEXT)"))
         c.execute(text("""CREATE TABLE services (
             id INT, name TEXT, description TEXT, price REAL, stock INT, image TEXT,
-            store_id INT, category_id INT, status INT, item_vector TEXT)"""))
+            store_id INT, category_id INT, duration_minutes INT, emergency INT,
+            status INT, item_vector TEXT)"""))
         c.execute(text("INSERT INTO categories VALUES (1,'Dairy'),(2,'Bakery')"))
         c.execute(text("INSERT INTO stores VALUES (9,'shop@example.com')"))
         for i in range(1, 21):
             c.execute(
-                text("INSERT INTO services VALUES (:id,:n,:d,:p,5,NULL,9,:c,:s,:v)"),
+                text("INSERT INTO services VALUES (:id,:n,:d,:p,5,NULL,9,:c,90,0,:s,:v)"),
                 {"id": i, "n": f"Item {i}", "d": "d", "p": float(i),
                  "c": 1 if i % 2 else 2,
                  "s": 0 if i == 20 else 1,          # one inactive row
                  "v": json.dumps(unit(rng).tolist())},
             )
         # A row with no vector: it must be excluded, not crash the build.
-        c.execute(text("INSERT INTO services VALUES (21,'No vector','d',1.0,5,NULL,9,1,1,NULL)"))
+        c.execute(text("INSERT INTO services VALUES (21,'No vector','d',1.0,5,NULL,9,1,90,0,1,NULL)"))
 
     monkeypatch.setattr(catalog_index, "engine", engine)
     catalog_index.clear()

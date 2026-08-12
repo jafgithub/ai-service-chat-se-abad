@@ -85,15 +85,26 @@ def test_empty_search_suggests_what_to_do_next():
     assert "couldn't find" in reply.lower()
 
 
-def test_cart_reply_totals():
+def test_what_is_picked_is_named_but_never_priced():
+    """The service is named; no figure is quoted.
+
+    This asserted a running total when the same code was a shop. The price of
+    the work belongs to the provider, and at this point in the conversation no
+    provider has been chosen, so any figure here would be the guide price
+    presented as a quote.
+    """
     reply = response.cart_reply(CART)
-    assert "$4.51" in reply and "Skim Milk" in reply
+    assert "Skim Milk" in reply
+    assert "$" not in reply
 
 
-def test_single_item_is_not_shown_with_a_quantity():
-    """"Added Skim Milk" reads better than "Added 1 x Skim Milk"."""
-    assert "1 x" not in response.added_reply([("Skim Milk", 1)])
-    assert "2 x" in response.added_reply([("Skim Milk", 2)])
+def test_no_reply_talks_about_quantities():
+    """You do not book two of a visit."""
+    for reply in (response.added_reply([("Skim Milk", 1)]),
+                  response.added_reply([("Skim Milk", 2)]),
+                  response.quantity_reply("Skim Milk", 3)):
+        assert "x " not in reply
+        assert "Skim Milk" in reply
 
 
 # ── products with no name ────────────────────────────────────────────────────

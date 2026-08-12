@@ -30,11 +30,20 @@ def build_shown(services: list[dict]) -> list[dict]:
 
 
 def numbered_list(services: list[dict], limit: int = 5) -> str:
+    """The shortlist, numbered so "book item 2" resolves.
+
+    Two things this deliberately does not say. There is no "/unit": a visit is
+    not sold by the kilo, and the catalogue's unit column is the placeholder
+    string "unit" on every single row. And the figure is prefixed with "from",
+    because it is the service's guide price and every provider sets their own;
+    quoting it flat and then showing a different number on the review screen is
+    how a booking flow loses somebody two steps before it takes their money.
+    """
     lines = []
     for i, p in enumerate(services[:limit], 1):
         price = p.get("price_per_unit")
-        price_str = f"${float(price):.2f}" if price is not None else ""
-        lines.append(f"{i}. {p['name']}: {price_str}/{p.get('unit', 'unit')}".rstrip("/"))
+        price_str = f": from ${float(price):.2f}" if price else ""
+        lines.append(f"{i}. {p['name']}{price_str}")
     return "\n".join(lines)
 
 
@@ -49,36 +58,56 @@ def search_reply(services: list[dict]) -> str:
 
 
 def added_reply(added: list[tuple[str, int]]) -> str:
+    """Choosing a service, which used to be adding it to a cart.
+
+    The intent engine still calls this "add", and one line below is why that is
+    left alone: what the customer said is "book item 2", and what they want next
+    is to see who can do it. So the reply hands over to the provider list rather
+    than confirming a basket. Nothing here quotes a price, because the price is
+    the provider's and is not known yet.
+    """
     if not added:
-        return ("I'm not sure which item you meant. Tell me the number from the list "
-                "(e.g. \"add item 2\") or the service name.")
-    parts = ", ".join(f"{qty} x {name}" if qty > 1 else name for name, qty in added)
-    return f"Added {parts} to your cart. Anything else I can help you with?"
+        return ("I'm not sure which one you meant. Tell me the number from the list "
+                "(e.g. \"book item 2\") or the name of the service.")
+    name = added[0][0]
+    return f"Right, {name}. Here is who can do that, and when they are free."
 
 
 def removed_reply(name: Optional[str]) -> str:
     if not name:
-        return "I couldn't find that item in your cart. Which one would you like to remove?"
-    return f"Removed {name} from your cart. Anything else I can help you with?"
+        return "Nothing is chosen at the moment. Tell me what has gone wrong and I will look it up."
+    return f"Fine, I have set {name} aside. What else can I help with?"
 
 
 def quantity_reply(name: Optional[str], qty: int) -> str:
+    """A visit is not a quantity.
+
+    Somebody who says "change item 2 to 3" is thinking in a shop, so the reply
+    says plainly that this is not one, and points at the thing that does vary:
+    how long the visit is and when it happens.
+    """
     if not name:
-        return "Tell me which item and the new quantity, e.g. \"change item 2 to 3\"."
-    if qty <= 0:
-        return f"Removed {name} from your cart. Anything else?"
-    return f"Updated {name} to {qty}. Anything else I can help you with?"
+        return "Tell me which one you mean by its number, e.g. \"book item 2\"."
+    return (f"One visit covers {name}. If it is a bigger job than that, "
+            "say so and I will find someone with a longer slot.")
 
 
 def cart_reply(cart: dict) -> str:
+    """What they have picked so far. Deliberately no total.
+
+    Whatever the shop's cart is holding, the price of the work is the chosen
+    provider's, and no provider has been chosen at this point. Quoting a figure
+    here would be quoting the guide price as though it were a quote.
+    """
     if not cart["items"]:
-        return "Your cart is empty right now. What would you like to add?"
-    lines = [f"{i}. {li['name']} x {li['quantity']}: ${li['subtotal']:.2f}"
-             for i, li in enumerate(cart["items"], 1)]
-    return "Here's your cart:\n" + "\n".join(lines) + f"\nTotal: ${cart['total']:.2f}\n\nSay \"checkout\" when you're ready."
+        return "You have not picked anything yet. What do you need doing?"
+    lines = [f"{i}. {li['name']}" for i, li in enumerate(cart["items"], 1)]
+    return ("So far you are looking at:\n" + "\n".join(lines) +
+            "\n\nSay \"book item 1\" and I will show you who can do it and when.")
 
 
 def checkout_reply(cart: dict) -> str:
     if not cart["items"]:
-        return "Your cart is empty. Add a few items first, then say \"checkout\"."
-    return f"Great! Your cart total is ${cart['total']:.2f}. I'll take you to checkout to confirm your details."
+        return "Tell me what needs doing first and I will find someone who does it."
+    name = cart["items"][0]["name"]
+    return f"Let's get {name} booked. Pick a provider and a time and I will confirm it."

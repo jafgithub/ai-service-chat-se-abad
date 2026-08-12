@@ -21,6 +21,25 @@ function isPrompt(line: string): boolean {
   return /^(just say|say|tap|try saying|you can say)\b/i.test(line.trim());
 }
 
+/**
+ * `**like this**` becomes bold.
+ *
+ * The greeting and the booking confirmation both emphasise a name or a
+ * reference this way, and until now the asterisks were printed literally:
+ * "Your reference is **BK-00011**". Nothing else in these replies is markdown,
+ * so this handles the one mark that is actually used rather than pulling in a
+ * parser for a syntax the backend never emits.
+ */
+function withEmphasis(text: string): React.ReactNode {
+  const parts = text.split(/\*\*([^*]+)\*\*/g);
+  // split() with one capture group alternates: plain, bold, plain, bold…
+  return parts.map((part, i) =>
+    i % 2 === 1
+      ? <strong key={i} className="font-semibold text-ink">{part}</strong>
+      : <span key={i}>{part}</span>
+  );
+}
+
 function FormattedText({ text }: { text: string }) {
   const lines = text.split(/\n+/).filter((l) => l.trim() !== "");
 
@@ -50,7 +69,7 @@ function FormattedText({ text }: { text: string }) {
         if (isPrompt(trimmed)) {
           return (
             <p key={i} className="text-sm leading-relaxed text-ink-muted">
-              {trimmed}
+              {withEmphasis(trimmed)}
             </p>
           );
         }
@@ -63,7 +82,7 @@ function FormattedText({ text }: { text: string }) {
               i === 0 ? "font-medium text-ink" : "text-ink-muted"
             )}
           >
-            {trimmed}
+            {withEmphasis(trimmed)}
           </p>
         );
       })}

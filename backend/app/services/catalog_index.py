@@ -47,6 +47,7 @@ logger = logging.getLogger("rag")
 _BUILD_SQL = """
     SELECT i.id, i.name, i.description, i.price, i.stock, i.image,
            i.store_id, i.category_id,
+           i.duration_minutes, i.emergency,
            c.name  AS category_name,
            s.email AS owner_email,
            i.item_vector
@@ -64,7 +65,13 @@ _CHUNK = 2000
 # Meta tuple layout. Indexing a tuple by constant is far cheaper in both memory
 # and time than 25k dicts, and results are only ever materialised for the handful
 # of rows a query actually returns.
-_ID, _NAME, _DESC, _PRICE, _STOCK, _IMAGE, _STORE, _CATID, _CAT, _EMAIL = range(10)
+#
+# `duration` and `emergency` are carried here rather than fetched per result:
+# the service card shows how long a visit takes and whether it is attended out
+# of hours, and going back to the database for two columns on every card would
+# undo the point of the index.
+(_ID, _NAME, _DESC, _PRICE, _STOCK, _IMAGE, _STORE, _CATID, _CAT, _EMAIL,
+ _DURATION, _EMERGENCY) = range(12)
 
 # Set by build(); read by search. Assignment is atomic under the GIL, so a
 # rebuild swaps the whole index in one statement and readers never see it torn.
@@ -114,6 +121,8 @@ class CatalogIndex:
             "stock":          m[_STOCK],
             "image_url":      serialized_image_for(m[_ID], m[_IMAGE], m[_STORE]),
             "owner_email":    m[_EMAIL],
+            "duration_minutes": m[_DURATION],
+            "emergency":      m[_EMERGENCY],
             "similarity":     round(similarity, 4),
         }
 
@@ -318,6 +327,8 @@ def _load(conn, expected: int, t0: float) -> CatalogIndex:
                 int(row.category_id) if row.category_id is not None else None,
                 cat_name,
                 intern(row.owner_email),
+                int(row.duration_minutes) if row.duration_minutes is not None else None,
+                bool(row.emergency),
             ))
             n += 1
 

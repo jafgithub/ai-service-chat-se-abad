@@ -1,47 +1,39 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/sections/Hero";
 import { HowItWorks } from "@/components/sections/HowItWorks";
-import { ProductCategories } from "@/components/sections/ProductCategories";
-import { PartnerModal } from "@/components/ui/PartnerModal";
+import { ServiceCategories } from "@/components/sections/ServiceCategories";
 
 export default function HomePage() {
   const router = useRouter();
-  const [partnerModalOpen, setPartnerModalOpen] = useState(false);
 
-  const startOrdering = (scope?: string) => {
-    localStorage.removeItem("chat_messages");
-    localStorage.removeItem("chat_products");
-    const url = scope ? `/chat?scope=${encodeURIComponent(scope)}` : "/chat";
-    router.push(url);
+  const start = (scope?: string) => {
+    // A fresh conversation each time somebody comes in from the front page.
+    // Carrying yesterday's problem into today's is confusing, and the results
+    // beside it would be answering a question nobody just asked.
+    localStorage.removeItem("sa_conversation");
+    localStorage.removeItem("sa_services");
+    router.push(scope ? `/chat?scope=${encodeURIComponent(scope)}` : "/chat");
   };
 
   return (
     <>
-      <Navbar
-        onStartOrdering={() => startOrdering()}
-        onPartnerClick={() => setPartnerModalOpen(true)}
-      />
+      <Navbar onStart={() => start()} />
 
       <main>
         <Hero
-          onStartOrdering={() => startOrdering()}
-          onPartnerClick={() => setPartnerModalOpen(true)}
+          onStart={() => start()}
+          onProviderClick={() => router.push("/provider/register")}
         />
         <HowItWorks />
-        <ProductCategories onCategorySelect={(scope) => startOrdering(scope)} />
+        <ServiceCategories onCategorySelect={(scope) => start(scope)} />
       </main>
 
       <Footer />
-
-      <PartnerModal
-        open={partnerModalOpen}
-        onClose={() => setPartnerModalOpen(false)}
-      />
     </>
   );
 }
