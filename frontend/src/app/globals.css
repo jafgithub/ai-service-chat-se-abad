@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens.
+ *
+ * Everything visual should come from here rather than from ad-hoc utilities.
+ * Before this existed the UI used nine text sizes between 10px and 16px, three
+ * different orange gradients as surfaces, and `rounded-xl`/`2xl`/`3xl`
+ * interchangeably, which is most of why it read as unfinished.
+ *
+ * The brand ramp is the orange the client already knows. What changed is where
+ * it is allowed to appear: as the accent on the one primary action of a screen,
+ * not as the background of every header, panel and button at once.
+ */
+@theme {
+  /* Brand */
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+
+  /* Surfaces and lines. Page is a hair off-white so white cards read as raised. */
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f7f7f8;
+  --color-surface-hover: #f4f4f5;
+  --color-line: #e7e7ea;
+  --color-line-strong: #d4d4d8;
+
+  /* Text. Three weights of emphasis is enough for this product. */
+  --color-ink: #18181b;
+  --color-ink-muted: #6b7280;
+  --color-ink-faint: #9ca3af;
+
+  /* Status */
+  --color-positive: #10b981;
+  --color-positive-soft: #ecfdf5;
+  --color-warn: #d97706;
+  --color-warn-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+
+  /* One radius per role, so shapes stop drifting. */
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+  --radius-sheet: 1.25rem;
+
+  /* Two elevations. Cards sit; things that float pop. */
+  --shadow-card: 0 1px 2px rgb(24 24 27 / 0.05), 0 1px 3px rgb(24 24 27 / 0.04);
+  --shadow-card-hover: 0 4px 12px rgb(24 24 27 / 0.08), 0 2px 4px rgb(24 24 27 / 0.04);
+  --shadow-pop: 0 12px 32px rgb(24 24 27 / 0.14), 0 4px 8px rgb(24 24 27 / 0.06);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/*
+ * No `font-family` here. layout.tsx loads Geist and puts `--font-geist-sans` on
+ * <html>, and the mapping above turns it into Tailwind's `font-sans`. This file
+ * used to end with `body { font-family: Arial, Helvetica, sans-serif }`, which
+ * won on specificity and threw away the font the app had already downloaded.
+ */
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* A visible focus ring for keyboard users, without boxing every mouse click. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+/* Slim scrollbars for the chat and results columns. */
+.chat-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 9999px;
+}
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-faint);
+}
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* Assistant "thinking" dots and the newly-added-to-cart tick. */
+@keyframes rise {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+.animate-rise {
+  animation: rise 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

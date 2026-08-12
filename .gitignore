@@ -1,0 +1,20 @@
+# Secrets. Never committed, in either half of the repo.
+.env
+.env.*
+!.env.example
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.cache/
+
+# Node and Next
+node_modules/
+.next/
+out/
+tsconfig.tsbuildinfo
+
+# Build output
+build/web/
