@@ -10,7 +10,8 @@ import hmac
 import logging
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import (APIRouter, BackgroundTasks, Depends, Header, HTTPException,
+                     Query, Request)
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
@@ -24,6 +25,8 @@ from app.models.service import Service
 from app.models.service_request import ServiceRequest
 from app.api.deps import require_customer
 from app.services import booking_service, calendly
+from app.services.booking_notify import (send_booking_emails,
+                                         send_cancellation_email)
 
 logger = logging.getLogger("booking")
 
@@ -213,6 +216,7 @@ class BookedOut(BaseModel):
 @router.post("/book", response_model=BookedOut,
              summary="Take a time with a provider, in one step")
 def book(payload: BookIn,
+         background: BackgroundTasks,
          customer: Customer = Depends(require_customer),
          db: Session = Depends(get_db)):
     """The whole booking, as one call, against one provider.
@@ -325,6 +329,12 @@ def book(payload: BookIn,
         f"[BOOKING] job {job.id}: {service.name} with {provider.business_name} "
         f"for customer {customer.id} at {appointment.starts_at:%Y-%m-%d %H:%M}"
     )
+
+    # After the commit and outside the request. The booking exists either way:
+    # a relay that is slow or refusing must not hold this response open, and
+    # must not turn a booking that worked into an error on screen.
+    background.add_task(send_booking_emails, appointment.id)
+
     return BookedOut(
         job_id=job.id,
         appointment_id=appointment.id,
@@ -400,6 +410,7 @@ def my_bookings(when: str = Query("all", pattern="^(all|upcoming|past|cancelled)
 
 @router.post("/{appointment_id}/cancel", summary="Cancel one of my bookings")
 def cancel_booking(appointment_id: int,
+                   background: BackgroundTasks,
                    customer: Customer = Depends(require_customer),
                    db: Session = Depends(get_db)):
     """Only the customer whose booking it is. The join to `jobs` is what
@@ -422,4 +433,9 @@ def cancel_booking(appointment_id: int,
     job.status = "cancelled"
     db.commit()
     logger.info(f"[BOOKING] appointment {appointment.id} cancelled by customer {customer.id}")
+
+    # The provider is told, because a freed slot is only useful to somebody who
+    # knows it is free.
+    background.add_task(send_cancellation_email, appointment.id)
+
     return {"status": "cancelled", "reference": f"BK-{job.id:05d}"}

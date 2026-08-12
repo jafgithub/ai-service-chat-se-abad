@@ -39,7 +39,7 @@ export function BookingConfirmation({ booking, onDone }: BookingConfirmationProp
 
       <h2 className="text-lg font-bold text-ink">You are booked in</h2>
       <p className="mt-1 text-sm text-ink-muted">
-        {booking.provider_name} will attend. We have emailed you the details.
+        {booking.provider_name} will attend. The details are on their way to your email.
       </p>
 
       <p className="mt-4 inline-block rounded-control border border-dashed border-line-strong px-4 py-2">

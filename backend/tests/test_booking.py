@@ -608,3 +608,186 @@ def test_the_by_id_availability_route_still_works(db, client):
     res = client.get(f"/api/v1/providers/{provider.id}/availability?service_id={service.id}")
     assert res.status_code == 200
     assert res.json()["slots"]
+
+
+# ── the emails a booking produces ────────────────────────────────────────────
+#
+# Nothing here talks to a relay. What is worth testing is that the booking asks
+# for the emails at all (it did not, for the whole of Phase E), that a refusing
+# relay cannot break a booking, and that the wording is right, because these go
+# straight to customers.
+
+def test_booking_schedules_both_emails(db, client, monkeypatch):
+    """The fault this guards against: no email was ever attempted for a booking.
+
+    The endpoint existed, the sender existed, and nothing joined them, so the
+    confirmation screen said "we have emailed you the details" and nothing had.
+    """
+    from app.services import booking_notify
+
+    sent = []
+    monkeypatch.setattr(booking_notify, "send_booking_emails", lambda a: sent.append(a))
+    # The endpoint imported it by name, so that is the reference to replace.
+    import app.api.booking as booking_api
+    monkeypatch.setattr(booking_api, "send_booking_emails", lambda a: sent.append(a))
+
+    service = a_service(db)
+    provider = a_provider(db, "Emails Firm")
+    offers(db, provider, service, price=95)
+    headers = sign_in_customer(client, "emails@example.com")
+
+    slot = LocalCalendar(db, provider.id).free_slots(service.id, 60, days_ahead=7)[0]
+    res = client.post("/api/v1/booking/book", json={
+        "provider_id": provider.id, "service_id": service.id,
+        "starts_at": slot.starts_at.isoformat(),
+    }, headers=headers)
+
+    assert res.status_code == 200, res.json()
+    assert sent == [res.json()["appointment_id"]], "the booking did not ask for its emails"
+
+
+def test_a_refusing_relay_cannot_break_a_booking(db, client, monkeypatch):
+    """The booking is committed first, so a send that fails is a logged warning
+    and nothing more. Anything else turns a booking that worked into an error."""
+    from app.services import booking_emails, booking_notify
+
+    def refuse(**kwargs):
+        raise OSError("relay refused the connection")
+
+    monkeypatch.setattr(booking_emails, "send_customer_confirmation", refuse)
+    monkeypatch.setattr(booking_emails, "send_provider_notification", refuse)
+
+    service = a_service(db)
+    provider = a_provider(db, "Unreachable Relay")
+    offers(db, provider, service, price=95)
+    headers = sign_in_customer(client, "relay@example.com")
+
+    slot = LocalCalendar(db, provider.id).free_slots(service.id, 60, days_ahead=7)[0]
+    res = client.post("/api/v1/booking/book", json={
+        "provider_id": provider.id, "service_id": service.id,
+        "starts_at": slot.starts_at.isoformat(),
+    }, headers=headers)
+    assert res.status_code == 200
+
+    # Called directly, exactly as the background task would.
+    booking_notify.send_booking_emails(res.json()["appointment_id"])
+
+
+def test_cancelling_tells_the_provider(db, client, monkeypatch):
+    import app.api.booking as booking_api
+
+    told = []
+    monkeypatch.setattr(booking_api, "send_cancellation_email", lambda a: told.append(a))
+
+    service = a_service(db)
+    provider = a_provider(db, "Told On Cancel")
+    offers(db, provider, service, price=95)
+    headers = sign_in_customer(client, "cancels@example.com")
+
+    slot = LocalCalendar(db, provider.id).free_slots(service.id, 60, days_ahead=7)[0]
+    booked = client.post("/api/v1/booking/book", json={
+        "provider_id": provider.id, "service_id": service.id,
+        "starts_at": slot.starts_at.isoformat(),
+    }, headers=headers).json()
+
+    client.post(f"/api/v1/booking/{booked['appointment_id']}/cancel", headers=headers)
+    assert told == [booked["appointment_id"]]
+
+
+def test_the_customer_email_says_what_it_should(monkeypatch):
+    from app.services import booking_emails
+
+    captured = {}
+    monkeypatch.setattr(booking_emails, "_send",
+                        lambda to, subject, html: captured.update(
+                            to=to, subject=subject, html=html))
+
+    booking_emails.send_customer_confirmation(
+        to="someone@example.com", customer_name="Alex Morgan", reference="BK-00042",
+        service_name="Leak found and fixed", provider_name="Quickfix Drains",
+        provider_phone="01234 111222",
+        starts_at=datetime(2026, 8, 12, 17, 0), duration_minutes=90,
+        price=110.0, currency="USD", address="14 Mill Lane", notes="Dog is friendly",
+    )
+
+    html = captured["html"]
+    for expected in ["BK-00042", "Leak found and fixed", "Quickfix Drains",
+                     "01234 111222", "5:00 PM", "1 hr 30 min", "$110.00",
+                     "14 Mill Lane", "Dog is friendly"]:
+        assert expected in html, f"the customer email does not mention {expected!r}"
+
+    assert "BK-00042" in captured["subject"]
+    # It must not claim money has changed hands.
+    assert "paid" not in html.lower() or "Nothing has been charged" in html
+    # And it must not have picked up the shop's vocabulary.
+    for shop_word in ["cart", "delivery", "SmartMarket"]:
+        assert shop_word.lower() not in html.lower(), f"{shop_word!r} leaked into a booking email"
+
+
+def test_the_provider_email_leads_with_the_address(monkeypatch):
+    from app.services import booking_emails
+
+    captured = {}
+    monkeypatch.setattr(booking_emails, "_send",
+                        lambda to, subject, html: captured.update(html=html))
+
+    booking_emails.send_provider_notification(
+        to="firm@example.com", provider_name="Quickfix Drains", reference="BK-00042",
+        service_name="Leak found and fixed", customer_name="Alex Morgan",
+        customer_email="alex@example.com", customer_phone="07700 900000",
+        starts_at=datetime(2026, 8, 12, 17, 0), duration_minutes=90,
+        price=110.0, currency="USD", address="14 Mill Lane", notes="Park on the drive",
+    )
+
+    html = captured["html"]
+    assert "14 Mill Lane" in html
+    assert "07700 900000" in html, "the provider cannot ring somebody without a number"
+    assert "Park on the drive" in html
+
+
+def test_a_missing_address_is_called_out_rather_than_left_blank(monkeypatch):
+    """A provider setting off to an unknown address is the worst outcome here."""
+    from app.services import booking_emails
+
+    captured = {}
+    monkeypatch.setattr(booking_emails, "_send",
+                        lambda to, subject, html: captured.update(html=html))
+
+    booking_emails.send_provider_notification(
+        to="firm@example.com", provider_name="Quickfix Drains", reference="BK-00043",
+        service_name="Leak found and fixed", customer_name="Alex Morgan",
+        customer_email=None, customer_phone=None,
+        starts_at=datetime(2026, 8, 12, 17, 0), duration_minutes=60,
+        price=95.0, currency="USD", address=None, notes=None,
+    )
+
+    assert "Ring the customer before you set off" in captured["html"]
+
+
+def test_no_booking_email_uses_a_banned_dash():
+    """The client reads them as machine written, and these are customer facing."""
+    from app.services import booking_emails
+
+    captured = []
+    original = booking_emails._send
+    booking_emails._send = lambda to, subject, html: captured.append(subject + html)
+    try:
+        when = datetime(2026, 8, 12, 17, 0)
+        booking_emails.send_customer_confirmation(
+            to="a@example.com", customer_name="A", reference="BK-1", service_name="S",
+            provider_name="P", provider_phone="1", starts_at=when, duration_minutes=90,
+            price=1.0, currency="USD", address="X", notes="Y")
+        booking_emails.send_provider_notification(
+            to="a@example.com", provider_name="P", reference="BK-1", service_name="S",
+            customer_name="C", customer_email="c@example.com", customer_phone="1",
+            starts_at=when, duration_minutes=90, price=1.0, currency="USD",
+            address="X", notes="Y")
+        booking_emails.send_cancellation(
+            to="a@example.com", provider_name="P", reference="BK-1", service_name="S",
+            customer_name="C", starts_at=when)
+    finally:
+        booking_emails._send = original
+
+    for text in captured:
+        assert "—" not in text, "em dash in a booking email"
+        assert "–" not in text, "en dash in a booking email"
