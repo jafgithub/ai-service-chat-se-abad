@@ -13,6 +13,7 @@ from app.services import phrase_index
 from app.db.database import engine, Base
 from app.models import (  # noqa: F401 - imported so create_all registers every table
     Service, Customer, Job, JobLine, Payment, ChatSession, CartItem, Appointment,
+    Provider, ProviderService, ProviderAvailability, Account, Session,
 )
 from app.api import admin, chat, jobs, payments, services, cart, voice, media, booking
 
