@@ -18,9 +18,11 @@ from app.core.config import settings
 from app.db.database import get_db
 from app.models.appointment import Appointment
 from app.models.job import Job
+from app.models.customer import Customer
+from app.models.provider import Provider, ProviderService
 from app.models.service import Service
-from app.schemas.order import CustomerIn
-from app.services import booking_service, calendly, job_service
+from app.api.deps import require_customer
+from app.services import booking_service, calendly
 
 logger = logging.getLogger("booking")
 
@@ -77,93 +79,6 @@ def _out(appointment: Appointment) -> AppointmentOut:
         status=appointment.status,
         label=appointment.starts_at.strftime("%A %-d %B, %-I:%M %p"),
     )
-
-
-@router.get("/availability", response_model=AvailabilityOut,
-            summary="Free times for a service")
-def availability(
-    service_id: int = Query(..., ge=1),
-    days_ahead: int = Query(0, ge=0, le=60),
-    db: Session = Depends(get_db),
-):
-    service = db.query(Service).filter(Service.id == service_id).first()
-    if service is None:
-        raise HTTPException(status_code=404, detail="We do not offer that service.")
-
-    # Cheap, and it means an abandoned conversation gives its slot back without
-    # anything having to run on a timer.
-    booking_service.release_expired(db)
-
-    try:
-        slots = booking_service.available_slots(
-            db, service, days_ahead=days_ahead or settings.BOOKING_DAYS_AHEAD,
-        )
-    except booking_service.BookingError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-
-    return AvailabilityOut(
-        service_id=service.id,
-        service_name=service.name or "",
-        duration_minutes=int(service.duration_minutes or 60),
-        sample=calendly.current(db).is_stub,
-        slots=[SlotOut(starts_at=s.starts_at, ends_at=s.ends_at,
-                       label=s.label, ref=s.ref) for s in slots],
-    )
-
-
-@router.post("/hold", response_model=AppointmentOut,
-             summary="Reserve a time while the customer finishes")
-def hold(payload: HoldIn, db: Session = Depends(get_db)):
-    job = db.query(Job).filter(Job.id == payload.job_id).first()
-    if job is None:
-        raise HTTPException(status_code=404, detail="That job no longer exists.")
-
-    service_id = None
-    if job.items_json:
-        first = (job.items_json or [{}])[0]
-        service_id = first.get("item_id") or first.get("service_id")
-    service = db.query(Service).filter(Service.id == service_id).first() if service_id else None
-    duration = int(service.duration_minutes or 60) if service else 60
-
-    from datetime import timedelta
-    slot = calendly.Slot(
-        starts_at=payload.starts_at,
-        ends_at=payload.starts_at + timedelta(minutes=duration),
-        ref=payload.ref,
-    )
-    try:
-        return _out(booking_service.hold(db, job, slot))
-    except booking_service.BookingError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
-
-
-@router.post("/confirm", response_model=AppointmentOut,
-             summary="Take the held time and book it")
-def confirm(payload: ConfirmIn, db: Session = Depends(get_db)):
-    appointment = (
-        db.query(Appointment).filter(Appointment.id == payload.appointment_id).first()
-    )
-    if appointment is None:
-        raise HTTPException(status_code=404, detail="That appointment no longer exists.")
-
-    try:
-        booked = booking_service.confirm(
-            db, appointment,
-            name=payload.name, email=payload.email, phone=payload.phone,
-            address=payload.address, notes=payload.notes,
-        )
-    except booking_service.BookingError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
-
-    job = db.query(Job).filter(Job.id == booked.job_id).first()
-    if job is not None:
-        job.status = "scheduled"
-        job.appointment_date = booked.starts_at.date()
-        job.appointment_time = booked.starts_at.strftime("%-I:%M %p")
-        job.access_notes = payload.notes or job.access_notes
-        db.commit()
-
-    return _out(booked)
 
 
 def _signature_ok(raw: bytes, header: str) -> bool:
@@ -235,61 +150,96 @@ async def calendly_webhook(
 # ── booking in one step ──────────────────────────────────────────────────────
 
 class BookIn(BaseModel):
-    """Everything a booking needs, in one request."""
+    """Everything a booking needs, in one request.
 
+    No customer fields: the customer is whoever is signed in. Taking a name and
+    an email from the body would let anybody book in somebody else's name, and
+    would quietly create a second customer record for a person we already have.
+    """
+
+    provider_id: int
     service_id: int
     starts_at: datetime
-    name: str = Field(min_length=1, max_length=120)
-    email: EmailStr
-    phone: str = Field(min_length=5, max_length=40)
-    address: str = Field(min_length=3, max_length=400)
+    #: Where the work is, if different from the address on the account.
+    address: str = Field(default="", max_length=400)
     notes: str = Field(default="", max_length=2000)
-    session_id: str = Field(default="", max_length=64)
 
 
 class BookedOut(BaseModel):
     job_id: int
     appointment_id: int
+    reference: str
+    provider_id: int
+    provider_name: str
     service_name: str
     starts_at: datetime
+    ends_at: datetime
+    duration_minutes: int
     label: str
     price: float
     customer_id: int
+    customer_name: str
+    status: str
 
 
 @router.post("/book", response_model=BookedOut,
-             summary="Take a time and create the job, in one step")
-def book(payload: BookIn, db: Session = Depends(get_db)):
-    """The whole booking, as one call.
+             summary="Take a time with a provider, in one step")
+def book(payload: BookIn,
+         customer: Customer = Depends(require_customer),
+         db: Session = Depends(get_db)):
+    """The whole booking, as one call, against one provider.
 
-    Deliberately not the shop's two step cart and checkout. A visit is one job
-    at one time at one address, so there is nothing to accumulate and nothing to
-    review: the moment the customer has chosen a time and given their details,
-    the booking either exists or it does not.
+    Deliberately not a cart and a checkout. A visit is one job at one time at one
+    address, so there is nothing to accumulate and nothing to review.
 
-    Doing it in one transaction is also what stops the half finished states the
-    cart produced. The live system had forty three conversations, two abandoned
-    cart rows, and zero jobs, zero appointments and zero customers.
+    The price and the duration come from `provider_services`, not from the
+    service row. The service carries a guide figure for matching and for showing
+    a range before anybody is chosen; what a business charges and how long it
+    takes are the business's to say, and are what a booking is made against.
     """
+    provider = db.query(Provider).filter(Provider.id == payload.provider_id).first()
+    if provider is None:
+        raise HTTPException(status_code=404, detail="No such provider.")
+    if provider.status != "active":
+        # A pending application can fill in its profile; it cannot receive work.
+        raise HTTPException(
+            status_code=409,
+            detail="That provider is not taking bookings yet.",
+        )
+
     service = db.query(Service).filter(Service.id == payload.service_id).first()
     if service is None:
         raise HTTPException(status_code=404, detail="We do not offer that service.")
 
+    offering = (
+        db.query(ProviderService)
+        .filter(ProviderService.provider_id == provider.id,
+                ProviderService.service_id == service.id,
+                ProviderService.active.is_(True))
+        .first()
+    )
+    if offering is None:
+        raise HTTPException(status_code=409,
+                            detail="That provider does not offer that service.")
+
+    price = float(offering.price if offering.price is not None else (service.price or 0))
+    duration = int(offering.duration_minutes or service.duration_minutes or 60)
+
     booking_service.release_expired(db)
 
-    customer = job_service.upsert_customer(db, CustomerIn(
-        name=payload.name, email=payload.email, phone=payload.phone,
-        address=payload.address,
-    ))
+    if payload.address and not customer.address:
+        customer.address = payload.address
 
     job = Job(
         customer_id=customer.id,
+        provider_id=provider.id,
+        provider_service_id=offering.id,
         status="pending",
-        total_amount=float(service.price or 0),
+        total_amount=price,
         items_json=[{
             "item_id": service.id,
             "name": service.name,
-            "price": float(service.price or 0),
+            "price": price,
             "quantity": 1,
         }],
         notes=payload.notes or None,
@@ -299,22 +249,22 @@ def book(payload: BookIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(job)
 
-    duration = int(service.duration_minutes or 60)
     slot = calendly.Slot(
         starts_at=payload.starts_at,
         ends_at=payload.starts_at + timedelta(minutes=duration),
     )
 
     try:
-        appointment = booking_service.hold(db, job, slot)
+        appointment = booking_service.hold(db, job, slot, provider.id)
         appointment = booking_service.confirm(
             db, appointment,
-            name=payload.name, email=payload.email, phone=payload.phone,
-            address=payload.address, notes=payload.notes,
+            name=customer.name, email=customer.email,
+            phone=customer.phone or "", address=payload.address or customer.address or "",
+            notes=payload.notes,
         )
     except booking_service.BookingError as exc:
-        # The job would otherwise sit there with no appointment attached, which
-        # is exactly the half finished state this endpoint exists to avoid.
+        # Otherwise the job sits there with no appointment, which is exactly the
+        # half finished state this endpoint exists to avoid.
         db.delete(job)
         db.commit()
         raise HTTPException(status_code=409, detail=str(exc))
@@ -325,15 +275,77 @@ def book(payload: BookIn, db: Session = Depends(get_db)):
     db.commit()
 
     logger.info(
-        f"[BOOKING] job {job.id}: {service.name} for {customer.email} "
-        f"at {appointment.starts_at:%Y-%m-%d %H:%M}"
+        f"[BOOKING] job {job.id}: {service.name} with {provider.business_name} "
+        f"for customer {customer.id} at {appointment.starts_at:%Y-%m-%d %H:%M}"
     )
     return BookedOut(
         job_id=job.id,
         appointment_id=appointment.id,
+        reference=f"BK-{job.id:05d}",
+        provider_id=provider.id,
+        provider_name=provider.business_name,
         service_name=service.name or "",
         starts_at=appointment.starts_at,
+        ends_at=appointment.ends_at,
+        duration_minutes=duration,
         label=appointment.starts_at.strftime("%A %-d %B, %-I:%M %p"),
-        price=float(service.price or 0),
+        price=price,
         customer_id=customer.id,
+        customer_name=customer.name or "",
+        status=appointment.status,
     )
+
+
+@router.get("/mine", summary="My bookings")
+def my_bookings(customer: Customer = Depends(require_customer),
+                db: Session = Depends(get_db)):
+    """Scoped to the signed-in customer. There is no id to tamper with, because
+    the endpoint never takes one."""
+    rows = (
+        db.query(Appointment, Job, Provider)
+        .join(Job, Job.id == Appointment.job_id)
+        .outerjoin(Provider, Provider.id == Appointment.provider_id)
+        .filter(Job.customer_id == customer.id)
+        .order_by(Appointment.starts_at.desc())
+        .limit(100)
+        .all()
+    )
+    return [{
+        "reference": f"BK-{j.id:05d}",
+        "appointment_id": a.id,
+        "job_id": j.id,
+        "status": a.status,
+        "starts_at": a.starts_at,
+        "label": a.starts_at.strftime("%A %-d %B, %-I:%M %p"),
+        "provider_name": p.business_name if p else None,
+        "provider_phone": p.phone if p else None,
+        "service": (j.items_json or [{}])[0].get("name"),
+        "price": float(j.total_amount or 0),
+    } for a, j, p in rows]
+
+
+@router.post("/{appointment_id}/cancel", summary="Cancel one of my bookings")
+def cancel_booking(appointment_id: int,
+                   customer: Customer = Depends(require_customer),
+                   db: Session = Depends(get_db)):
+    """Only the customer whose booking it is. The join to `jobs` is what
+    enforces that: somebody else's appointment id finds nothing."""
+    row = (
+        db.query(Appointment, Job)
+        .join(Job, Job.id == Appointment.job_id)
+        .filter(Appointment.id == appointment_id, Job.customer_id == customer.id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not one of your bookings.")
+
+    appointment, job = row
+    if appointment.status in ("cancelled", "completed"):
+        return {"status": appointment.status, "reference": f"BK-{job.id:05d}"}
+
+    appointment.status = "cancelled"
+    appointment.cancel_reason = "Cancelled by the customer."
+    job.status = "cancelled"
+    db.commit()
+    logger.info(f"[BOOKING] appointment {appointment.id} cancelled by customer {customer.id}")
+    return {"status": "cancelled", "reference": f"BK-{job.id:05d}"}

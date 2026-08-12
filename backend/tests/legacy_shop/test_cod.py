@@ -19,8 +19,8 @@ from sqlalchemy.pool import StaticPool
 from app.core.config import settings
 from app.db.database import Base, get_db
 from app.main import app
-from app.models.order import Order
-from app.services.order_service import note_with_payment_method
+from app.models.job import Job
+from app.services.job_service import note_with_payment_method
 
 
 @pytest.fixture
@@ -130,7 +130,7 @@ def test_the_cash_flag_is_written_where_it_will_actually_sync(client, db):
     so that is where the instruction to collect has to live."""
     order_id = place(client, "cod", notes="Gate code 4412").json()["order_id"]
 
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Job).filter(Job.id == order_id).first()
     assert "CASH ON DELIVERY" in order.notes
     assert "Gate code 4412" in order.notes, "what the shopper typed is kept"
 

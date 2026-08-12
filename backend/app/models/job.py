@@ -16,6 +16,10 @@ class Job(Base):
 
     id           = Column(Integer, primary_key=True, autoincrement=True)
     customer_id  = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    # Who is doing the work, and on which of their offerings. The offering is
+    # kept so a later price change does not rewrite what somebody was quoted.
+    provider_id         = Column(Integer, ForeignKey("providers.id"))
+    provider_service_id = Column(Integer, ForeignKey("provider_services.id"))
     status       = Column(
         Enum("pending", "confirmed", "scheduled", "completed", "cancelled"),
         nullable=False,

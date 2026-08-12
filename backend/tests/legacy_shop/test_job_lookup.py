@@ -17,7 +17,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.database import Base, get_db
 from app.main import app
-from app.services import order_service
+from app.services import job_service
 
 
 class CustomerIn:
@@ -58,11 +58,11 @@ def make_order(db, key: str | None, total: float = 21.60):
              "VALUES (1, 'Whole Milk', 10.0, 0, 1, 50, 1, 1)")
     )
     db.flush()
-    customer = order_service.upsert_customer(db, CustomerIn(name="Buyer"))
-    details, subtotal = order_service.build_line_items(
+    customer = job_service.upsert_customer(db, CustomerIn(name="Buyer"))
+    details, subtotal = job_service.build_line_items(
         db, [type("I", (), {"product_id": 1, "quantity": 2})()]
     )
-    order = order_service.create_order(
+    order = job_service.create_order(
         db, customer, details, total, status="pending", idempotency_key=key,
     )
     db.commit()

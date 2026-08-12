@@ -182,21 +182,21 @@ def sqlite_catalog(monkeypatch):
     with engine.begin() as c:
         c.execute(text("CREATE TABLE categories (id INT, name TEXT)"))
         c.execute(text("CREATE TABLE stores (id INT, email TEXT)"))
-        c.execute(text("""CREATE TABLE items (
+        c.execute(text("""CREATE TABLE services (
             id INT, name TEXT, description TEXT, price REAL, stock INT, image TEXT,
             store_id INT, category_id INT, status INT, item_vector TEXT)"""))
         c.execute(text("INSERT INTO categories VALUES (1,'Dairy'),(2,'Bakery')"))
         c.execute(text("INSERT INTO stores VALUES (9,'shop@example.com')"))
         for i in range(1, 21):
             c.execute(
-                text("INSERT INTO items VALUES (:id,:n,:d,:p,5,NULL,9,:c,:s,:v)"),
+                text("INSERT INTO services VALUES (:id,:n,:d,:p,5,NULL,9,:c,:s,:v)"),
                 {"id": i, "n": f"Item {i}", "d": "d", "p": float(i),
                  "c": 1 if i % 2 else 2,
                  "s": 0 if i == 20 else 1,          # one inactive row
                  "v": json.dumps(unit(rng).tolist())},
             )
         # A row with no vector: it must be excluded, not crash the build.
-        c.execute(text("INSERT INTO items VALUES (21,'No vector','d',1.0,5,NULL,9,1,1,NULL)"))
+        c.execute(text("INSERT INTO services VALUES (21,'No vector','d',1.0,5,NULL,9,1,1,NULL)"))
 
     monkeypatch.setattr(catalog_index, "engine", engine)
     catalog_index.clear()
@@ -207,7 +207,7 @@ def sqlite_catalog(monkeypatch):
 def test_build_loads_only_active_rows_with_vectors(sqlite_catalog):
     index = catalog_index.build()
     assert index is not None
-    assert index.rows == 19        # 20 items, minus the inactive one; no-vector excluded
+    assert index.rows == 19        # 20 services, minus the inactive one; no-vector excluded
     assert index.dims == DIMS
     assert catalog_index.status()["state"] == "ready"
     assert catalog_index.get() is index
@@ -224,7 +224,7 @@ def test_build_resolves_joined_category_and_store(sqlite_catalog):
 def test_rebuild_swaps_the_index(sqlite_catalog):
     first = catalog_index.build()
     with sqlite_catalog.begin() as c:
-        c.execute(text("UPDATE items SET status = 0 WHERE id <= 5"))
+        c.execute(text("UPDATE services SET status = 0 WHERE id <= 5"))
     second = catalog_index.build()
     assert second is not first
     assert second.rows == first.rows - 5

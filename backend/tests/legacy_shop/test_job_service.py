@@ -1,4 +1,4 @@
-"""The money-safety rules in order_service.
+"""The money-safety rules in job_service.
 
 Each of these covers a hazard that was real in the code before payments went in,
 so they are regression tests, not hypotheticals:
@@ -15,9 +15,9 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.database import Base
 from app.models.customer import Customer
-from app.models.order import Order
-from app.services import order_service
-from app.services.order_service import OrderError
+from app.models.job import Job
+from app.services import job_service
+from app.services.job_service import OrderError
 
 
 @pytest.fixture
@@ -57,27 +57,27 @@ class Item:
 
 def test_reserving_stock_decrements_once(db):
     add_product(db, 1, stock=5)
-    assert order_service._reserve_stock(db, 1, 2) is True
+    assert job_service._reserve_stock(db, 1, 2) is True
     assert stock_of(db, 1) == 3
 
 
 def test_cannot_reserve_more_than_exists(db):
     add_product(db, 1, stock=2)
-    assert order_service._reserve_stock(db, 1, 3) is False
+    assert job_service._reserve_stock(db, 1, 3) is False
     assert stock_of(db, 1) == 2, "a failed reservation must not touch stock"
 
 
 def test_last_unit_cannot_be_sold_twice(db):
     """The oversell that the old read-modify-write allowed."""
     add_product(db, 1, stock=1)
-    assert order_service._reserve_stock(db, 1, 1) is True
-    assert order_service._reserve_stock(db, 1, 1) is False
+    assert job_service._reserve_stock(db, 1, 1) is True
+    assert job_service._reserve_stock(db, 1, 1) is False
     assert stock_of(db, 1) == 0, "stock must never go negative"
 
 
 def test_build_line_items_reserves_and_prices(db):
     add_product(db, 1, stock=10, price=2.50)
-    details, subtotal = order_service.build_line_items(db, [Item(1, 4)])
+    details, subtotal = job_service.build_line_items(db, [Item(1, 4)])
     assert subtotal == 10.0
     assert details[0]["unit_price"] == 2.50
     assert stock_of(db, 1) == 6
@@ -86,14 +86,14 @@ def test_build_line_items_reserves_and_prices(db):
 def test_build_line_items_rejects_insufficient_stock(db):
     add_product(db, 1, stock=1)
     with pytest.raises(OrderError) as exc:
-        order_service.build_line_items(db, [Item(1, 5)])
+        job_service.build_line_items(db, [Item(1, 5)])
     assert "Not enough stock" in exc.value.message
     assert stock_of(db, 1) == 1
 
 
 def test_build_line_items_rejects_unknown_product(db):
     with pytest.raises(OrderError) as exc:
-        order_service.build_line_items(db, [Item(999, 1)])
+        job_service.build_line_items(db, [Item(999, 1)])
     assert exc.value.status_code == 404
 
 
@@ -104,14 +104,14 @@ def _pending_order(db, pid=1, qty=2):
     customer = Customer(name="A", email="a@example.com")
     db.add(customer)
     db.flush()
-    details, subtotal = order_service.build_line_items(db, [Item(pid, qty)])
-    _, total = order_service.totals_for(subtotal)
-    return order_service.create_order(db, customer, details, total, status="pending")
+    details, subtotal = job_service.build_line_items(db, [Item(pid, qty)])
+    _, total = job_service.totals_for(subtotal)
+    return job_service.create_order(db, customer, details, total, status="pending")
 
 
 def test_confirm_moves_pending_to_confirmed(db):
     order = _pending_order(db)
-    assert order_service.confirm_order(db, order) is True
+    assert job_service.confirm_order(db, order) is True
     assert order.status == "confirmed"
 
 
@@ -119,23 +119,23 @@ def test_confirming_twice_is_a_no_op(db):
     """A replayed webhook must not re-confirm, because the caller emails the
     shopper on a True return."""
     order = _pending_order(db)
-    assert order_service.confirm_order(db, order) is True
-    assert order_service.confirm_order(db, order) is False
+    assert job_service.confirm_order(db, order) is True
+    assert job_service.confirm_order(db, order) is False
     assert order.status == "confirmed"
 
 
 def test_cancelling_releases_the_reserved_stock(db):
     order = _pending_order(db, qty=3)
     assert stock_of(db, 1) == 7
-    assert order_service.cancel_order(db, order, "card declined") is True
+    assert job_service.cancel_order(db, order, "card declined") is True
     assert order.status == "cancelled"
     assert stock_of(db, 1) == 10, "a failed payment must put the stock back"
 
 
 def test_cancelling_a_confirmed_order_does_nothing(db):
     order = _pending_order(db, qty=3)
-    order_service.confirm_order(db, order)
-    assert order_service.cancel_order(db, order) is False
+    job_service.confirm_order(db, order)
+    assert job_service.cancel_order(db, order) is False
     assert order.status == "confirmed"
     assert stock_of(db, 1) == 7, "stock must not be handed back for a paid order"
 
@@ -147,19 +147,19 @@ def test_idempotency_key_finds_the_original_order(db):
     customer = Customer(name="A", email="a@example.com")
     db.add(customer)
     db.flush()
-    details, subtotal = order_service.build_line_items(db, [Item(1, 1)])
-    _, total = order_service.totals_for(subtotal)
-    first = order_service.create_order(
+    details, subtotal = job_service.build_line_items(db, [Item(1, 1)])
+    _, total = job_service.totals_for(subtotal)
+    first = job_service.create_order(
         db, customer, details, total, status="pending", idempotency_key="abc-123",
     )
     db.flush()
-    assert order_service.find_by_idempotency_key(db, "abc-123").id == first.id
+    assert job_service.find_by_idempotency_key(db, "abc-123").id == first.id
 
 
 def test_no_key_never_matches_an_existing_order(db):
     """Orders placed without a key must not collide with each other."""
-    assert order_service.find_by_idempotency_key(db, None) is None
-    assert order_service.find_by_idempotency_key(db, "") is None
+    assert job_service.find_by_idempotency_key(db, None) is None
+    assert job_service.find_by_idempotency_key(db, "") is None
 
 
 def test_duplicate_idempotency_key_is_rejected_by_the_database(db):
@@ -170,16 +170,16 @@ def test_duplicate_idempotency_key_is_rejected_by_the_database(db):
     customer = Customer(name="A", email="a@example.com")
     db.add(customer)
     db.flush()
-    details, subtotal = order_service.build_line_items(db, [Item(1, 1)])
-    _, total = order_service.totals_for(subtotal)
+    details, subtotal = job_service.build_line_items(db, [Item(1, 1)])
+    _, total = job_service.totals_for(subtotal)
 
-    order_service.create_order(db, customer, details, total, status="pending",
+    job_service.create_order(db, customer, details, total, status="pending",
                                idempotency_key="same-key")
     db.flush()
     # create_order flushes internally to get the order id, so the constraint
     # fires inside the call rather than at a later flush.
     with pytest.raises(IntegrityError):
-        order_service.create_order(db, customer, details, total, status="pending",
+        job_service.create_order(db, customer, details, total, status="pending",
                                    idempotency_key="same-key")
 
 
@@ -198,8 +198,8 @@ class CustomerIn:
 
 
 def test_upsert_customer_reuses_the_same_email(db):
-    first  = order_service.upsert_customer(db, CustomerIn(name="First"))
-    second = order_service.upsert_customer(db, CustomerIn(name="Second"))
+    first  = job_service.upsert_customer(db, CustomerIn(name="First"))
+    second = job_service.upsert_customer(db, CustomerIn(name="Second"))
     assert first.id == second.id, "one customer per email, not one per order"
     assert second.name == "Second", "details from the latest order win"
     assert db.query(Customer).count() == 1

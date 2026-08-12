@@ -137,3 +137,29 @@ class ProviderAvailability(Base):
         UniqueConstraint("provider_id", "weekday", "opens_at",
                          name="uq_provider_weekday"),
     )
+
+
+class ProviderTimeOff(Base):
+    """A closure: a holiday, a training afternoon, a van off the road.
+
+    Working hours describe the normal week. They cannot say "closed Tuesday
+    afternoon", and a diary that only knows the normal pattern will sell an hour
+    nobody is there for. This is subtracted from availability alongside real
+    appointments.
+    """
+
+    __tablename__ = "provider_time_off"
+
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    provider_id = Column(Integer, ForeignKey("providers.id", ondelete="CASCADE"),
+                         nullable=False)
+
+    starts_at = Column(DateTime, nullable=False)
+    ends_at   = Column(DateTime, nullable=False)
+    reason    = Column(String(200))
+
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_time_off_provider", "provider_id", "starts_at", "ends_at"),
+    )

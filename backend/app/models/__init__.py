@@ -14,12 +14,14 @@ from app.models.appointment import Appointment
 from app.models.payment import Payment
 from app.models.chat_session import ChatSession
 from app.models.cart_item import CartItem
-from app.models.provider import Provider, ProviderService, ProviderAvailability
+from app.models.provider import (
+    Provider, ProviderService, ProviderAvailability, ProviderTimeOff,
+)
 from app.models.account import Account, Session
 
 __all__ = [
     "Service", "Customer", "Job", "JobLine", "Appointment", "Payment",
     "ChatSession", "CartItem",
-    "Provider", "ProviderService", "ProviderAvailability",
+    "Provider", "ProviderService", "ProviderAvailability", "ProviderTimeOff",
     "Account", "Session",
 ]

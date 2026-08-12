@@ -13,10 +13,12 @@ from app.services import phrase_index
 from app.db.database import engine, Base
 from app.models import (  # noqa: F401 - imported so create_all registers every table
     Service, Customer, Job, JobLine, Payment, ChatSession, CartItem, Appointment,
-    Provider, ProviderService, ProviderAvailability, Account, Session,
+    Provider, ProviderService, ProviderAvailability, ProviderTimeOff,
+    Account, Session,
 )
 from app.api import (
-    admin, auth, booking, cart, chat, jobs, media, payments, services, voice,
+    admin, auth, booking, cart, chat, jobs, media, payments, providers,
+    services, voice,
 )
 
 
@@ -113,6 +115,7 @@ app.include_router(voice.router,    prefix="/api/v1")
 app.include_router(media.router,    prefix="/api/v1")
 app.include_router(booking.router,  prefix="/api/v1")
 app.include_router(auth.router,     prefix="/api/v1")
+app.include_router(providers.router, prefix="/api/v1")
 
 
 @app.exception_handler(Exception)

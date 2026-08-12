@@ -37,30 +37,45 @@ def _now() -> datetime:
     return datetime.utcnow()
 
 
-def available_slots(db: Session, service: Service, days_ahead: int = 14) -> list[Slot]:
-    """Free times for a service, minus anything we are already holding."""
-    provider = calendly.current(db)
-    duration = int(service.duration_minutes or 60)
+def available_slots(db: Session, service: Service, provider_id: int,
+                    duration_minutes: int | None = None,
+                    days_ahead: int = 14) -> list[Slot]:
+    """Free times for one provider doing one service.
+
+    The provider is required. There is no platform diary: two firms in the same
+    trade keep different hours and are busy at different moments, so "is Tuesday
+    free" is only answerable about somebody in particular.
+
+    The duration comes from the provider's own offering where they have set one,
+    because how long a job takes is theirs to say.
+    """
+    diary = calendly.current(db, provider_id)
+    duration = int(duration_minutes or service.duration_minutes or 60)
 
     try:
-        slots = provider.free_slots(service.id, duration, days_ahead=days_ahead)
+        slots = diary.free_slots(service.id, duration, days_ahead=days_ahead)
     except CalendarError as exc:
         raise BookingError(str(exc)) from exc
 
-    taken = _taken_starts(db)
+    taken = _taken_starts(db, provider_id)
     return [s for s in slots if s.starts_at.replace(tzinfo=None) not in taken]
 
 
-def _taken_starts(db: Session) -> set[datetime]:
-    """Start times we have already promised to somebody.
+def _taken_starts(db: Session, provider_id: int) -> set[datetime]:
+    """Start times this provider has already promised.
+
+    Scoped to the provider on purpose. Filtering globally would have one firm's
+    busy Tuesday hide another firm's free one, which is the bug that comes from
+    treating a marketplace as though it had a single diary.
 
     Live holds and real bookings both count. An expired hold does not, which is
-    what makes an abandoned conversation give its slot back without anybody
-    having to tidy up.
+    what makes an abandoned conversation give its slot back with nothing having
+    to sweep up.
     """
     rows = (
         db.query(Appointment.starts_at)
         .filter(
+            Appointment.provider_id == provider_id,
             Appointment.status.in_(("held", "booked", "rescheduled")),
             or_(
                 Appointment.status != "held",
@@ -73,14 +88,20 @@ def _taken_starts(db: Session) -> set[datetime]:
     return {r[0] for r in rows}
 
 
-def hold(db: Session, job: Job, slot: Slot) -> Appointment:
-    """Reserve a slot for as long as it takes to finish the conversation."""
+def hold(db: Session, job: Job, slot: Slot, provider_id: int) -> Appointment:
+    """Reserve one provider's slot while the customer finishes.
+
+    The clash check is against that provider only. Two customers booking the
+    same hour with two different firms is not a clash, it is a marketplace
+    working.
+    """
     starts = slot.starts_at.replace(tzinfo=None)
-    if starts in _taken_starts(db):
+    if starts in _taken_starts(db, provider_id):
         raise BookingError("Somebody just took that time. Please choose another.")
 
     appointment = Appointment(
         job_id=job.id,
+        provider_id=provider_id,
         starts_at=starts,
         ends_at=slot.ends_at.replace(tzinfo=None),
         status="held",
@@ -90,7 +111,8 @@ def hold(db: Session, job: Job, slot: Slot) -> Appointment:
     db.add(appointment)
     db.commit()
     db.refresh(appointment)
-    logger.info(f"[BOOKING] held {starts:%Y-%m-%d %H:%M} for job {job.id}")
+    logger.info(f"[BOOKING] held {starts:%Y-%m-%d %H:%M} with provider "
+                f"{provider_id} for job {job.id}")
     return appointment
 
 
@@ -106,7 +128,7 @@ def confirm(db: Session, appointment: Appointment, *, name: str, email: str,
     slot = Slot(starts_at=appointment.starts_at, ends_at=appointment.ends_at,
                 ref=appointment.calendly_uri or "")
     try:
-        booking = calendly.current(db).book(
+        booking = calendly.current(db, appointment.provider_id).book(
             slot, name=name, email=email, phone=phone, address=address, notes=notes,
         )
     except CalendarError as exc:

@@ -20,7 +20,7 @@ _cached: CalendarProvider | None = None
 _cached_for: str | None = None
 
 
-def current(db=None) -> CalendarProvider:
+def current(db=None, provider_id=None) -> CalendarProvider:
     """The calendar in use, built once.
 
     Falls back to the stub rather than failing when Calendly is selected but has
@@ -38,7 +38,7 @@ def current(db=None) -> CalendarProvider:
     # The local diary reads the appointments table, so it is built per request
     # with that request's session rather than cached holding a connection.
     if choice == "local":
-        return LocalCalendar(db)
+        return LocalCalendar(db, provider_id)
 
     if _cached is not None and _cached_for == choice:
         return _cached

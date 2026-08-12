@@ -25,6 +25,12 @@ class Appointment(Base):
     id     = Column(Integer, primary_key=True, autoincrement=True)
     job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
 
+    # Whose diary this occupies. Nullable only because one appointment was taken
+    # before providers existed; every new booking sets it, and availability is
+    # scoped by it, so a null here means "before the marketplace" rather than
+    # "anybody's".
+    provider_id = Column(Integer, ForeignKey("providers.id"))
+
     starts_at = Column(DateTime, nullable=False)
     ends_at   = Column(DateTime, nullable=False)
 
