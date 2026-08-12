@@ -1,0 +1,7 @@
+# Generated: the diagram pages, the photographs and both built documents.
+# Everything here comes back from `render_diagrams.py`, `render_pages.py`,
+# `build_docx.py` and `render_html.py`. The sources that matter are `source.md`,
+# `shots/` and the scripts.
+pages/
+build/
+.venv/
