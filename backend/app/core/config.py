@@ -172,6 +172,21 @@ class Settings(BaseSettings):
     # Nothing sooner than this, so we never offer a time nobody could reach.
     BOOKING_LEAD_HOURS: int = 3
 
+    # ── accounts ─────────────────────────────────────────────────────────────
+    # How long a signed-in session lasts. Long enough that a customer is not
+    # asked again between booking a visit and the visit happening.
+    SESSION_DAYS: int = 30
+
+    # How providers are ordered when several offer the same service.
+    # "soonest"  the first who can attend, then the cheapest of those
+    # "price"    cheapest first
+    # "distance" nearest first (needs a customer location)
+    # "rating"   best rated first (needs ratings, which do not exist yet)
+    #
+    # A setting rather than a hard-coded sort, because it is a business rule and
+    # the client may want to change it without a deployment.
+    PROVIDER_RANKING: str = "soonest"
+
     CALENDLY_TOKEN: str = ""
     # One Calendly event type per service is what makes the durations right, so
     # a tap washer does not book the same hour as a new boiler. As
