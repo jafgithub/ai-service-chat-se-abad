@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Service Assistant: running it and rebuilding it</title>
+<title>Service Agent: spin-off and plumbing handover</title>
 <style>
 :root {
   --bg:#FFFFFF; --ink:#14130F; --muted:#77726A; --faint:#A8A29A;
@@ -90,160 +90,97 @@ tbody tr:last-child td { border-bottom: none; }
 </head>
 <body>
 <div class="masthead">
-  <p class="eyebrow">Operations runbook</p>
-  <p class="title">Service Assistant: running it and rebuilding it</p>
-  <p class="sub">Where the database is, what every file and setting does, and how to stand the whole system up again on a new Lightsail instance with its own subdomain and certificate.</p>
+  <p class="eyebrow">Handover document</p>
+  <p class="title">Service Agent: application spin-off and plumbing handover</p>
+  <p class="sub">How the booking platform was built from the shop, what changed between them, and the procedure for standing either one up on a new machine.</p>
   <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 14 August 2026 &nbsp;&middot;&nbsp; every command run against the live server</p>
 </div>
-<h1>What this document is</h1>
-<p>The Service Assistant runs on one Amazon Lightsail machine. This is the record of what is on it, where the database lives, and how to build the same thing again on a new machine with its own subdomain and its own certificate.</p>
-<p>Every command here was run against the live server. Nothing is written from memory. Where a value is a secret it is shown as a placeholder and the document says which file on the server holds the real one.</p>
-<p><strong>Live now:</strong> https://serviceagent.fordev.fun</p>
+<h1>1. Purpose</h1>
+<p>Two applications share one codebase. The Product Application is a grocery shop where a customer searches a catalogue and fills a basket. The Plumbing Application, called Service Agent, is a booking platform where a customer describes a problem and books a tradesperson for a time.</p>
+<p>The second was built from the first. This document records what carried over, what was rewritten, what was thrown away, and how to do the same again for a third application.</p>
+<p>It is written to be worked from. Every command was run against the live servers and every figure was read off them. Where a value is a secret it is shown as a placeholder and the document names the file on the machine that holds the real one.</p>
+<p><strong>Product Application:</strong> https://dev.agent.fordev.fun <strong>Plumbing Application:</strong> https://serviceagent.fordev.fun</p>
 <hr>
-<h1>The machine</h1>
+<h1>2. Architecture Overview</h1>
+<p>Both applications are the same four parts in the same arrangement.</p>
 <div class="tw"><table>
+<thead><tr><th>Part</th><th>What it is</th><th>Where it runs</th></tr></thead>
 <tbody>
-<tr><td></td><td></td></tr>
-<tr><td>Address</td><td>52.25.174.57</td></tr>
-<tr><td>Subdomain</td><td>serviceagent.fordev.fun</td></tr>
-<tr><td>Operating system</td><td>Ubuntu 22.04.5 LTS, 64 bit</td></tr>
-<tr><td>Size</td><td>2 processors, 1 GB memory, 58 GB disk, 53 percent used</td></tr>
-<tr><td>Region</td><td>Oregon, US West</td></tr>
-<tr><td>Sign in</td><td><code>ssh -i sailagentecsdevkey.pem ubuntu@52.25.174.57</code></td></tr>
+<tr><td>Website</td><td>Next.js, exported to plain files</td><td>served by nginx, no program running</td></tr>
+<tr><td>API</td><td>FastAPI on uvicorn</td><td>127.0.0.1, behind nginx</td></tr>
+<tr><td>Database</td><td>MySQL 8</td><td>the same machine</td></tr>
+<tr><td>Assistant</td><td>Google Gemini</td><td>called out over the internet</td></tr>
 </tbody></table></div>
-<p>Three things run on it. The API, the web server in front of it, and the database. A fourth service, the render service on port 8800, belongs to the grocery shop and is not part of this system.</p>
+<p>nginx is the only thing listening to the internet. It serves the website from disk and passes anything under <code>/api/</code> to the API on a local port. The API is the only thing that talks to the database. Nothing in the website holds a server address: it calls <code>/api/</code> on whatever host it was opened from, which is why moving to a new subdomain needs no rebuild.</p>
 <div class="tw"><table>
-<thead><tr><th>Program</th><th>Version</th><th>Listening on</th></tr></thead>
+<thead><tr><th></th><th>Product Application</th><th>Plumbing Application</th></tr></thead>
 <tbody>
-<tr><td>nginx</td><td>1.18.0</td><td>80 and 443, open to the internet</td></tr>
-<tr><td>Service Assistant API</td><td>uvicorn, Python 3.12.13</td><td>127.0.0.1:8100, local only</td></tr>
-<tr><td>MySQL</td><td>8.0.46</td><td>3306</td></tr>
-<tr><td>Python on the machine</td><td>3.10.12</td><td>the API uses its own 3.12</td></tr>
-<tr><td>uv, the installer</td><td>0.12.1</td><td></td></tr>
+<tr><td>Machine</td><td>54.255.130.57, Singapore</td><td>52.25.174.57, Oregon</td></tr>
+<tr><td>Address</td><td>dev.agent.fordev.fun</td><td>serviceagent.fordev.fun</td></tr>
+<tr><td>API port</td><td>8000</td><td>8100</td></tr>
+<tr><td>Service name</td><td><code>aiorder</code></td><td><code>plumber</code></td></tr>
+<tr><td>Website root</td><td><code>/var/www/ai-order/frontend-dist</code></td><td><code>/var/www/serviceagent</code></td></tr>
+<tr><td>API folder</td><td><code>/var/www/ai-order/backend</code></td><td><code>/home/ubuntu/plumber/backend</code></td></tr>
+<tr><td>Database</td><td><code>aidata2prd_dev</code></td><td><code>plumber_assistant</code></td></tr>
 </tbody></table></div>
+<p>Note the API folders differ. The Product Application lives under <code>/var/www</code>, the Plumbing Application under the home folder. Worth knowing before going looking.</p>
 <hr>
-<h1>Where everything lives</h1>
-<div class="tw"><table>
-<thead><tr><th>Path</th><th>What it is</th></tr></thead>
-<tbody>
-<tr><td><code>/home/ubuntu/plumber/backend</code></td><td>The API. Code, settings and its own Python.</td></tr>
-<tr><td><code>/home/ubuntu/plumber/backend/.env</code></td><td>Every setting and secret. The one file to guard.</td></tr>
-<tr><td><code>/home/ubuntu/plumber/backend/.venv</code></td><td>The API&#x27;s own Python 3.12 and its libraries.</td></tr>
-<tr><td><code>/home/ubuntu/plumber/backend/migrations</code></td><td>Four database change scripts, safe to re-run.</td></tr>
-<tr><td><code>/var/www/serviceagent</code></td><td>The website. Plain files, no program.</td></tr>
-<tr><td><code>/etc/nginx/sites-available/serviceagent</code></td><td>The web server settings for this subdomain.</td></tr>
-<tr><td><code>/etc/systemd/system/plumber.service</code></td><td>What starts the API and restarts it if it stops.</td></tr>
-<tr><td><code>/etc/letsencrypt/live/serviceagent.fordev.fun</code></td><td>The certificate.</td></tr>
-</tbody></table></div>
-<p>The API is under <code>/home/ubuntu</code>, not under <code>/var/www</code>. That is worth knowing before going looking for it.</p>
-<hr>
-<h1>The database</h1>
-<div class="tw"><table>
-<thead><tr><th>Setting</th><th>Value</th></tr></thead>
-<tbody>
-<tr><td>Server</td><td>the same machine, 52.25.174.57</td></tr>
-<tr><td>Port</td><td>3306</td></tr>
-<tr><td>Database name</td><td><code>plumber_assistant</code></td></tr>
-<tr><td>User</td><td><code>aiorder</code></td></tr>
-<tr><td>Password</td><td>in <code>/home/ubuntu/plumber/backend/.env</code>, on the <code>DB_PASSWORD</code> line</td></tr>
-<tr><td>Size</td><td>2.2 MB across 18 tables</td></tr>
-</tbody></table></div>
-<p>To read the password:</p>
-<pre><code>ssh -i sailagentecsdevkey.pem ubuntu@52.25.174.57
-grep DB_ /home/ubuntu/plumber/backend/.env</code></pre>
-<p>To connect from the machine itself:</p>
-<pre><code>mysql -h 127.0.0.1 -u aiorder -p plumber_assistant</code></pre>
-<p>To connect from your own computer, over an encrypted tunnel rather than across the open internet:</p>
-<pre><code>ssh -i sailagentecsdevkey.pem -L 3307:127.0.0.1:3306 ubuntu@52.25.174.57
-mysql -h 127.0.0.1 -P 3307 -u aiorder -p plumber_assistant</code></pre>
-<figure><img src="img/t01_tables.png" alt="The 18 tables, listed from the live database" loading="lazy"></figure>
-<h2>What the tables hold</h2>
-<div class="tw"><table>
-<thead><tr><th>Group</th><th>Tables</th></tr></thead>
-<tbody>
-<tr><td>Bookings</td><td><code>service_requests</code>, <code>jobs</code>, <code>appointments</code>, <code>job_lines</code>, <code>payments</code></td></tr>
-<tr><td>Providers</td><td><code>providers</code>, <code>provider_services</code>, <code>provider_availability</code>, <code>provider_time_off</code></td></tr>
-<tr><td>Catalogue</td><td><code>services</code>, <code>service_phrases</code>, <code>categories</code>, <code>stores</code></td></tr>
-<tr><td>People and sessions</td><td><code>accounts</code>, <code>customers</code>, <code>sessions</code>, <code>chat_sessions</code>, <code>cart_items</code></td></tr>
-</tbody></table></div>
-<p><code>services</code> still carries a few columns from the grocery system it was built from, such as <code>veg</code> and <code>organic</code>. They are unused here. The columns that matter are <code>price</code>, <code>duration_minutes</code> and <code>emergency</code>.</p>
-<hr>
-<h1>Building a new machine</h1>
-<p>Fifteen steps. Read the whole list before starting: steps 2 and 3 are the ones people forget, and both have to be done before the certificate will issue.</p>
-<h2>1. Create the instance</h2>
-<p>In the Lightsail console: <strong>Create instance</strong>, Linux, <strong>Ubuntu 22.04 LTS</strong>, then the 2 GB plan or larger. Attach a static IP afterwards, otherwise the address changes when the machine restarts and the subdomain stops working.</p>
-<p>Download the key file and protect it, or SSH refuses to use it:</p>
+<h1>3. SOP: Spinning Off a New Application</h1>
+<p>Fifteen steps. Read the whole list first: steps 2 and 3 are the ones people forget, and both must be done before a certificate will issue.</p>
+<h2>3.1 From Product Snapshot</h2>
+<p>Start from a copy of the working application rather than an empty machine.</p>
+<pre><code>git clone git@github.com:jafgithub/ai-service-chat-se-abad.git ~/plumber</code></pre>
+<p>Or take the files straight off a running machine:</p>
+<pre><code>scp -i key.pem -r ubuntu@OLD.IP:~/plumber/backend ~/plumber/</code></pre>
+<p>Copy the code, never the <code>.env</code>. That file carries the old machine&#x27;s database password, payment keys and admin token, and every one of them should be new.</p>
+<h2>3.2 New Server</h2>
+<p>In the Lightsail console: <strong>Create instance</strong>, Linux, <strong>Ubuntu 22.04 LTS</strong>, the 2 GB plan or larger. Attach a static IP afterwards, or the address changes when the machine restarts and the subdomain stops working.</p>
 <pre><code>chmod 600 ~/Downloads/your-key.pem
 ssh -i ~/Downloads/your-key.pem ubuntu@NEW.IP.ADDRESS</code></pre>
-<h2>2. Open the ports</h2>
-<p>Lightsail blocks everything except SSH until told otherwise. In <strong>Networking</strong> on the instance, add:</p>
-<div class="tw"><table>
-<thead><tr><th>Application</th><th>Protocol</th><th>Port</th></tr></thead>
-<tbody>
-<tr><td>HTTP</td><td>TCP</td><td>80</td></tr>
-<tr><td>HTTPS</td><td>TCP</td><td>443</td></tr>
-</tbody></table></div>
-<p>Leave 3306 closed. The API talks to the database on the same machine, so the database never needs to be reachable from outside.</p>
-<h2>3. Point the subdomain at it</h2>
-<p>In the DNS for <code>fordev.fun</code>, add an <strong>A record</strong>: the name is the subdomain, for example <code>serviceagent</code>, and the value is the new static IP.</p>
-<p>Wait until this answers with the new address before going further, because the certificate in step 12 is issued by a service that checks the name really points at the machine:</p>
+<p>Open the ports. Lightsail blocks everything but SSH until told otherwise. Under <strong>Networking</strong>, add HTTP on TCP 80 and HTTPS on TCP 443. Leave 3306 closed: the API reaches the database on the same machine.</p>
+<p>Point the subdomain at it. Add an <strong>A record</strong> in the DNS for <code>fordev.fun</code>, the name being the subdomain and the value the new static IP. Wait for it to answer before going on, because the certificate step checks that the name really points at the machine:</p>
 <pre><code>dig +short yoursubdomain.fordev.fun</code></pre>
-<h2>4. Install what is needed</h2>
+<p>Then install what is needed:</p>
 <pre><code>sudo apt update
 sudo apt install -y nginx mysql-server ffmpeg git curl
 curl -LsSf https://astral.sh/uv/install.sh | sh</code></pre>
-<p><code>ffmpeg</code> is required: it converts the audio from voice bookings.</p>
-<h2>5. Create the database</h2>
+<p><code>ffmpeg</code> is required. It converts the audio from voice bookings.</p>
+<h2>3.3 Database</h2>
 <pre><code>sudo mysql -e &quot;CREATE DATABASE plumber_assistant CHARACTER SET utf8mb4;&quot;
 sudo mysql -e &quot;CREATE USER &#x27;aiorder&#x27;@&#x27;localhost&#x27; IDENTIFIED BY &#x27;CHOOSE_A_STRONG_PASSWORD&#x27;;&quot;
 sudo mysql -e &quot;GRANT ALL ON plumber_assistant.* TO &#x27;aiorder&#x27;@&#x27;localhost&#x27;;&quot;
 sudo mysql -e &quot;FLUSH PRIVILEGES;&quot;</code></pre>
-<p>Use <code>&#x27;aiorder&#x27;@&#x27;localhost&#x27;</code>, not <code>&#x27;aiorder&#x27;@&#x27;%&#x27;</code>. The second form lets the user sign in from anywhere on the internet, which is how the current machine is set up and is the one thing about it that should not be copied.</p>
-<h2>6. Copy the data across</h2>
-<p>On the old machine:</p>
-<pre><code>mysqldump -h 127.0.0.1 -u aiorder -p plumber_assistant &gt; plumber.sql</code></pre>
-<p>Bring it to the new one and load it:</p>
-<pre><code>scp -i key.pem ubuntu@OLD.IP:plumber.sql .
+<p>Use <code>&#x27;aiorder&#x27;@&#x27;localhost&#x27;</code>, not <code>&#x27;aiorder&#x27;@&#x27;%&#x27;</code>. The second form lets the user sign in from anywhere on the internet. Section 10.1 explains why that matters.</p>
+<p>Move the data across:</p>
+<pre><code>mysqldump -h 127.0.0.1 -u aiorder -p plumber_assistant &gt; plumber.sql
 scp -i key.pem plumber.sql ubuntu@NEW.IP:~
 ssh -i key.pem ubuntu@NEW.IP
 mysql -h 127.0.0.1 -u aiorder -p plumber_assistant &lt; plumber.sql</code></pre>
-<h2>7. Copy the application</h2>
-<pre><code>mkdir -p ~/plumber
-scp -i key.pem -r ubuntu@OLD.IP:~/plumber/backend ~/plumber/</code></pre>
-<p>Or from the repository, which is cleaner:</p>
-<pre><code>git clone git@github.com:jafgithub/ai-service-chat-se-abad.git ~/plumber</code></pre>
-<h2>8. Install the API&#x27;s own Python</h2>
+<figure><img src="img/t01_tables.png" alt="The 18 tables, listed from the live database" loading="lazy"></figure>
+<h2>3.4 Application Files</h2>
 <pre><code>cd ~/plumber/backend
 uv venv .venv --python 3.12
 uv pip install --python .venv/bin/python -r requirements.txt</code></pre>
-<p>The virtual environment is made by <code>uv</code> and has no <code>pip</code> inside it. Use <code>uv pip install --python .venv/bin/python</code>, not <code>.venv/bin/pip</code>, which does not exist.</p>
-<h2>9. Write the settings file</h2>
+<p>The environment is made by <code>uv</code> and has <strong>no <code>pip</code> inside it</strong>. Use <code>uv pip install --python .venv/bin/python</code>. <code>.venv/bin/pip</code> does not exist.</p>
+<h2>3.5 Environment Configuration</h2>
 <pre><code>nano ~/plumber/backend/.env
 chmod 600 ~/plumber/backend/.env</code></pre>
-<p>These are the settings. Copy the old file and change the marked lines:</p>
+<p>The full list is in the appendix. These are the ones that must change on a new machine:</p>
 <div class="tw"><table>
-<thead><tr><th>Setting</th><th>Change it?</th><th>What it is</th></tr></thead>
+<thead><tr><th>Setting</th><th>Why</th></tr></thead>
 <tbody>
-<tr><td><code>APP_NAME</code></td><td>if renaming</td><td>Shown in emails</td></tr>
-<tr><td><code>DB_HOST</code> <code>DB_PORT</code> <code>DB_NAME</code> <code>DB_USER</code></td><td>usually not</td><td><code>127.0.0.1</code>, <code>3306</code>, <code>plumber_assistant</code>, <code>aiorder</code></td></tr>
-<tr><td><code>DB_PASSWORD</code></td><td><strong>yes</strong></td><td>The one chosen in step 5</td></tr>
-<tr><td><code>GEMINI_API_KEY</code> <code>GEMINI_MODEL</code></td><td>carry over</td><td>The assistant&#x27;s language model</td></tr>
-<tr><td><code>LLM_PROVIDER</code> <code>SPEECH_PROVIDER</code></td><td>no</td><td>Both <code>gemini</code></td></tr>
-<tr><td><code>FFMPEG_PATH</code> <code>FFPROBE_PATH</code></td><td>no</td><td><code>/usr/bin/ffmpeg</code>, <code>/usr/bin/ffprobe</code></td></tr>
-<tr><td><code>SMTP_HOST</code> <code>SMTP_PORT</code> <code>SMTP_USER</code> <code>SMTP_PASSWORD</code></td><td>carry over</td><td>Sends booking emails</td></tr>
-<tr><td><code>SMTP_FROM</code> <code>AI_ORDER_EMAIL</code></td><td><strong>yes</strong></td><td>Sender and the address that gets copies</td></tr>
-<tr><td><code>ADMIN_TOKEN</code></td><td><strong>yes, new one</strong></td><td>Opens the admin screens</td></tr>
-<tr><td><code>STRIPE_SECRET_KEY</code> <code>STRIPE_PUBLISHABLE_KEY</code> <code>STRIPE_WEBHOOK_SECRET</code></td><td><strong>yes</strong></td><td>Card payments</td></tr>
-<tr><td><code>PAYPAL_CLIENT_ID</code> <code>PAYPAL_SECRET</code> <code>PAYPAL_BASE_URL</code> <code>PAYPAL_WEBHOOK_ID</code></td><td><strong>yes</strong></td><td>PayPal</td></tr>
-<tr><td><code>PAYMENTS_ENABLED</code> <code>COD_ENABLED</code></td><td>as wanted</td><td>Turn payment methods on or off</td></tr>
-<tr><td><code>CALENDAR_PROVIDER</code></td><td>no</td><td></td></tr>
+<tr><td><code>DB_PASSWORD</code></td><td>The one chosen in 3.3</td></tr>
+<tr><td><code>ADMIN_TOKEN</code></td><td>Opens the admin screens. Generate a new one.</td></tr>
+<tr><td><code>SMTP_FROM</code>, <code>AI_ORDER_EMAIL</code></td><td>Sender, and the address that gets copies</td></tr>
+<tr><td><code>STRIPE_SECRET_KEY</code>, <code>STRIPE_PUBLISHABLE_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code></td><td>Card payments</td></tr>
+<tr><td><code>PAYPAL_CLIENT_ID</code>, <code>PAYPAL_SECRET</code>, <code>PAYPAL_BASE_URL</code>, <code>PAYPAL_WEBHOOK_ID</code></td><td>PayPal</td></tr>
 </tbody></table></div>
-<p>The Stripe and PayPal webhook settings are tied to the address that the payment company calls back. Changing the subdomain means updating them in the Stripe and PayPal dashboards too, or payments will be taken and never confirmed.</p>
-<h2>10. Apply the database changes</h2>
+<p>Carry over unchanged: <code>GEMINI_API_KEY</code>, <code>GEMINI_MODEL</code>, the <code>SMTP_HOST</code> group, <code>FFMPEG_PATH</code>, <code>FFPROBE_PATH</code>.</p>
+<p>Then apply the database changes:</p>
 <pre><code>cd ~/plumber/backend
 for m in migrations/00*.py; do .venv/bin/python &quot;$m&quot;; done</code></pre>
-<p>Each one checks before it changes anything, so running them twice is safe.</p>
-<h2>11. Make the API start on boot</h2>
+<p>Each checks before it changes anything, so running them twice is safe.</p>
+<h2>3.6 Systemd</h2>
 <pre><code>sudo nano /etc/systemd/system/plumber.service</code></pre>
 <pre><code>[Unit]
 Description=Service Assistant API
@@ -268,8 +205,8 @@ WantedBy=multi-user.target</code></pre>
 sudo systemctl enable --now plumber
 systemctl status plumber</code></pre>
 <figure><img src="img/t02_service.png" alt="The API running, as reported by the machine itself" loading="lazy"></figure>
-<p>On a machine with 1 GB of memory raise <code>MemoryMax</code>, or drop it entirely on a larger machine. On the current server the API sits at 699.8 MB against a 700 MB ceiling, which is too close to the line.</p>
-<h2>12. Set up the web server</h2>
+<p>On a 1 GB machine raise <code>MemoryMax</code> or drop it entirely on a larger one. See section 10.2.</p>
+<h2>3.7 Nginx</h2>
 <pre><code>sudo nano /etc/nginx/sites-available/serviceagent</code></pre>
 <pre><code>server {
     listen 80;
@@ -295,24 +232,23 @@ systemctl status plumber</code></pre>
 sudo ln -sf /etc/nginx/sites-available/serviceagent /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx</code></pre>
-<p><code>proxy_read_timeout 180s</code> matters. Voice bookings can take longer than the minute nginx allows by default, and without it they fail halfway through.</p>
-<h2>13. Get the certificate</h2>
+<p><code>proxy_read_timeout 180s</code> matters. Voice bookings run longer than the minute nginx allows by default and fail halfway through without it.</p>
+<h2>3.8 SSL</h2>
 <pre><code>sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d yoursubdomain.fordev.fun --agree-tos -m you@example.com --redirect</code></pre>
-<p>Certbot edits the nginx file itself, adding the certificate lines and a rule sending plain HTTP to HTTPS. Renewal is automatic; the timer is already installed.</p>
+<p>Certbot edits the nginx file itself and installs a renewal timer.</p>
 <figure><img src="img/t03_certs.png" alt="The certificates held on the machine" loading="lazy"></figure>
-<h2>A wildcard certificate instead</h2>
-<p>One certificate covering every subdomain at once saves repeating step 13. It cannot be issued the same way: proving ownership of <code>*.fordev.fun</code> needs a DNS record rather than a web page, so the domain has to be verified by hand.</p>
+<p><strong>A wildcard certificate instead.</strong> One certificate for every subdomain cannot be issued the same way: proving ownership of <code>*.fordev.fun</code> needs a DNS record rather than a web page.</p>
 <pre><code>sudo certbot certonly --manual --preferred-challenges dns \
   -d &quot;*.fordev.fun&quot; -d fordev.fun --agree-tos -m you@example.com</code></pre>
-<p>Certbot prints a <code>_acme-challenge.fordev.fun</code> TXT record. Add it in the DNS, wait for it to answer, then press enter:</p>
+<p>Certbot prints a <code>_acme-challenge.fordev.fun</code> TXT record. Add it in the DNS, confirm it answers, then press enter:</p>
 <pre><code>dig +short TXT _acme-challenge.fordev.fun</code></pre>
-<p>Point nginx at the wildcard certificate instead of the per-subdomain one:</p>
+<p>Point nginx at it:</p>
 <pre><code>ssl_certificate     /etc/letsencrypt/live/fordev.fun/fullchain.pem;
 ssl_certificate_key /etc/letsencrypt/live/fordev.fun/privkey.pem;</code></pre>
-<p>The trade: a wildcard covers every subdomain, but a manual certificate does not renew on its own. It has to be reissued by hand every 90 days unless the DNS provider offers an automatic plugin. For one or two subdomains, step 13 is less work and less risk.</p>
-<h2>14. Put the website on</h2>
-<p>Built on your own computer, because the server has no Node installed:</p>
+<p>The trade: a wildcard covers everything, but a manual certificate does not renew on its own and must be reissued every 90 days unless the DNS provider offers an automatic plugin. For one or two subdomains, 3.8 is less work and less risk.</p>
+<h2>3.9 Frontend</h2>
+<p>Built on your own computer. The server has no Node installed.</p>
 <pre><code>cd frontend
 npm install
 npm run build:serviceagent
@@ -320,63 +256,252 @@ rsync -az --delete out/ ubuntu@NEW.IP:/tmp/fe-stage/
 ssh ubuntu@NEW.IP &#x27;sudo rsync -a --delete /tmp/fe-stage/ /var/www/serviceagent/ \
   &amp;&amp; sudo chown -R www-data:www-data /var/www/serviceagent/&#x27;</code></pre>
 <p>Use <code>build:serviceagent</code>, not <code>build</code>. The plain build is made for the older address where the app sat in a folder called <code>/plumber</code>, and its pages look for their files in the wrong place on a subdomain.</p>
-<h2>15. Check it</h2>
+<h2>3.10 Verification</h2>
 <pre><code>curl -s -o /dev/null -w &quot;home    %{http_code}\n&quot; https://yoursubdomain.fordev.fun/
 curl -s -o /dev/null -w &quot;health  %{http_code}\n&quot; https://yoursubdomain.fordev.fun/health
 curl -s https://yoursubdomain.fordev.fun/api/v1/services | head -c 200</code></pre>
-<p>Three 200s and a list of services means the website, the API and the database are all working together.</p>
+<p>Three 200s and a list of services means website, API and database are all talking to each other.</p>
 <figure><img src="img/t04_verify.png" alt="The checks passing on the live server" loading="lazy"></figure>
-<figure><img src="img/s01_home.png" alt="The Service Assistant, running" loading="lazy"></figure>
+<figure><img src="img/s01_home.png" alt="The Plumbing Application, running" loading="lazy"></figure>
 <hr>
-<h1>Changing the subdomain later</h1>
-<pre><code>sudo nano /etc/nginx/sites-available/serviceagent    # change server_name, both blocks
-sudo certbot --nginx -d thenewname.fordev.fun --agree-tos --redirect
-sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
-<p>Add the DNS record for the new name first. Nothing in the API or the website holds the address: the website calls <code>/api/</code> on whatever host it was opened from, so it follows the subdomain without being rebuilt.</p>
-<p>The exception is payments. Stripe and PayPal call back to a fixed address, so their webhook settings have to be changed in those dashboards to match.</p>
+<h1>4. Product Application</h1>
+<h2>4.1 Current Architecture</h2>
+<p>A conversational grocery shop. A shopper types or speaks, the assistant searches the catalogue of 25,631 products, and results fill a basket. When the catalogue has nothing, a paid search through SerpApi looks at other shops and those results can be adopted into the catalogue.</p>
+<p>Search does not touch the database. All 25,631 products and their embeddings are held in memory and rebuilt on a 20 second delay after a change, which is what makes a search answer in about 200 milliseconds.</p>
+<h2>4.2 Snapshot Components</h2>
+<div class="tw"><table>
+<thead><tr><th>Component</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>services/catalog_index.py</code></td><td>The whole catalogue in memory, searched by vector</td></tr>
+<tr><td><code>services/rag.py</code></td><td>Turns a phrase into a vector and ranks matches</td></tr>
+<tr><td><code>services/conversation.py</code>, <code>intent.py</code>, <code>response.py</code></td><td>Understanding the turn and wording the reply</td></tr>
+<tr><td><code>services/gemini_service.py</code>, <code>voice_service.py</code></td><td>The assistant, speech in and speech out</td></tr>
+<tr><td><code>services/cart_service.py</code></td><td>The basket, shared by chat, voice and buttons</td></tr>
+<tr><td><code>services/shopping/</code></td><td>SerpApi search and the store comparison</td></tr>
+<tr><td><code>services/browser/</code></td><td>Rendering a retailer page inside ours. Built, then switched off.</td></tr>
+<tr><td><code>api/products.py</code>, <code>shopping.py</code>, <code>orders.py</code></td><td>Catalogue, outside search, checkout</td></tr>
+</tbody></table></div>
+<h2>4.3 Configuration</h2>
+<p>70 settings. The ones unique to this application are the shopping group: <code>SERPAPI_KEY</code>, <code>SHOPPING_PROVIDER</code>, <code>SHOPPING_COUNTRY</code>, <code>SHOPPING_REFRESH_BUDGET_PER_DAY</code>, <code>STORE_COMPARISON_TTL_DAYS</code>, <code>AUTO_ADOPT_SEARCH_RESULTS</code>, <code>ADOPTED_ITEM_ID_BASE</code>, and the six <code>BROWSE_</code> settings for the switched off in-app browser.</p>
+<h2>4.4 Database</h2>
+<p>26 working tables. The ones that matter: <code>items</code> for the catalogue, <code>external_offers</code> and <code>external_items</code> for what outside search found, <code>orders</code> and <code>order_details</code>, <code>carts</code> and <code>cart_items</code>, <code>customers</code>, <code>stores</code>, <code>categories</code>.</p>
+<p>Two flows connect it to the client&#x27;s own system. <code>items</code> is pulled one way from his live database and overwrites anything written locally. <code>sync_to_remote.py</code> pushes customers and orders back, and never items.</p>
 <hr>
-<h1>Everyday commands</h1>
+<h1>5. Plumbing Application</h1>
+<h2>5.1 Architecture</h2>
+<p>The same shape, a different transaction. A customer describes a problem, the assistant matches it to a service, shows which providers do it and what they charge, offers real times from each provider&#x27;s diary, and books one. Providers register, set their hours, and see their appointments.</p>
+<h2>5.2 Database Changes</h2>
+<p>18 tables. Four migrations built them, each safe to re-run:</p>
+<div class="tw"><table>
+<thead><tr><th>Migration</th><th>Adds</th></tr></thead>
+<tbody>
+<tr><td><code>001_providers_and_accounts</code></td><td><code>providers</code>, <code>provider_services</code>, <code>provider_availability</code>, <code>accounts</code>, <code>sessions</code></td></tr>
+<tr><td><code>002_provider_time_off</code></td><td><code>provider_time_off</code></td></tr>
+<tr><td><code>003_service_requests</code></td><td><code>service_requests</code></td></tr>
+<tr><td><code>004_booking_payments</code></td><td><code>jobs.payment_status</code></td></tr>
+</tbody></table></div>
+<p><code>items</code> became <code>services</code>, keeping the same columns and gaining <code>duration_minutes</code> and <code>emergency</code>. <code>orders</code> became <code>jobs</code>, <code>order_details</code> became <code>job_lines</code>, and <code>appointments</code> is new.</p>
+<h2>5.3 New Files</h2>
+<p>27 new Python files and 33 new frontend files.</p>
+<div class="tw"><table>
+<thead><tr><th>Area</th><th>Files</th></tr></thead>
+<tbody>
+<tr><td>Booking</td><td><code>services/booking_service.py</code>, <code>job_service.py</code>, <code>booking_emails.py</code>, <code>booking_notify.py</code></td></tr>
+<tr><td>Providers</td><td><code>models/provider.py</code>, <code>api/providers.py</code>, <code>services/discovery.py</code></td></tr>
+<tr><td>Accounts</td><td><code>models/account.py</code>, <code>api/auth.py</code>, <code>services/auth.py</code>, <code>api/deps.py</code>, <code>services/rate_limit.py</code></td></tr>
+<tr><td>Diary</td><td><code>models/appointment.py</code>, <code>services/calendly/</code> with four providers</td></tr>
+<tr><td>Matching</td><td><code>services/phrase_index.py</code></td></tr>
+<tr><td>Frontend, customer</td><td><code>booking/BookingFlow.tsx</code>, <code>SlotPicker.tsx</code>, <code>ProviderCard.tsx</code>, <code>BookingReview.tsx</code>, <code>BookingConfirmation.tsx</code>, <code>ServiceCard.tsx</code>, <code>ProviderProfilePanel.tsx</code></td></tr>
+<tr><td>Frontend, provider</td><td><code>provider/ProviderShell.tsx</code> and six provider screens</td></tr>
+<tr><td>Frontend, shared</td><td><code>auth/AuthPanel.tsx</code>, <code>auth/AuthProvider.tsx</code>, <code>layout/PageShell.tsx</code>, <code>layout/AccountMenu.tsx</code>, <code>ui/Field.tsx</code>, <code>Sheet.tsx</code>, <code>States.tsx</code>, <code>HoverCard.tsx</code>, <code>ServiceImage.tsx</code></td></tr>
+</tbody></table></div>
+<p>Routes went from 3 to 15: the shop had <code>/</code>, <code>/chat</code> and <code>/admin</code>; the booking platform adds <code>/book</code>, <code>/bookings</code>, <code>/requests</code>, <code>/login</code>, <code>/register</code> and six under <code>/provider</code>.</p>
+<h2>5.4 Modified Files</h2>
+<p>24 of the 41 shared Python files were changed. 17 came across untouched.</p>
+<div class="tw"><table>
+<thead><tr><th>File</th><th>Change</th></tr></thead>
+<tbody>
+<tr><td><code>core/config.py</code></td><td>Shopping settings out, booking settings in</td></tr>
+<tr><td><code>main.py</code></td><td>Routers swapped</td></tr>
+<tr><td><code>services/catalog_index.py</code></td><td>Reads <code>services</code> not <code>items</code>, carries <code>duration_minutes</code> and <code>emergency</code></td></tr>
+<tr><td><code>services/rag.py</code>, <code>intent.py</code>, <code>response.py</code></td><td>Wording and matching moved from products to services</td></tr>
+<tr><td><code>services/cart_service.py</code></td><td>Kept, holds a service before it becomes a booking</td></tr>
+<tr><td><code>api/chat.py</code>, <code>voice.py</code></td><td>Same machinery, booking vocabulary</td></tr>
+<tr><td><code>api/payments.py</code></td><td>Pays for a booking rather than an order</td></tr>
+</tbody></table></div>
+<p>Untouched and carried straight over: <code>services/media.py</code>, <code>email_service.py</code>, <code>ai.py</code>, <code>reindex_queue.py</code>, and the database and schema helpers.</p>
+<h2>5.5 Removed / Deprecated Files</h2>
+<p>23 Python files and 21 frontend files did not come across.</p>
+<div class="tw"><table>
+<thead><tr><th>Area</th><th>Removed</th></tr></thead>
+<tbody>
+<tr><td>Outside search</td><td><code>services/shopping/</code> all five files, <code>offer_store.py</code>, <code>adopt_service.py</code>, <code>auto_adopt.py</code></td></tr>
+<tr><td>In-app browser</td><td><code>services/browser/</code> all four files, <code>api/browse.py</code></td></tr>
+<tr><td>Shop domain</td><td><code>api/products.py</code>, <code>orders.py</code>, <code>partners.py</code>, <code>models/product.py</code>, <code>order.py</code>, <code>order_detail.py</code>, <code>external_item.py</code>, <code>external_offer.py</code>, <code>services/order_service.py</code></td></tr>
+<tr><td>Shop interface</td><td><code>ProductCard.tsx</code>, <code>ProductDetailsModal.tsx</code>, <code>CartDrawer.tsx</code>, <code>StoreComparison.tsx</code>, <code>SourcedPanel.tsx</code>, <code>VendorProductModal.tsx</code>, <code>StoreBrowserModal.tsx</code>, <code>VisitingStoreBar.tsx</code>, <code>OrderConfirmation.tsx</code> and five more</td></tr>
+</tbody></table></div>
+<h2>5.6 Configuration Changes</h2>
+<p>14 settings removed, 14 added. The count matching is a coincidence.</p>
+<div class="tw"><table>
+<thead><tr><th>Added</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>BOOKING_OPEN_HOUR</code> = 8, <code>BOOKING_CLOSE_HOUR</code> = 17</td><td>The working day</td></tr>
+<tr><td><code>BOOKING_WEEKENDS</code> = false</td><td>Saturdays and Sundays offered or not</td></tr>
+<tr><td><code>BOOKING_SLOT_STEP_MINUTES</code> = 60</td><td>Spacing between offered times</td></tr>
+<tr><td><code>BOOKING_LEAD_HOURS</code> = 3</td><td>How soon the first slot can be</td></tr>
+<tr><td><code>BOOKING_DAYS_AHEAD</code> = 14</td><td>How far ahead the diary runs</td></tr>
+<tr><td><code>BOOKING_HOLD_MINUTES</code> = 10</td><td>How long a slot is held during checkout</td></tr>
+<tr><td><code>PROVIDER_RANKING</code> = soonest</td><td>How providers are ordered</td></tr>
+<tr><td><code>SESSION_DAYS</code> = 30</td><td>How long a sign-in lasts</td></tr>
+<tr><td><code>CALENDAR_PROVIDER</code> and four <code>CALENDLY_</code> settings</td><td>Outside diary, when used</td></tr>
+</tbody></table></div>
+<h2>5.7 Provider / Booking Changes</h2>
+<p>A provider is a business with an address, a travel radius, a set of services with their own prices, weekly hours and time off. Ranking is by who can come soonest, which is why <code>provider_availability</code> and <code>provider_time_off</code> are read on every search rather than only at booking time.</p>
+<p>A booking holds a slot for ten minutes while the customer confirms, so two people cannot take the same time. Payment is cash, card through Stripe, or PayPal, and only a signed webhook marks a booking paid.</p>
+<hr>
+<h1>6. Product to Plumbing Conversion</h1>
+<h2>6.1 What Was Reused</h2>
+<p>Everything that was not about selling groceries. The assistant, speech in and out, the in-memory search index, the vector matching, the design system and its tokens, authentication patterns, the email sender, the payment providers, the media helper, and the deployment shape of nginx plus a static export plus a local API.</p>
+<p>Of 41 shared backend files, 17 were carried across byte for byte.</p>
+<h2>6.2 What Was Changed</h2>
+<p>24 shared files. The pattern throughout: the machinery stayed, the vocabulary and the domain changed. <code>catalog_index.py</code> is the clearest example. It still holds every row in memory and still ranks by dot product, but it reads the <code>services</code> table and carries two extra columns the service card needs.</p>
+<h2>6.3 What Was Added</h2>
+<p>The booking domain, which has no equivalent in a shop: providers, their diaries, appointments with holds, accounts for two kinds of user, and a service request that exists before a job does.</p>
+<h2>6.4 What Was Removed</h2>
+<p>Everything that assumed goods rather than time: outside product search, the store comparison, product adoption, the in-app retailer browser, orders and order lines, and the whole shop interface.</p>
+<h2>6.5 Configuration Mapping</h2>
+<div class="tw"><table>
+<thead><tr><th>Product setting</th><th>Plumbing equivalent</th></tr></thead>
+<tbody>
+<tr><td><code>SHOPPING_PROVIDER</code>, <code>SERPAPI_KEY</code></td><td>none. Services are the client&#x27;s own.</td></tr>
+<tr><td><code>STORE_COMPARISON_TTL_DAYS</code></td><td>none</td></tr>
+<tr><td><code>ADOPTED_ITEM_ID_BASE</code></td><td>none</td></tr>
+<tr><td><code>BROWSE_*</code></td><td>none</td></tr>
+<tr><td>none</td><td><code>BOOKING_*</code>, seven settings</td></tr>
+<tr><td>none</td><td><code>PROVIDER_RANKING</code></td></tr>
+<tr><td>none</td><td><code>CALENDAR_PROVIDER</code>, <code>CALENDLY_*</code></td></tr>
+<tr><td><code>TAX_RATE</code>, <code>SHOP_NAME</code>, <code>GEMINI_*</code>, <code>SMTP_*</code></td><td>unchanged</td></tr>
+</tbody></table></div>
+<hr>
+<h1>7. Deployment &amp; Rebuild Procedure</h1>
+<p>Backend, code only. The <code>.env</code> and the environment on the server are left alone:</p>
+<pre><code>rsync -az --delete backend/app/ ubuntu@HOST:/home/ubuntu/plumber/backend/app/
+ssh ubuntu@HOST &#x27;sudo systemctl restart plumber&#x27;</code></pre>
+<p>Frontend, staged then moved with sudo because the web root is owned by root:</p>
+<pre><code>cd frontend &amp;&amp; npm run build:serviceagent
+rsync -az --delete out/ ubuntu@HOST:/tmp/fe-stage/
+ssh ubuntu@HOST &#x27;sudo rsync -a --delete /tmp/fe-stage/ /var/www/serviceagent/ \
+  &amp;&amp; sudo chown -R www-data:www-data /var/www/serviceagent/&#x27;</code></pre>
+<p>Documents are served from <code>/var/www/serviceagent-docs/</code>, deliberately outside the website root, because the frontend deploy above uses <code>--delete</code> and would otherwise remove them.</p>
+<hr>
+<h1>8. Verification / Smoke Tests</h1>
+<pre><code>systemctl is-active plumber
+curl -s -o /dev/null -w &quot;%{http_code}\n&quot; https://serviceagent.fordev.fun/health
+curl -s https://serviceagent.fordev.fun/api/v1/services | head -c 120</code></pre>
+<p>Then by hand, because these are the paths that break quietly:</p>
+<ol><li>Describe a problem in the chat and check services come back with prices.</li><li>Pick one and check real times appear.</li><li>Book it and check the confirmation email arrives.</li><li>Sign in as a provider and check the appointment is on the diary.</li><li>Speak a request and check the reply is spoken back.</li></ol>
+<hr>
+<h1>9. Everyday Operations</h1>
 <div class="tw"><table>
 <thead><tr><th>Task</th><th>Command</th></tr></thead>
 <tbody>
 <tr><td>Is the API running</td><td><code>systemctl status plumber</code></td></tr>
 <tr><td>Restart it</td><td><code>sudo systemctl restart plumber</code></td></tr>
-<tr><td>Watch what it is doing</td><td><code>sudo journalctl -u plumber -f</code></td></tr>
+<tr><td>Watch it</td><td><code>sudo journalctl -u plumber -f</code></td></tr>
 <tr><td>Errors in the last hour</td><td><code>sudo journalctl -u plumber --since &quot;1 hour ago&quot; -p err</code></td></tr>
 <tr><td>Reload the web server</td><td><code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></td></tr>
 <tr><td>Check the certificate</td><td><code>sudo certbot certificates</code></td></tr>
-<tr><td>Test renewal without doing it</td><td><code>sudo certbot renew --dry-run</code></td></tr>
+<tr><td>Test renewal</td><td><code>sudo certbot renew --dry-run</code></td></tr>
 <tr><td>Back up the database</td><td><code>mysqldump -u aiorder -p plumber_assistant &gt; backup.sql</code></td></tr>
 <tr><td>Free space</td><td><code>df -h /</code></td></tr>
-<tr><td>Memory in use</td><td><code>free -m</code></td></tr>
+<tr><td>Memory</td><td><code>free -m</code></td></tr>
 </tbody></table></div>
-<hr>
-<h1>When something is wrong</h1>
 <div class="tw"><table>
-<thead><tr><th>What you see</th><th>Where to look</th></tr></thead>
+<thead><tr><th>Symptom</th><th>Where to look</th></tr></thead>
 <tbody>
 <tr><td>502 on every page</td><td>The API has stopped. <code>systemctl status plumber</code>, then the log.</td></tr>
-<tr><td>404 on every page</td><td><code>/var/www/serviceagent</code> is empty, or nginx is pointed elsewhere.</td></tr>
-<tr><td>Website loads, nothing works</td><td>The API is not answering on 8100. Check <code>curl localhost:8100/health</code> on the machine.</td></tr>
-<tr><td>Certificate warning</td><td>The name in nginx and the name on the certificate do not match.</td></tr>
+<tr><td>404 on every page</td><td>The website root is empty, or nginx points elsewhere.</td></tr>
+<tr><td>Website loads, nothing works</td><td>API not answering. <code>curl localhost:8100/health</code> on the machine.</td></tr>
+<tr><td>Certificate warning</td><td>The name in nginx and on the certificate do not match.</td></tr>
 <tr><td>Voice bookings cut off</td><td><code>proxy_read_timeout</code> missing from the nginx file.</td></tr>
-<tr><td>API restarting over and over</td><td>Out of memory. Raise <code>MemoryMax</code> or use a larger machine.</td></tr>
+<tr><td>API restarting repeatedly</td><td>Out of memory. See 10.2.</td></tr>
 <tr><td>Emails not arriving</td><td>The <code>SMTP_</code> settings. Check the log for the send attempt.</td></tr>
 </tbody></table></div>
 <hr>
-<h1>Two things to fix on the current machine</h1>
-<p>Both are true of the server as it stands today and should not be repeated on a new one.</p>
-<p><strong>The database is open to the internet.</strong> MySQL is listening on every network interface, port 3306 is reachable from anywhere, and the <code>aiorder</code> user is allowed to sign in from any address. Anyone who guesses the password reaches the customer and booking records. Step 5 above sets up a new machine correctly. To close it on the current one:</p>
+<h1>10. Known Issues &amp; Security Notes</h1>
+<h2>10.1 MySQL Exposure</h2>
+<p>MySQL on the Plumbing machine listens on every network interface, port 3306 is reachable from the internet, and the <code>aiorder</code> user is permitted to sign in from any address. Anyone who guesses the password reaches the customer and booking records. This was confirmed by connecting from outside the machine.</p>
 <pre><code>sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf     # bind-address = 127.0.0.1
 sudo mysql -e &quot;DROP USER &#x27;aiorder&#x27;@&#x27;%&#x27;;&quot;
 sudo systemctl restart mysql</code></pre>
-<p>Then remove the port 3306 rule in Lightsail Networking. The application connects over <code>localhost</code>, so nothing breaks.</p>
-<p><strong>The API is at its memory ceiling.</strong> It is using 699.8 MB of the 700 MB it is allowed, on a machine with 1 GB in total. It will be restarted mid request sooner or later. Either raise the limit and move to a 2 GB machine, or keep the limit and accept the restarts.</p>
+<p>Then remove the 3306 rule in Lightsail Networking. The application connects over <code>localhost</code>, so nothing breaks. Section 3.3 sets a new machine up correctly.</p>
+<h2>10.2 Memory Limit</h2>
+<p>The API is using 699.8 MB against the 700 MB it is allowed, on a machine with 1 GB in total. It will be killed mid request sooner or later. Either raise <code>MemoryMax</code> and move to a 2 GB machine, or keep the limit and accept the restarts.</p>
+<h2>Also outstanding</h2>
+<ul><li>Stripe and PayPal webhook addresses are not registered in those dashboards, so</li></ul>
+<p>a real payment cannot confirm itself yet.</p>
+<ul><li>Backups are manual. The <code>mysqldump</code> command above is the whole of it.</li></ul>
 <hr>
-<h1>What is not finished</h1>
-<ul><li>The Stripe and PayPal webhook addresses are not registered in those</li></ul>
-<p>dashboards, so a real payment cannot confirm itself yet.</p>
-<ul><li>Backups are not automatic. The <code>mysqldump</code> command above is the whole of it</li></ul>
-<p>today, and it has to be run by hand.</p>
+<h1>11. Rollback / Recovery</h1>
+<p><strong>A bad backend deploy.</strong> The code is in git and the server holds no state of its own, so put the previous commit back and restart:</p>
+<pre><code>git checkout &lt;previous-commit&gt; -- backend/app
+rsync -az --delete backend/app/ ubuntu@HOST:/home/ubuntu/plumber/backend/app/
+ssh ubuntu@HOST &#x27;sudo systemctl restart plumber&#x27;</code></pre>
+<p><strong>A bad frontend deploy.</strong> Rebuild from the previous commit and deploy again. The website is plain files, so there is nothing else to undo.</p>
+<p><strong>A bad database change.</strong> Restore the dump:</p>
+<pre><code>mysql -h 127.0.0.1 -u aiorder -p plumber_assistant &lt; backup.sql</code></pre>
+<p>Take one first. There is no automatic backup, so the only copy is the one made by hand before the change.</p>
+<p><strong>The machine is lost.</strong> Section 3 is the recovery procedure. What cannot be rebuilt from the repository is the database and the <code>.env</code>, so those two are what a backup has to cover.</p>
+<hr>
+<h1>12. Appendix</h1>
+<h2>Database schema</h2>
+<p><strong>Plumbing, 18 tables.</strong> Bookings: <code>service_requests</code>, <code>jobs</code>, <code>appointments</code>, <code>job_lines</code>, <code>payments</code>. Providers: <code>providers</code>, <code>provider_services</code>, <code>provider_availability</code>, <code>provider_time_off</code>. Catalogue: <code>services</code>, <code>service_phrases</code>, <code>categories</code>, <code>stores</code>. People: <code>accounts</code>, <code>customers</code>, <code>sessions</code>, <code>chat_sessions</code>, <code>cart_items</code>. Total size 2.2 MB.</p>
+<p><strong>Product, 26 working tables.</strong> Catalogue and outside search: <code>items</code>, <code>external_offers</code>, <code>external_items</code>. Trade: <code>orders</code>, <code>order_details</code>, <code>carts</code>, <code>cart_items</code>, <code>payments</code>. Reference: <code>customers</code>, <code>stores</code>, <code>categories</code>. The rest are load and sync logs.</p>
+<p><code>services</code> still carries <code>veg</code>, <code>organic</code> and <code>stock</code> from the shop it was built from. They are unused. The live columns are <code>price</code>, <code>duration_minutes</code> and <code>emergency</code>.</p>
+<h2>Environment variables</h2>
+<p>70 settings, in <code>/home/ubuntu/plumber/backend/.env</code>, permissions 600.</p>
+<div class="tw"><table>
+<thead><tr><th>Group</th><th>Settings</th></tr></thead>
+<tbody>
+<tr><td>Application</td><td><code>APP_NAME</code></td></tr>
+<tr><td>Database</td><td><code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code></td></tr>
+<tr><td>Assistant</td><td><code>LLM_PROVIDER</code>, <code>SPEECH_PROVIDER</code>, <code>GEMINI_API_KEY</code>, <code>GEMINI_MODEL</code></td></tr>
+<tr><td>Audio</td><td><code>FFMPEG_PATH</code>, <code>FFPROBE_PATH</code></td></tr>
+<tr><td>Email</td><td><code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASSWORD</code>, <code>SMTP_FROM</code>, <code>AI_ORDER_EMAIL</code></td></tr>
+<tr><td>Access</td><td><code>ADMIN_TOKEN</code>, <code>SESSION_DAYS</code></td></tr>
+<tr><td>Payments</td><td><code>PAYMENTS_ENABLED</code>, <code>COD_ENABLED</code>, four <code>STRIPE_</code>, four <code>PAYPAL_</code></td></tr>
+<tr><td>Booking</td><td>seven <code>BOOKING_</code>, <code>PROVIDER_RANKING</code></td></tr>
+<tr><td>Diary</td><td><code>CALENDAR_PROVIDER</code>, four <code>CALENDLY_</code></td></tr>
+</tbody></table></div>
+<h2>File change inventory</h2>
+<div class="tw"><table>
+<thead><tr><th></th><th>Backend</th><th>Frontend</th></tr></thead>
+<tbody>
+<tr><td>In the Product Application</td><td>64</td><td>41</td></tr>
+<tr><td>In the Plumbing Application</td><td>68</td><td>53</td></tr>
+<tr><td>Carried over unchanged</td><td>17</td><td>20 shared</td></tr>
+<tr><td>Modified</td><td>24</td><td></td></tr>
+<tr><td>Added</td><td>27</td><td>33</td></tr>
+<tr><td>Removed</td><td>23</td><td>21</td></tr>
+</tbody></table></div>
+<h2>Git commits</h2>
+<p>Thirteen commits, oldest last. All on <code>master</code> in the Plumbing repository.</p>
+<div class="tw"><table>
+<thead><tr><th>Commit</th><th>Date</th><th>Subject</th></tr></thead>
+<tbody>
+<tr><td><code>69240eb</code></td><td>14 Aug</td><td>The runbook: where the database is and how to build the machine again</td></tr>
+<tr><td><code>ce32243</code></td><td>14 Aug</td><td>Keep the two build profiles in the repo</td></tr>
+<tr><td><code>13696d8</code></td><td>14 Aug</td><td>Its own subdomain, so the base path has to be a setting</td></tr>
+<tr><td><code>7b62905</code></td><td>12 Aug</td><td>Paying for a booking: cash, card and PayPal</td></tr>
+<tr><td><code>ed5661d</code></td><td>12 Aug</td><td>Booking emails, which had never been sent</td></tr>
+<tr><td><code>c9bcae8</code></td><td>12 Aug</td><td>Phase E walkthrough, in the format the client reads</td></tr>
+<tr><td><code>ef61b45</code></td><td>12 Aug</td><td>Phase E: the shop becomes a booking application</td></tr>
+<tr><td><code>2a380ab</code></td><td>12 Aug</td><td>Phase D: a backend the interface can be written against</td></tr>
+<tr><td><code>2f5b617</code></td><td>12 Aug</td><td>Phase C: a diary per provider, and the terms of the business</td></tr>
+<tr><td><code>aa8261a</code></td><td>12 Aug</td><td>Phase B: one authentication system for both sides</td></tr>
+<tr><td><code>0b45198</code></td><td>12 Aug</td><td>Providers, accounts and sessions: the domain a booking platform needs</td></tr>
+<tr><td><code>751f040</code></td><td>12 Aug</td><td>Track the backend properly, not as an embedded repository</td></tr>
+<tr><td><code>25cc36b</code></td><td>12 Aug</td><td>Book a real time against a real diary, in one step</td></tr>
+</tbody></table></div>
 </body>
 </html>

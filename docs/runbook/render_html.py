@@ -239,14 +239,14 @@ def main() -> None:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Service Assistant: running it and rebuilding it</title>
+<title>Service Agent: spin-off and plumbing handover</title>
 <style>{STYLE}</style>
 </head>
 <body>
 <div class="masthead">
-  <p class="eyebrow">Operations runbook</p>
-  <p class="title">Service Assistant: running it and rebuilding it</p>
-  <p class="sub">Where the database is, what every file and setting does, and how to stand the whole system up again on a new Lightsail instance with its own subdomain and certificate.</p>
+  <p class="eyebrow">Handover document</p>
+  <p class="title">Service Agent: application spin-off and plumbing handover</p>
+  <p class="sub">How the booking platform was built from the shop, what changed between them, and the procedure for standing either one up on a new machine.</p>
   <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 14 August 2026 &nbsp;&middot;&nbsp; every command run against the live server</p>
 </div>
 {body}

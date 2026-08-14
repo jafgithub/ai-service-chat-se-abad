@@ -1,8 +1,8 @@
-# Service Assistant: running it and rebuilding it
+# Service Agent: application spin-off and plumbing handover
 
-The operations runbook. Where the database is, what every file and setting does,
-and how to stand the whole system up again on a new Lightsail instance with its
-own subdomain and certificate.
+Twelve sections. How the booking platform was built from the shop, what changed
+between them file by file, the procedure for standing either one up on a new
+machine, and the operational detail: verification, rollback, security notes.
 
 **Live:** https://serviceagent.fordev.fun/docs/runbook/
 
