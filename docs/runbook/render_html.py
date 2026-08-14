@@ -68,6 +68,14 @@ figure img {
   display: block; width: 100%; height: auto;
   border: 1px solid var(--line); border-radius: 10px;
 }
+.expect {
+  border-left: 3px solid #2f6b4c;
+  background: #f2f8f4;
+  padding: 10px 16px;
+  margin: -6px 0 16px;
+  font-size: 14.5px;
+  color: #23402f;
+}
 pre {
   background: #0f1613;
   color: #d7e0da;
@@ -78,7 +86,17 @@ pre {
   line-height: 1.55;
   margin: 14px 0;
 }
-pre code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; }
+/* The inline `code` pill must not apply inside a command block: its pale
+   background and dark text landed on the dark block and became unreadable. */
+pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #e6ede8;
+  font-size: 13px;
+}
 .tw { overflow-x: auto; margin: 22px 0; border: 1px solid var(--line); border-radius: 10px; }
 table { border-collapse: collapse; width: 100%; font-size: 15px; }
 th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -122,6 +140,14 @@ def render(md: str, images: dict[str, str]) -> str:
 
         if not stripped:
             i += 1
+            continue
+
+        if stripped.startswith("> "):
+            body = []
+            while i < len(lines) and lines[i].strip().startswith(">"):
+                body.append(lines[i].strip().lstrip(">").strip())
+                i += 1
+            out.append('<p class="expect">' + inline(" ".join(body)) + "</p>")
             continue
 
         if stripped == "---":
