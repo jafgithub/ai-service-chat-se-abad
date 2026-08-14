@@ -2,6 +2,11 @@
 .env
 .env.*
 !.env.example
+# Except the two build profiles, which carry no secret: they only say where a
+# build is served from and where its API is. Without them in the repo a fresh
+# clone cannot run `build` or `build:serviceagent` at all.
+!frontend/.env.production
+!frontend/.env.serviceagent
 *.pem
 
 # Python
