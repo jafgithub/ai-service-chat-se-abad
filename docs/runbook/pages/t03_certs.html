@@ -1,0 +1,49 @@
+<!doctype html><meta charset="utf-8">
+<style>
+body{margin:0;background:#eef0ec;font-family:system-ui,-apple-system,sans-serif;
+ -webkit-font-smoothing:antialiased}
+.wrap{width:1000px;padding:34px 38px}
+.eyebrow{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;
+ text-transform:uppercase;color:#3f7d5f;margin:0 0 8px}
+h1{font:600 21px/1.25 system-ui;margin:0 0 6px;color:#151a17}
+.note{font:400 13px/1.5 system-ui;color:#5d6661;margin:0 0 16px}
+.term{background:#101713;border-radius:8px;overflow:hidden;
+ box-shadow:0 10px 30px rgba(0,0,0,.16)}
+.bar{display:flex;gap:6px;align-items:center;padding:9px 13px;background:#1b241f}
+.dot{width:10px;height:10px;border-radius:50%}
+.cmd{padding:12px 16px 4px;font:500 12.5px/1.5 ui-monospace,monospace;color:#8fd3ab}
+.out{padding:2px 16px 16px;margin:0;font:400 12.5px/1.55 ui-monospace,monospace;
+ color:#cfd8d2;white-space:pre-wrap}
+.ok{color:#7fd3a0}.bad{color:#f08a70}
+</style><div class="wrap">
+<p class="eyebrow">The certificate</p>
+<h1>What the machine holds today</h1>
+<div class="term"><div class="bar">
+ <span class="dot" style="background:#f05a4f"></span>
+ <span class="dot" style="background:#f5bf4f"></span>
+ <span class="dot" style="background:#5fc463"></span></div>
+<div class="cmd">$ sudo certbot certificates</div>
+<pre class="out">
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Found the following certs:
+  Certificate Name: agent.fordev.fun
+    Serial Number: 5041334added77937b3c0951497dd385ed8
+    Key Type: RSA
+    Domains: agent.fordev.fun
+<span class="ok">    Expiry Date: 2026-10-29 21:03:53+00:00 (VALID: 76 days)</span>
+    Certificate Path: /etc/letsencrypt/live/agent.fordev.fun/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/agent.fordev.fun/privkey.pem
+  Certificate Name: dev.agent.fordev.fun
+    Serial Number: 52b2530539fec82f68452a2d6af684fa6ca
+    Key Type: RSA
+    Domains: dev.agent.fordev.fun
+<span class="ok">    Expiry Date: 2026-10-30 22:27:31+00:00 (VALID: 77 days)</span>
+    Certificate Path: /etc/letsencrypt/live/dev.agent.fordev.fun/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/dev.agent.fordev.fun/privkey.pem
+  Certificate Name: serviceagent.fordev.fun
+    Serial Number: 6192013cc05d367e44b587b401a6f6bf99a
+    Key Type: RSA
+    Domains: serviceagent.fordev.fun
+<span class="ok">    Expiry Date: 2026-11-12 10:31:15+00:00 (VALID: 89 days)</span>
+    Certificate Path: /etc/letsencrypt/live/serviceagent.fordev.fun/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/serviceagent.fordev.fun/privkey.pem</pre></div></div>

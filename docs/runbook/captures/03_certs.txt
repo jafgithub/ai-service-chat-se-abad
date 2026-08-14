@@ -1,0 +1,24 @@
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Found the following certs:
+  Certificate Name: agent.fordev.fun
+    Serial Number: 5041334added77937b3c0951497dd385ed8
+    Key Type: RSA
+    Domains: agent.fordev.fun
+    Expiry Date: 2026-10-29 21:03:53+00:00 (VALID: 76 days)
+    Certificate Path: /etc/letsencrypt/live/agent.fordev.fun/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/agent.fordev.fun/privkey.pem
+  Certificate Name: dev.agent.fordev.fun
+    Serial Number: 52b2530539fec82f68452a2d6af684fa6ca
+    Key Type: RSA
+    Domains: dev.agent.fordev.fun
+    Expiry Date: 2026-10-30 22:27:31+00:00 (VALID: 77 days)
+    Certificate Path: /etc/letsencrypt/live/dev.agent.fordev.fun/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/dev.agent.fordev.fun/privkey.pem
+  Certificate Name: serviceagent.fordev.fun
+    Serial Number: 6192013cc05d367e44b587b401a6f6bf99a
+    Key Type: RSA
+    Domains: serviceagent.fordev.fun
+    Expiry Date: 2026-11-12 10:31:15+00:00 (VALID: 89 days)
+    Certificate Path: /etc/letsencrypt/live/serviceagent.fordev.fun/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/serviceagent.fordev.fun/privkey.pem

@@ -1,0 +1,12 @@
+● plumber.service - Plumber Assistant API
+     Loaded: loaded (/etc/systemd/system/plumber.service; enabled; vendor preset: enabled)
+     Active: active (running) since Fri 2026-08-14 11:28:15 UTC; 3h 47min ago
+   Main PID: 30089 (uvicorn)
+      Tasks: 13 (limit: 2214)
+     Memory: 699.8M (max: 700.0M available: 204.0K)
+        CPU: 27.107s
+     CGroup: /system.slice/plumber.service
+             └─30089 /home/ubuntu/plumber/backend/.venv/bin/python3 /home/ubuntu/plumber/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8100
+
+Aug 14 13:50:30 ip-172-26-10-75 uvicorn[30089]: 13:50:30  INFO      [BOOKING] request 24 from customer 9
+Aug 14 13:50:30 ip-172-26-10-75 uvicorn[30089]: INFO:     104.14.148.198:0 - "POST /api/v1/requests HTTP/1.0" 201 Created
