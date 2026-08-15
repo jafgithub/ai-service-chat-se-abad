@@ -45,9 +45,188 @@ looking for one.
 
 # 3. SOP: Spinning Off a New Application
 
-![Building a new machine: the whole journey](d02_journey.png)
+![Two ways to get a new machine](d05_routes.png)
 
-Six stages, in order. Allow about an hour.
+**Route A** copies the machine we already run. **Route B** builds one from
+nothing. Route A is the normal way and the rest of this section assumes it.
+Route B is section 3.2, kept for the day there is no machine left to copy.
+
+---
+
+# 3.1 Route A: from a snapshot of Service Assistant
+
+![Route A: the whole journey](d06_snapshot.png)
+
+A snapshot is a photograph of a whole machine, disk and all, taken while it
+runs. Launch a new machine from one and it starts up already finished: nginx,
+MySQL, Python, ffmpeg, the code, the settings and the data are all there, and
+the application is already running.
+
+The work is not building anything. The work is changing the handful of things
+that still say **serviceagent.fordev.fun**.
+
+![What the copy brings with it](d07_carried.png)
+
+## Stage 1: Take the snapshot
+
+Lightsail console, the Service Assistant instance, the **Snapshots** tab,
+**Create snapshot**. Name it with the date.
+
+Nothing stops and nobody is logged out. It takes a few minutes because the disk
+is about 31 GB.
+
+> You should see: the snapshot appear in the list, state **Available**. Until it
+> says that, it cannot be launched from.
+
+## Stage 2: Launch the new machine
+
+On the snapshot, **Create new instance**.
+
+Choose a plan with **at least as much disk as the original**. Lightsail will not
+let you go smaller, and the same size or larger is the safe answer. The original
+is a 2 GB machine, so pick 2 GB or more.
+
+Then attach a **static IP**, or the address changes on restart and the subdomain
+stops working.
+
+**Open the two doors.** Networking, add HTTP on TCP **80** and HTTPS on **443**.
+Leave **3306 closed**.
+
+> You should see: the new instance go **Running**, and this, straight away:
+
+```
+ssh -i ~/Downloads/your-key.pem ubuntu@NEW.IP.ADDRESS
+systemctl is-active plumber nginx mysql
+```
+
+Three times `active`. The application is already up, on a machine you have done
+nothing to. That is the whole point of route A.
+
+## Stage 3: Give it its own address
+
+In the DNS for `fordev.fun`, add an **A record**: name is the new subdomain,
+value is the new static IP.
+
+```
+dig +short newname.fordev.fun
+```
+
+> You should see: the new IP. Nothing, or the old address, means it has not
+> spread yet. Wait. Stage 4 will fail without this.
+
+## Stage 4: Change the five things
+
+Everything here is a copy of ours until you change it.
+
+**1. The name in the front door.**
+
+```
+sudo nano /etc/nginx/sites-available/serviceagent
+```
+
+Change **every** `server_name serviceagent.fordev.fun;` to the new name. There
+are two, one in each block.
+
+```
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+> You should see: `syntax is ok` and `test is successful`.
+
+**2. The certificate.** The one in the picture is ours and has our name on it,
+so a browser will warn until you get your own.
+
+```
+sudo certbot --nginx -d newname.fordev.fun --agree-tos -m you@example.com --redirect
+```
+
+> You should see: "Congratulations". If it fails, the subdomain is not pointing
+> here yet: go back to stage 3.
+
+Then remove ours, which will never renew on this machine:
+
+```
+sudo certbot delete --cert-name serviceagent.fordev.fun
+```
+
+**3 and 4. The two passwords.** The database password and the admin token are
+both ours, and both are in a file another team has seen.
+
+```
+sudo mysql -e "ALTER USER 'aiorder'@'localhost' IDENTIFIED BY 'A_NEW_PASSWORD';"
+nano /home/ubuntu/plumber/backend/.env      # DB_PASSWORD and ADMIN_TOKEN
+sudo systemctl restart plumber
+```
+
+While that file is open, the same list from route B applies if any of it is
+yours rather than ours: `SMTP_FROM`, `AI_ORDER_EMAIL`, the four `STRIPE_` and
+the four `PAYPAL_`.
+
+**5. The data.** The database arrived with our bookings, providers and customers
+in it. Two choices.
+
+Keep it, if this is a copy of the same business. Or empty the working records and
+keep the catalogue:
+
+```
+mysql -u aiorder -p plumber_assistant -e "
+  SET FOREIGN_KEY_CHECKS=0;
+  TRUNCATE appointments; TRUNCATE jobs; TRUNCATE job_lines; TRUNCATE payments;
+  TRUNCATE service_requests; TRUNCATE chat_sessions; TRUNCATE cart_items;
+  TRUNCATE sessions; TRUNCATE customers;
+  SET FOREIGN_KEY_CHECKS=1;"
+```
+
+Take a backup first. `mysqldump -u aiorder -p plumber_assistant > before.sql`.
+There is no undo.
+
+## Stage 5: Clear out what came along
+
+The snapshot copied the whole disk, so it copied things that were only ever on
+our machine. None of it is running on yours. It is about 8 GB of room.
+
+```
+sudo rm -f /etc/nginx/sites-enabled/aiorder-dev
+sudo systemctl disable --now aiorder-render
+sudo rm -rf /var/www/ai-order
+sudo mysql -e "DROP DATABASE aidata2prd_dev;"
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Also **check who can log in**. Our machine has four keys on it, and they all
+came with the copy:
+
+```
+nano ~/.ssh/authorized_keys
+```
+
+Leave your own line. Delete the rest.
+
+## Stage 6: The same four checks
+
+```
+curl -s -o /dev/null -w "home    %{http_code}\n" https://newname.fordev.fun/
+curl -s -o /dev/null -w "health  %{http_code}\n" https://newname.fordev.fun/health
+curl -s https://newname.fordev.fun/api/v1/services | head -c 200
+```
+
+Two 200s and a list of services. Then the four pictures in section 3.2, stage 6,
+show what each check looks like when it is right.
+
+## One thing route A does not fix
+
+The copy inherits both problems in section 10: the database open to the
+internet, and the 700 MB memory ceiling. Section 10.1 and 10.2 are worth doing
+on the new machine on day one, while nobody is using it yet.
+
+---
+
+# 3.2 Route B: from an empty machine
+
+![Route B: building from an empty machine](d02_journey.png)
+
+Only needed when there is no machine to copy. Six stages, in order. Allow about
+an hour.
 
 ## Stage 1: Prepare
 
@@ -128,6 +307,10 @@ mysql -h 127.0.0.1 -u aiorder -p plumber_assistant < plumber.sql
 ```
 git clone git@github.com:jafgithub/ai-service-chat-se-abad.git ~/plumber
 ```
+
+The code is not in that repository yet. Until it is, copy the folder off a
+running machine instead: `rsync -az ubuntu@52.25.174.57:/home/ubuntu/plumber/
+~/plumber/`. Route A avoids this question entirely.
 
 **Give it its own Python.**
 
@@ -465,6 +648,9 @@ off** means `proxy_read_timeout` is missing from the nginx file.
 
 # 10. Known Issues & Security Notes
 
+Both of these travel in a snapshot. A machine launched by route A arrives with
+them, so fix them there too.
+
 ## 10.1 The database is open to the internet
 
 MySQL is listening on every network connection, port 3306 is reachable from
@@ -518,9 +704,12 @@ mysql -h 127.0.0.1 -u aiorder -p plumber_assistant < backup.sql
 Take the backup **first**. There is no automatic one, so the only copy is the
 one you made by hand before the change.
 
-**The machine is lost.** Section 3 is the recovery procedure. Everything can be
-rebuilt from the repository except the database and the settings file, so those
-two are what a backup has to cover.
+**The machine is lost.** Launch a new one from the most recent snapshot, section
+3.1. It comes back with the database and the settings file as they were on the
+day the snapshot was taken, which is the strongest reason to take one on a
+schedule. Everything after that day has to come from a `mysqldump`.
+
+Section 3.2 is the recovery procedure only if there is no snapshot either.
 
 ---
 

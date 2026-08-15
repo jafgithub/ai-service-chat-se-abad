@@ -144,8 +144,78 @@ tbody tr:last-child td { border-bottom: none; }
 <p>The two application folders are in different places. Worth knowing before going looking for one.</p>
 <hr>
 <h1>3. SOP: Spinning Off a New Application</h1>
-<figure><img src="img/d02_journey.png" alt="Building a new machine: the whole journey" loading="lazy"></figure>
-<p>Six stages, in order. Allow about an hour.</p>
+<figure><img src="img/d05_routes.png" alt="Two ways to get a new machine" loading="lazy"></figure>
+<p><strong>Route A</strong> copies the machine we already run. <strong>Route B</strong> builds one from nothing. Route A is the normal way and the rest of this section assumes it. Route B is section 3.2, kept for the day there is no machine left to copy.</p>
+<hr>
+<h1>3.1 Route A: from a snapshot of Service Assistant</h1>
+<figure><img src="img/d06_snapshot.png" alt="Route A: the whole journey" loading="lazy"></figure>
+<p>A snapshot is a photograph of a whole machine, disk and all, taken while it runs. Launch a new machine from one and it starts up already finished: nginx, MySQL, Python, ffmpeg, the code, the settings and the data are all there, and the application is already running.</p>
+<p>The work is not building anything. The work is changing the handful of things that still say <strong>serviceagent.fordev.fun</strong>.</p>
+<figure><img src="img/d07_carried.png" alt="What the copy brings with it" loading="lazy"></figure>
+<h2>Stage 1: Take the snapshot</h2>
+<p>Lightsail console, the Service Assistant instance, the <strong>Snapshots</strong> tab, <strong>Create snapshot</strong>. Name it with the date.</p>
+<p>Nothing stops and nobody is logged out. It takes a few minutes because the disk is about 31 GB.</p>
+<p class="expect">You should see: the snapshot appear in the list, state <strong>Available</strong>. Until it says that, it cannot be launched from.</p>
+<h2>Stage 2: Launch the new machine</h2>
+<p>On the snapshot, <strong>Create new instance</strong>.</p>
+<p>Choose a plan with <strong>at least as much disk as the original</strong>. Lightsail will not let you go smaller, and the same size or larger is the safe answer. The original is a 2 GB machine, so pick 2 GB or more.</p>
+<p>Then attach a <strong>static IP</strong>, or the address changes on restart and the subdomain stops working.</p>
+<p><strong>Open the two doors.</strong> Networking, add HTTP on TCP <strong>80</strong> and HTTPS on <strong>443</strong>. Leave <strong>3306 closed</strong>.</p>
+<p class="expect">You should see: the new instance go <strong>Running</strong>, and this, straight away:</p>
+<pre><code>ssh -i ~/Downloads/your-key.pem ubuntu@NEW.IP.ADDRESS
+systemctl is-active plumber nginx mysql</code></pre>
+<p>Three times <code>active</code>. The application is already up, on a machine you have done nothing to. That is the whole point of route A.</p>
+<h2>Stage 3: Give it its own address</h2>
+<p>In the DNS for <code>fordev.fun</code>, add an <strong>A record</strong>: name is the new subdomain, value is the new static IP.</p>
+<pre><code>dig +short newname.fordev.fun</code></pre>
+<p class="expect">You should see: the new IP. Nothing, or the old address, means it has not spread yet. Wait. Stage 4 will fail without this.</p>
+<h2>Stage 4: Change the five things</h2>
+<p>Everything here is a copy of ours until you change it.</p>
+<p><strong>1. The name in the front door.</strong></p>
+<pre><code>sudo nano /etc/nginx/sites-available/serviceagent</code></pre>
+<p>Change <strong>every</strong> <code>server_name serviceagent.fordev.fun;</code> to the new name. There are two, one in each block.</p>
+<pre><code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
+<p class="expect">You should see: <code>syntax is ok</code> and <code>test is successful</code>.</p>
+<p><strong>2. The certificate.</strong> The one in the picture is ours and has our name on it, so a browser will warn until you get your own.</p>
+<pre><code>sudo certbot --nginx -d newname.fordev.fun --agree-tos -m you@example.com --redirect</code></pre>
+<p class="expect">You should see: &quot;Congratulations&quot;. If it fails, the subdomain is not pointing here yet: go back to stage 3.</p>
+<p>Then remove ours, which will never renew on this machine:</p>
+<pre><code>sudo certbot delete --cert-name serviceagent.fordev.fun</code></pre>
+<p><strong>3 and 4. The two passwords.</strong> The database password and the admin token are both ours, and both are in a file another team has seen.</p>
+<pre><code>sudo mysql -e &quot;ALTER USER &#x27;aiorder&#x27;@&#x27;localhost&#x27; IDENTIFIED BY &#x27;A_NEW_PASSWORD&#x27;;&quot;
+nano /home/ubuntu/plumber/backend/.env      # DB_PASSWORD and ADMIN_TOKEN
+sudo systemctl restart plumber</code></pre>
+<p>While that file is open, the same list from route B applies if any of it is yours rather than ours: <code>SMTP_FROM</code>, <code>AI_ORDER_EMAIL</code>, the four <code>STRIPE_</code> and the four <code>PAYPAL_</code>.</p>
+<p><strong>5. The data.</strong> The database arrived with our bookings, providers and customers in it. Two choices.</p>
+<p>Keep it, if this is a copy of the same business. Or empty the working records and keep the catalogue:</p>
+<pre><code>mysql -u aiorder -p plumber_assistant -e &quot;
+  SET FOREIGN_KEY_CHECKS=0;
+  TRUNCATE appointments; TRUNCATE jobs; TRUNCATE job_lines; TRUNCATE payments;
+  TRUNCATE service_requests; TRUNCATE chat_sessions; TRUNCATE cart_items;
+  TRUNCATE sessions; TRUNCATE customers;
+  SET FOREIGN_KEY_CHECKS=1;&quot;</code></pre>
+<p>Take a backup first. <code>mysqldump -u aiorder -p plumber_assistant &gt; before.sql</code>. There is no undo.</p>
+<h2>Stage 5: Clear out what came along</h2>
+<p>The snapshot copied the whole disk, so it copied things that were only ever on our machine. None of it is running on yours. It is about 8 GB of room.</p>
+<pre><code>sudo rm -f /etc/nginx/sites-enabled/aiorder-dev
+sudo systemctl disable --now aiorder-render
+sudo rm -rf /var/www/ai-order
+sudo mysql -e &quot;DROP DATABASE aidata2prd_dev;&quot;
+sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
+<p>Also <strong>check who can log in</strong>. Our machine has four keys on it, and they all came with the copy:</p>
+<pre><code>nano ~/.ssh/authorized_keys</code></pre>
+<p>Leave your own line. Delete the rest.</p>
+<h2>Stage 6: The same four checks</h2>
+<pre><code>curl -s -o /dev/null -w &quot;home    %{http_code}\n&quot; https://newname.fordev.fun/
+curl -s -o /dev/null -w &quot;health  %{http_code}\n&quot; https://newname.fordev.fun/health
+curl -s https://newname.fordev.fun/api/v1/services | head -c 200</code></pre>
+<p>Two 200s and a list of services. Then the four pictures in section 3.2, stage 6, show what each check looks like when it is right.</p>
+<h2>One thing route A does not fix</h2>
+<p>The copy inherits both problems in section 10: the database open to the internet, and the 700 MB memory ceiling. Section 10.1 and 10.2 are worth doing on the new machine on day one, while nobody is using it yet.</p>
+<hr>
+<h1>3.2 Route B: from an empty machine</h1>
+<figure><img src="img/d02_journey.png" alt="Route B: building from an empty machine" loading="lazy"></figure>
+<p>Only needed when there is no machine to copy. Six stages, in order. Allow about an hour.</p>
 <h2>Stage 1: Prepare</h2>
 <p><strong>Create the machine.</strong> Lightsail console, <strong>Create instance</strong>, Linux, <strong>Ubuntu 22.04 LTS</strong>, the 2 GB plan or larger. Then attach a <strong>static IP</strong>, or the address changes on restart and the subdomain stops working.</p>
 <p><strong>Let your key be used.</strong> A key file that anyone can read is refused by SSH.</p>
@@ -178,6 +248,7 @@ sudo mysql -e &quot;FLUSH PRIVILEGES;&quot;</code></pre>
 <h2>Stage 4: Application</h2>
 <p><strong>Bring the code.</strong></p>
 <pre><code>git clone git@github.com:jafgithub/ai-service-chat-se-abad.git ~/plumber</code></pre>
+<p>The code is not in that repository yet. Until it is, copy the folder off a running machine instead: <code>rsync -az ubuntu@52.25.174.57:/home/ubuntu/plumber/ ~/plumber/</code>. Route A avoids this question entirely.</p>
 <p><strong>Give it its own Python.</strong></p>
 <pre><code>cd ~/plumber/backend
 uv venv .venv --python 3.12
@@ -354,6 +425,7 @@ curl -s -o /dev/null -w &quot;%{http_code}\n&quot; https://serviceagent.fordev.f
 <p>Two more symptoms worth knowing: a <strong>certificate warning</strong> means the name in nginx and the name on the certificate disagree, and <strong>voice bookings cutting off</strong> means <code>proxy_read_timeout</code> is missing from the nginx file.</p>
 <hr>
 <h1>10. Known Issues &amp; Security Notes</h1>
+<p>Both of these travel in a snapshot. A machine launched by route A arrives with them, so fix them there too.</p>
 <h2>10.1 The database is open to the internet</h2>
 <p>MySQL is listening on every network connection, port 3306 is reachable from anywhere, and the <code>aiorder</code> user is allowed in from any address. Confirmed by connecting from outside the machine. Anyone who guesses the password reaches the customer and booking records.</p>
 <pre><code>sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf     # bind-address = 127.0.0.1
@@ -376,7 +448,8 @@ ssh ubuntu@HOST &#x27;sudo systemctl restart plumber&#x27;</code></pre>
 <p><strong>A bad database change.</strong></p>
 <pre><code>mysql -h 127.0.0.1 -u aiorder -p plumber_assistant &lt; backup.sql</code></pre>
 <p>Take the backup <strong>first</strong>. There is no automatic one, so the only copy is the one you made by hand before the change.</p>
-<p><strong>The machine is lost.</strong> Section 3 is the recovery procedure. Everything can be rebuilt from the repository except the database and the settings file, so those two are what a backup has to cover.</p>
+<p><strong>The machine is lost.</strong> Launch a new one from the most recent snapshot, section 3.1. It comes back with the database and the settings file as they were on the day the snapshot was taken, which is the strongest reason to take one on a schedule. Everything after that day has to come from a <code>mysqldump</code>.</p>
+<p>Section 3.2 is the recovery procedure only if there is no snapshot either.</p>
 <hr>
 <h1>12. Appendix</h1>
 <p><strong>Database, plumbing, 18 tables.</strong> Bookings: <code>service_requests</code>, <code>jobs</code>, <code>appointments</code>, <code>job_lines</code>, <code>payments</code>. Providers: <code>providers</code>, <code>provider_services</code>, <code>provider_availability</code>, <code>provider_time_off</code>. Catalogue: <code>services</code>, <code>service_phrases</code>, <code>categories</code>, <code>stores</code>. People: <code>accounts</code>, <code>customers</code>, <code>sessions</code>, <code>chat_sessions</code>, <code>cart_items</code>. Total 2.2 MB.</p>

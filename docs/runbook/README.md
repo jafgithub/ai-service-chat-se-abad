@@ -22,8 +22,10 @@ comma, a full stop, or "to" for a range.
 |---|---|
 | `source.md` | The document text. This is the thing to edit. |
 | `captures/*.txt` | Unedited console output from the live server. Re-run the command to refresh one. |
-| `pages/*.html` | The captures dressed as terminal windows. |
+| `pages/*.html` | The captures dressed as terminal windows, and the diagrams. |
 | `build/*.png` | Those pages photographed, plus the app screenshot. |
+| `render_terminals.py` | Captures into terminal windows. One highlighted line each. |
+| `render_diagrams.py` | The seven diagrams, as inline SVG. |
 | `render_pages.py` | Photographs `pages/` into `build/`. |
 | `render_html.py` | The web version, into `build/web/`. Understands fenced code blocks. |
 

@@ -37,6 +37,10 @@ svg{display:block;width:100%;height:auto}
 .s{fill:#5b6b86;font:13px "DejaVu Sans",sans-serif;text-anchor:middle}
 .n{fill:#fff;font:700 15px "DejaVu Sans",sans-serif;text-anchor:middle}
 .lb{fill:#5b6b86;font:600 12.5px "DejaVu Sans",sans-serif;text-anchor:middle}
+.ll{fill:#14213a;font:700 14.5px "DejaVu Sans",sans-serif;text-anchor:start}
+.ls{fill:#5b6b86;font:13px "DejaVu Sans",sans-serif;text-anchor:start}
+.li{fill:#14213a;font:14.5px "DejaVu Sans",sans-serif;text-anchor:start}
+.hd{fill:#fff;font:700 15px "DejaVu Sans",sans-serif;text-anchor:start}
 """
 
 ARROW = ('<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" '
@@ -124,8 +128,8 @@ def d02():
         x += 220
     s.append('<text class="lb" x="680" y="245">about an hour, most of it waiting for the subdomain to answer</text>')
     s.append("</svg>")
-    write("d02_journey", "Section 3", "Building a new machine: the whole journey",
-          "Six stages. The detailed commands follow, one page per stage.",
+    write("d02_journey", "Section 3.2", "Route B: building from an empty machine",
+          "Six stages. Only needed when there is no machine left to copy.",
           "".join(s),
           "<b>Do these in order.</b> Stage 1 has to finish before stage 5: the "
           "certificate is only issued once the subdomain really points at the "
@@ -182,6 +186,129 @@ def d04():
           "application wrote, and the reason is usually in them.")
 
 
+# ── 5. the two ways to get a new machine ─────────────────────────────────────
+def d05():
+    s = [f'<svg viewBox="0 0 1360 420">{ARROW}']
+
+    s.append('<text class="ll" x="24" y="72">ROUTE A</text>')
+    s.append('<text class="ls" x="24" y="94">a copy of the</text>')
+    s.append('<text class="ls" x="24" y="113">machine we run</text>')
+    s.append('<text class="ls" x="24" y="139">about 20 minutes</text>')
+    a = [("ok", "Our machine", "running now"),
+         ("ok", "Snapshot", "a picture of it"),
+         ("ok", "New machine", "already built"),
+         ("you", "Change 5 things", "section 3.1"),
+         ("ok", "Live", "on its own name")]
+    x = 200
+    for cls, title, sub in a:
+        s.append(box(x, 45, 190, 100, cls, title, sub))
+        if x > 200:
+            s.append(arrow(x - 45, 95, x - 6, 95))
+        x += 235
+
+    s.append('<line x1="24" y1="205" x2="1336" y2="205" stroke="#d6dee9" stroke-width="1.4"/>')
+
+    s.append('<text class="ll" x="24" y="272">ROUTE B</text>')
+    s.append('<text class="ls" x="24" y="294">an empty machine,</text>')
+    s.append('<text class="ls" x="24" y="313">built up by hand</text>')
+    s.append('<text class="ls" x="24" y="339">about an hour</text>')
+    b = ["Empty Ubuntu", "Install", "Database", "Code", "Publish", "Live"]
+    x = 200
+    for i, title in enumerate(b):
+        s.append(box(x, 245, 155, 100, "ok" if i == 5 else "sys", title))
+        if x > 200:
+            s.append(arrow(x - 40, 295, x - 6, 295))
+        x += 195
+
+    s.append('<text class="lb" x="680" y="400">both end in exactly the same machine; route A just starts most of the way there</text>')
+    s.append("</svg>")
+    write("d05_routes", "Section 3", "Two ways to get a new machine",
+          "A snapshot is a photograph of a whole machine, taken while it runs. "
+          "Launching from one gives you a machine that is already finished.",
+          "".join(s),
+          "<b>Take route A.</b> Everything that is fiddly on route B, the Python "
+          "environment, the database engine, ffmpeg, the nginx file, is already "
+          "in the picture. Route B is kept for the day there is no machine left "
+          "to copy.")
+
+
+# ── 6. the snapshot journey ──────────────────────────────────────────────────
+def d06():
+    stages = [
+        ("1", "Snapshot", "take the picture,\nnothing stops", "ok"),
+        ("2", "Launch", "new machine\nfrom the picture", "ok"),
+        ("3", "Address", "static IP,\nDNS record", "you"),
+        ("4", "Change", "name, certificate,\ntwo passwords", "you"),
+        ("5", "Clear out", "old bookings,\nthe leftovers", "warn"),
+        ("6", "Check", "the same four\nchecks", "you"),
+    ]
+    s = [f'<svg viewBox="0 0 1360 300">{ARROW}']
+    x = 30
+    for num, title, sub, cls in stages:
+        s.append(f'<rect x="{x}" y="70" width="190" height="130" rx="12" class="{cls}"/>')
+        s.append(f'<circle cx="{x+26}" cy="96" r="17" fill="#c2451b"/>')
+        s.append(f'<text class="n" x="{x+26}" y="101">{num}</text>')
+        s.append(f'<text class="t" x="{x+108}" y="101">{title}</text>')
+        for i, line in enumerate(sub.split("\n")):
+            s.append(f'<text class="s" x="{x+95}" y="{140+i*20}">{line}</text>')
+        if x > 30:
+            s.append(arrow(x - 30, 135, x - 6, 135))
+        x += 220
+    s.append('<text class="lb" x="680" y="245">stages 1 and 2 are clicks in the Lightsail console; 3 to 6 are on the new machine</text>')
+    s.append("</svg>")
+    write("d06_snapshot", "Section 3.1", "Route A: the whole journey",
+          "Six stages. Only stages 4 and 5 need any thought, and they are the "
+          "same list every time.",
+          "".join(s),
+          "<b>Stage 3 before stage 4.</b> The certificate in stage 4 is only "
+          "issued once the new subdomain really answers with the new address, "
+          "and that can take a few minutes to spread.")
+
+
+# ── 7. what the copy brings with it ──────────────────────────────────────────
+def d07():
+    def column(x, y, w, h, cls, band, head, items):
+        out = [f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" class="{cls}"/>',
+               f'<path d="M{x} {y+46} v-34 a12 12 0 0 1 12 -12 h{w-24} a12 12 0 0 1 12 12 v34 z" '
+               f'fill="{band}"/>',
+               f'<text class="hd" x="{x+18}" y="{y+31}">{head}</text>']
+        for i, line in enumerate(items):
+            out.append(f'<text class="li" x="{x+18}" y="{y+82+i*31}">{line}</text>')
+        return "".join(out)
+
+    s = ['<svg viewBox="0 0 1360 330">']
+    s.append(column(24, 20, 420, 245, "ok", "#2f6b4c", "Arrives working. Leave it.", [
+        "nginx and the website",
+        "Python, the code, ffmpeg",
+        "MySQL and all 18 tables",
+        "the plumber service, starts on boot",
+        "every setting except the two below",
+    ]))
+    s.append(column(470, 20, 420, 245, "you", "#b1791a", "Still points at the old site.", [
+        "server_name in the nginx file",
+        "the certificate (it says serviceagent)",
+        "DB_PASSWORD",
+        "ADMIN_TOKEN",
+        "the bookings already in the database",
+    ]))
+    s.append(column(916, 20, 420, 245, "warn", "#c2451b", "Came along. Not yours.", [
+        "the aiorder-dev nginx site",
+        "/var/www/ai-order  5.6 GB",
+        "aidata2prd_dev database  2.5 GB",
+        "the aiorder-render service",
+        "other people's SSH keys",
+    ]))
+    s.append('<text class="lb" x="680" y="305">the snapshot also copies the two problems in section 10: the open database, and the 700 MB ceiling</text>')
+    s.append("</svg>")
+    write("d07_carried", "Section 3.1", "What the copy brings with it",
+          "A snapshot copies the whole disk, so it copies the good, the "
+          "old address, and the things that were only ever on our machine.",
+          "".join(s),
+          "<b>The middle column is the work.</b> Five changes, and the machine "
+          "is yours. The right column is only housekeeping: nothing there is "
+          "running, it is taking up room.")
+
+
 if __name__ == "__main__":
-    for fn in (d01, d02, d03, d04):
+    for fn in (d01, d02, d03, d04, d05, d06, d07):
         fn()
