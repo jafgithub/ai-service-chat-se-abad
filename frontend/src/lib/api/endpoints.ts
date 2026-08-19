@@ -216,9 +216,14 @@ export interface DocsSource {
   score: number;
 }
 
+export type DocsKind = "answer" | "chat" | "no_answer" | "error";
+
 export interface DocsAnswer {
   answer: string;
   grounded: boolean;
+  /** Which of the four sorts of reply this is; the panel styles each one
+   *  differently, because a greeting must not look like a warning. */
+  kind: DocsKind;
   sources: DocsSource[];
 }
 

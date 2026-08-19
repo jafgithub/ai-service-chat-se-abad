@@ -112,3 +112,49 @@ def test_both_sides_of_the_lease_contradiction_are_indexed():
     corpus = " ".join(c["text"] for c in docs_index._chunks)
     assert "Lease minimum is 1 year" in corpus
     assert "less than six (6) months" in corpus
+
+
+# ── the things people say that are not questions about the documents ─────────
+
+from app.api.docs import _small_talk  # noqa: E402
+
+
+@pytest.mark.parametrize("message", [
+    "hi", "Hello", "hey!", "Good morning", "Assalam Alaikum", "howdy",
+])
+def test_a_greeting_is_answered_warmly_and_says_what_it_can_do(message):
+    reply = _small_talk(message)
+    assert reply is not None, message
+    assert "quiet hours" in reply, "a greeting should say what it can help with"
+
+
+@pytest.mark.parametrize("message, needle", [
+    ("how are you?", "thank you for asking"),
+    ("thanks!", "very welcome"),
+    ("bye", "Goodbye"),
+    ("what can you do?", "Serenity community assistant"),
+    ("are you a real person?", "not a person"),
+])
+def test_conversational_openers_get_a_conversational_reply(message, needle):
+    reply = _small_talk(message)
+    assert reply is not None and needle in reply, message
+
+
+def test_a_greeting_carrying_a_real_question_is_not_swallowed():
+    """The point of anchoring the greeting patterns.
+
+    "hi, what are the quiet hours" must reach the documents. Answering it with
+    a wave would be worse than not having small talk at all.
+    """
+    assert _small_talk("hi, what are the quiet hours?") is None
+    assert _small_talk("hello - how much is the application fee?") is None
+
+
+@pytest.mark.parametrize("question", [
+    "What are the quiet hours for music and parties?",
+    "How much is the application fee?",
+    "Can I keep a dog?",
+    "What is the minimum lease term?",
+])
+def test_real_questions_are_never_treated_as_small_talk(question):
+    assert _small_talk(question) is None, question

@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Lottie } from "lottie-react";
 
-import { docsApi, type DocsSource } from "@/lib/api";
+import { docsApi, type DocsKind, type DocsSource } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import handshake from "./handshake.json";
+import wave from "./wave.json";
 
 /**
  * The community documents assistant, as a floating panel.
@@ -20,10 +20,9 @@ import handshake from "./handshake.json";
 interface Turn {
   role: "user" | "bot";
   text: string;
-  /** Undefined on a user turn. False marks a refusal or a failure. */
-  grounded?: boolean;
+  /** Undefined on a user turn. */
+  kind?: DocsKind;
   sources?: DocsSource[];
-  failed?: boolean;
 }
 
 // Survives navigation between pages, and is deliberately session rather than
@@ -146,12 +145,7 @@ export function HelpWidget() {
         const reply = await docsApi.ask(text);
         setTurns((t) => [
           ...t,
-          {
-            role: "bot",
-            text: reply.answer,
-            grounded: reply.grounded,
-            sources: reply.sources,
-          },
+          { role: "bot", text: reply.answer, kind: reply.kind, sources: reply.sources },
         ]);
       } catch {
         // A network failure is not "the documents do not say", and must never
@@ -161,8 +155,7 @@ export function HelpWidget() {
           {
             role: "bot",
             text: "Something went wrong reaching the assistant. Please try again.",
-            grounded: false,
-            failed: true,
+            kind: "error",
           },
         ]);
       } finally {
@@ -185,8 +178,12 @@ export function HelpWidget() {
         aria-controls="help-panel"
         aria-label={open ? "Close the help assistant" : "Ask about the community rules"}
         className={cn(
-          "fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center",
-          "rounded-full bg-brand-500 shadow-pop transition-all duration-200",
+          "fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center",
+          // The ring is not decoration. The button floats over whatever the
+          // page is showing, and on the services grid it landed on top of a
+          // card and read as part of it. A white ring separates it from
+          // anything behind without needing a backdrop.
+          "rounded-full bg-brand-500 shadow-pop ring-4 ring-white/85 transition-all duration-200",
           "hover:bg-brand-600 hover:scale-105 active:scale-95",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
           // Out of the way when the panel is up on a phone, where the panel
@@ -199,7 +196,7 @@ export function HelpWidget() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         ) : (
-          <Lottie src={handshake} loop className="h-9 w-9" />
+          <Lottie src={wave} loop className="h-9 w-9" />
         )}
       </button>
 
@@ -216,12 +213,12 @@ export function HelpWidget() {
             // scrollbar with a chat in it.
             "max-sm:inset-0 max-sm:rounded-none",
             // Desktop: a card sitting above the launcher.
-            "sm:bottom-24 sm:right-5 sm:h-[560px] sm:max-h-[calc(100dvh-8rem)] sm:w-[380px] sm:rounded-sheet"
+            "sm:bottom-[5.75rem] sm:right-6 sm:h-[560px] sm:max-h-[calc(100dvh-8rem)] sm:w-[380px] sm:rounded-sheet"
           )}
         >
           <header className="flex items-center gap-3 border-b border-line bg-brand-50 px-4 py-3">
             <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand-500">
-              <Lottie src={handshake} loop className="h-6 w-6" />
+              <Lottie src={wave} loop className="h-6 w-6" />
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">Community assistant</p>
@@ -288,19 +285,21 @@ export function HelpWidget() {
                 <div key={i} className="space-y-1.5">
                   <p
                     className={cn(
-                      "max-w-[92%] rounded-card px-3.5 py-2.5 text-sm leading-relaxed",
-                      turn.failed
+                      "max-w-[92%] whitespace-pre-line rounded-card px-3.5 py-2.5 text-sm leading-relaxed",
+                      // Four replies, three looks. An answer and a greeting are
+                      // both ordinary conversation and read the same. A refusal
+                      // is a note, so it cannot be mistaken for an answer at a
+                      // glance. A failure is a fault and says so.
+                      turn.kind === "error"
                         ? "border border-danger/25 bg-danger-soft text-ink"
-                        : turn.grounded
-                          ? "bg-surface-sunken text-ink"
-                          : // Not an answer. Styled as a note so it cannot be
-                            // mistaken for one at a glance.
-                            "border border-line bg-warn-soft text-ink"
+                        : turn.kind === "no_answer"
+                          ? "border border-line bg-warn-soft text-ink"
+                          : "bg-surface-sunken text-ink"
                     )}
                   >
                     {turn.text}
                   </p>
-                  {turn.grounded && turn.sources && turn.sources.length > 0 && (
+                  {turn.kind === "answer" && turn.sources && turn.sources.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {turn.sources.map((s) => (
                         <span
