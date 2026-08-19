@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { HelpWidget } from "@/components/chat/HelpWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,7 +50,13 @@ export default function RootLayout({
         {/* Wraps everything, because who is signed in decides what the header
             shows on every page, and because the token has to be picked up once
             rather than by each page separately. */}
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          {/* Mounted here rather than per page: it is meant to be reachable
+              from anywhere on the site, and the layout is the one place that
+              is true of. */}
+          <HelpWidget />
+        </AuthProvider>
       </body>
     </html>
   );

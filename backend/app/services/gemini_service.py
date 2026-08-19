@@ -71,12 +71,17 @@ def _extract_text(data: dict) -> str:
     return " ".join(p.get("text", "") for p in parts).strip()
 
 
-def generate(system: str, user: str, max_tokens: int = 300) -> Optional[str]:
+def generate(system: str, user: str, max_tokens: int = 300,
+             temperature: float = 0.4) -> Optional[str]:
     """Phrase a reply. Returns text, or None on any failure (caller falls back).
 
     Uses GEMINI_TEXT_MODEL rather than GEMINI_MODEL: wording a sentence is a far
     smaller job than understanding speech, and the lighter model does it in about
     a third of the time. Transcription stays on GEMINI_MODEL.
+
+    `temperature` defaults to the conversational 0.4 every existing caller
+    expects. Answering from a document passes 0: there the job is to repeat what
+    the passage says, and variety is not a feature.
     """
     model = settings.GEMINI_TEXT_MODEL or settings.GEMINI_MODEL
     t0 = time.perf_counter()
@@ -85,7 +90,7 @@ def generate(system: str, user: str, max_tokens: int = 300) -> Optional[str]:
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": [{"text": user}]}],
             "generationConfig": {
-                "temperature": 0.4,
+                "temperature": temperature,
                 # gemini-flash-latest counts "thinking" tokens against
                 # maxOutputTokens, so leave headroom above the 512 thinking budget
                 # or the visible reply gets cut off (finishReason MAX_TOKENS).

@@ -201,3 +201,37 @@ export const paymentsApi = {
       signal
     ),
 };
+
+/**
+ * The community documents assistant.
+ *
+ * Answers come only from the association's own PDFs, indexed at build time.
+ * `grounded` is false both when the documents do not cover the question and
+ * when the model could not be reached, so the panel styles those replies
+ * differently rather than letting a refusal read like an answer.
+ */
+export interface DocsSource {
+  section: string;
+  document: string;
+  score: number;
+}
+
+export interface DocsAnswer {
+  answer: string;
+  grounded: boolean;
+  sources: DocsSource[];
+}
+
+export interface DocsSuggestions {
+  greeting: string;
+  questions: string[];
+}
+
+export const docsApi = {
+  /** Opening line and the starter questions, all answerable from the documents. */
+  suggestions: (signal?: AbortSignal) =>
+    apiClient.get<DocsSuggestions>("/api/v1/docs/suggestions", signal),
+
+  ask: (question: string, signal?: AbortSignal) =>
+    apiClient.post<DocsAnswer>("/api/v1/docs/ask", { question }, signal),
+};

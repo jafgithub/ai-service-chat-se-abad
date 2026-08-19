@@ -17,7 +17,7 @@ from app.models import (  # noqa: F401 - imported so create_all registers every 
     Account, Session, ServiceRequest,
 )
 from app.api import (
-    admin, auth, booking, cart, chat, jobs, media, payments, providers,
+    admin, auth, booking, cart, chat, docs, jobs, media, payments, providers,
     requests as service_requests, services, voice,
 )
 
@@ -32,8 +32,8 @@ def setup_logging():
 
     # Explicit allowlist: a logger missing from it has its output silently
     # discarded, so anything new that logs has to be added here too.
-    for name in ("rag", "ai", "chat", "jobs", "payments", "booking", "auth", "voice",
-                 "uvicorn.access"):
+    for name in ("rag", "ai", "chat", "docs", "jobs", "payments", "booking", "auth",
+                 "voice", "uvicorn.access"):
         log = logging.getLogger(name)
         log.setLevel(logging.DEBUG)
         log.addHandler(handler)
@@ -117,6 +117,7 @@ app.include_router(booking.router,  prefix="/api/v1")
 app.include_router(auth.router,     prefix="/api/v1")
 app.include_router(providers.router, prefix="/api/v1")
 app.include_router(service_requests.router, prefix="/api/v1")
+app.include_router(docs.router,      prefix="/api/v1")
 
 
 @app.exception_handler(Exception)
