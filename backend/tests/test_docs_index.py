@@ -22,8 +22,16 @@ def hits_mentioning(question: str, needle: str) -> bool:
 
 def test_the_index_is_present_and_the_right_shape():
     assert docs_index.ready(), "no index file: run scripts/build_doc_index.py"
-    assert docs_index._vectors.shape[0] == 81
+    assert docs_index._vectors.shape[0] == len(docs_index._chunks)
     assert docs_index._vectors.shape[1] == 384
+
+
+def test_every_document_the_client_sent_is_represented():
+    docs = {c["document_short"] for c in docs_index._chunks}
+    for expected in ("Rules and Regulations", "Application Package",
+                     "ARB modification form", "Amenities fees",
+                     "Temporary parking pass", "Lauderdale Lakes code handbook"):
+        assert expected in docs, expected
 
 
 # ── the four questions the panel offers first ────────────────────────────────
@@ -158,3 +166,79 @@ def test_a_greeting_carrying_a_real_question_is_not_swallowed():
 ])
 def test_real_questions_are_never_treated_as_small_talk(question):
     assert _small_talk(question) is None, question
+
+
+
+# ── the documents added on 20 August ─────────────────────────────────────────
+
+@pytest.mark.parametrize("question, needle", [
+    ("How much for a copy of the condo docs?", "25.00"),
+    ("How many days is a temporary parking pass?", "five (5) days"),
+    ("When can vendors work on my property?", "6:30"),
+    ("Do I need approval before I start building?", "ARB"),
+])
+def test_the_new_documents_are_reachable(question, needle):
+    assert hits_mentioning(question, needle), question
+
+
+def test_the_fee_line_survived_chunking():
+    """It did not, the first time.
+
+    "Condo Docs/Bylaws Fee $25.00" is six words, and the generic chunker
+    dropped anything under twelve. On a form the short lines are the facts, so
+    short blocks are now merged forward rather than discarded.
+    """
+    corpus = " ".join(c["text"] for c in docs_index._chunks)
+    assert "Condo Docs/Bylaws" in corpus
+    assert "25.00" in corpus
+
+
+def test_letterhead_is_not_indexed_as_content():
+    """Both management companies' addresses repeat on every page, which made
+    the office address the most retrievable text in the amenities sheet."""
+    for c in docs_index._chunks:
+        assert "grsmanagement.com" not in c["text"].lower(), c["section"]
+        assert "lcroyal@" not in c["text"].lower(), c["section"]
+
+
+# ── one community must not be answered out of another's documents ────────────
+
+def test_another_communitys_rules_are_indexed_but_not_searched_by_default():
+    """The client sent a City of Lauderdale Lakes handbook with the Serenity
+    documents. Serenity Point is in Miami Lakes. It is indexed because he asked
+    for it, and excluded from ordinary answers because a resident asking about
+    their own bins must not be told another city's ordinance."""
+    assert any(c["community"] == "lauderdale lakes" for c in docs_index._chunks)
+    for hit in docs_index.search("When is my rubbish collected?"):
+        assert hit["community"] == "serenity", hit["section"]
+
+
+def test_naming_the_other_community_opens_it_up():
+    hits = docs_index.search("What does the Lauderdale Lakes code say about grass?")
+    assert any(h["community"] == "lauderdale lakes" for h in hits)
+
+
+# ── routing between the booking chat and the documents ───────────────────────
+
+from app.services.conversation import _is_policy_question  # noqa: E402
+
+
+@pytest.mark.parametrize("message", [
+    "What are the quiet hours?", "How much is the application fee?",
+    "When are trash days?", "Can I park a boat in my driveway?",
+    "Do I need ARB approval to paint my door?", "How many days is a parking pass?",
+])
+def test_a_rules_question_routes_to_the_documents(message):
+    assert _is_policy_question(message), message
+
+
+@pytest.mark.parametrize("message", [
+    "my boiler is leaking", "I need a plumber", "book a dog walker",
+    "someone to cut my grass", "can I book someone to cut the grass",
+    "can you send a plumber", "window cleaning please",
+])
+def test_a_booking_request_never_routes_to_the_documents(message):
+    """The overlap this exists for. "Someone to cut my grass" reaches the lawn
+    rule at 0.470, higher than several genuine policy questions score, so the
+    score cannot make this call on its own."""
+    assert not _is_policy_question(message), message

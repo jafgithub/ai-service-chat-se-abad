@@ -31,6 +31,13 @@ INDEX_PATH = Path(__file__).resolve().parent.parent / "data" / "serenity_docs.js
 # refusal is a small annoyance, an invented rule about someone's home is not.
 MIN_SCORE = 0.30
 
+# The community the assistant speaks for. Chunks from anywhere else are indexed
+# but not searched unless the question names that place, because the client sent
+# a City of Lauderdale Lakes code handbook along with the Serenity documents and
+# Serenity Point is in Miami Lakes. A resident asking about their own bin day
+# must not be answered out of another city's ordinances.
+HOME_COMMUNITY = "serenity"
+
 _lock = threading.Lock()
 _vectors: Optional[np.ndarray] = None
 _chunks: list[dict] = []
@@ -83,6 +90,22 @@ def ready() -> bool:
     return _load()
 
 
+def _allowed(query: str) -> set:
+    """Which communities this question may be answered from.
+
+    Home only, unless the question names somewhere else, in which case that
+    place is added rather than substituted: "how does Lauderdale Lakes handle
+    bins" is a fair question and so is comparing the two.
+    """
+    lowered = query.lower()
+    allowed = {HOME_COMMUNITY}
+    for chunk in _chunks:
+        community = chunk.get("community", HOME_COMMUNITY)
+        if community != HOME_COMMUNITY and community in lowered:
+            allowed.add(community)
+    return allowed
+
+
 def search(query: str, k: int = 4) -> list[dict]:
     """The k passages closest to the question, best first, above MIN_SCORE.
 
@@ -99,14 +122,20 @@ def search(query: str, k: int = 4) -> list[dict]:
         return []
 
     scores = _vectors @ vec
-    top = np.argsort(-scores)[: max(k, 1)]
+    allowed = _allowed(query)
+    # Ranked over everything, then filtered, so a strong match in another
+    # community cannot push a weaker home match out of the top k.
+    order = np.argsort(-scores)
+    top = [i for i in order
+           if _chunks[i].get("community", HOME_COMMUNITY) in allowed][: max(k, 1)]
     hits = [
         {**_chunks[i], "score": round(float(scores[i]), 4)}
         for i in top
         if scores[i] >= MIN_SCORE
     ]
     logger.info(
-        "[DOCS] %r -> %d hit(s), best %.3f",
-        query[:60], len(hits), float(scores[top[0]]) if len(top) else 0.0,
+        "[DOCS] %r -> %d hit(s), best %.3f, scope=%s",
+        query[:60], len(hits), float(scores[top[0]]) if top else 0.0,
+        ",".join(sorted(allowed)),
     )
     return hits

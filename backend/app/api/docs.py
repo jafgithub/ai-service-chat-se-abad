@@ -174,6 +174,56 @@ def _context(hits: list[dict]) -> str:
     )
 
 
+def answer_from_documents(question: str) -> "str | None":
+    """A grounded answer, or None. The shared core, used by two callers.
+
+    The floating panel calls it through `/docs/ask` below. The main chat calls
+    it directly when the service catalogue has nothing, so a resident who types
+    "what are the quiet hours" into the booking chat gets the same answer they
+    would get from the panel, out of the same index, with the same grounding.
+
+    None means "the documents do not answer this", including small talk and
+    model failures, so a caller with its own wording for that case can use it.
+    """
+    question = (question or "").strip()
+    if _small_talk(question) is not None:
+        return None
+
+    hits = docs_index.search(question, k=4)
+    if not hits:
+        return None
+
+    reply = gemini_service.generate(
+        SYSTEM,
+        f"{_context(hits)}\n\nResident's question: {question}",
+        max_tokens=320,
+        temperature=0.0,
+    )
+    if not reply:
+        return None
+    reply = _tidy(reply.strip())
+    if "NO_ANSWER" in reply.upper() or len(reply) < 2:
+        return None
+    return reply
+
+
+def _tidy(reply: str) -> str:
+    """Strip what the model adds despite being asked not to.
+
+    The prompt forbids markdown and passage numbers and mostly holds, but
+    *Serenity Point Rules and Regulations* and "Passage 2 states" both reached
+    live answers. The panel renders text rather than markdown, and the resident
+    has never seen a passage, so both are removed here as well as forbidden
+    there.
+    """
+    reply = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", reply)
+    reply = re.sub(r"\s*\((?:see |per |from )?[^)]*(?:Rule|Passage)\s*\d+[^)]*\)", "", reply)
+    reply = re.sub(r"(?im)^\s*(?:and\s+)?passage\s*\d+\s*(?:also\s*)?"
+                   r"(?:states|says|notes|adds|indicates)\s*(?:that\s*)?", "", reply)
+    reply = re.sub(r"(?m)^([a-z])", lambda m: m.group(1).upper(), reply)
+    return re.sub(r"[ \t]{2,}", " ", reply).strip()
+
+
 @router.post("/ask", response_model=AskOut)
 def ask(payload: AskIn) -> AskOut:
     question = payload.question.strip()
@@ -205,23 +255,9 @@ def ask(payload: AskIn) -> AskOut:
             grounded=False, kind="error",
         )
 
-    reply = reply.strip()
+    reply = _tidy(reply.strip())
     if "NO_ANSWER" in reply.upper() or len(reply) < 2:
         return AskOut(answer=NO_ANSWER, grounded=False, kind="no_answer")
-
-    # Belt and braces on top of the prompt. The model mostly obeys "plain text",
-    # but it slipped *Serenity Point Rules and Regulations* into a live answer,
-    # and the panel renders text rather than markdown, so the reader would have
-    # seen the asterisks. Stripping is safer than teaching the panel markdown.
-    reply = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", reply)
-    reply = re.sub(r"\s*\((?:see |per |from )?[^)]*(?:Rule|Passage)\s*\d+[^)]*\)", "", reply)
-    # It still says "Passage 2 states ..." now and then despite being told not
-    # to, and the resident has no idea what passage 2 is. Drop the lead-in and
-    # keep the sentence, capitalising whatever now starts it.
-    reply = re.sub(r"(?im)^\s*(?:and\s+)?passage\s*\d+\s*(?:also\s*)?"
-                   r"(?:states|says|notes|adds|indicates)\s*(?:that\s*)?", "", reply)
-    reply = re.sub(r"(?m)^([a-z])", lambda m: m.group(1).upper(), reply)
-    reply = re.sub(r"[ \t]{2,}", " ", reply).strip()
 
     return AskOut(answer=reply, grounded=True, kind="answer", sources=_credits(hits))
 

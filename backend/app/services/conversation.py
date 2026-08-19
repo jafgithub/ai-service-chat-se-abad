@@ -4,6 +4,7 @@ endpoints. One message in → intent parse → RAG / cart mutation → phrased r
 plus the updated cart and a structured `action` the frontend can react to.
 """
 
+import re
 import logging
 
 from sqlalchemy.orm import Session
@@ -12,6 +13,49 @@ from app.core.config import settings
 from app.services import rag, ai, intent as intent_svc, cart_service, response
 
 logger = logging.getLogger("chat")
+
+
+# A question about the rules, rather than a request for somebody to come out.
+#
+# Score alone cannot make this call: measured over twenty real phrasings the two
+# overlap, because "someone to cut my grass" is both a service we book and a
+# thing the rules have an opinion about (0.470 against the lawn rule), while
+# "how much for a copy of the condo docs" is a pure policy question that only
+# reaches 0.382. So shape decides what kind of message it is and the score
+# decides whether the documents actually cover it.
+_POLICY_SHAPE = re.compile(
+    r"^\s*(what|when|where|which|who|how much|how many|how long|how do i|"
+    r"can i|may i|am i allowed|do i need|is there|are there|are we|is it ok)\b",
+    re.IGNORECASE,
+)
+# Books a job whatever else it looks like. "I need a plumber" opens with none of
+# the above, but "can I book someone to cut the grass" opens with "can I" and
+# would otherwise be read as a policy question.
+_BOOKING_SHAPE = re.compile(
+    r"\b(book|order|arrange|send|hire|come out|call out|quote|appointment|"
+    r"i need (a|an|someone)|my \w+ (is|has) (broken|leaking|blocked|stopped))\b",
+    re.IGNORECASE,
+)
+
+def _is_policy_question(message: str) -> bool:
+    return bool(_POLICY_SHAPE.search(message)) and not _BOOKING_SHAPE.search(message)
+
+
+def _document_answer(message: str) -> "str | None":
+    """The community documents' answer to a question the catalogue could not meet.
+
+    Shares one index and one endpoint with the floating help panel, so a resident
+    gets the same answer whichever way they ask, and there is one place to fix a
+    wrong one. Grounding is unchanged: retrieval has to clear its floor before a
+    model is asked anything, and a refusal here returns None so the caller falls
+    back to its own "nothing found" wording rather than printing two.
+    """
+    try:
+        from app.api.docs import answer_from_documents
+        return answer_from_documents(message)
+    except Exception:  # noqa: BLE001 - the chat must survive a documents outage
+        logger.exception("[CHAT] document lookup failed")
+        return None
 
 
 def process(message: str, session, db: Session, category_filter: str | None = None) -> dict:
@@ -24,6 +68,25 @@ def process(message: str, session, db: Session, category_filter: str | None = No
 
     # ── search ───────────────────────────────────────────────────────────────
     if intent.type == "search":
+        # A question about the community rules, asked in the booking chat. The
+        # catalogue will always return something loosely related (asking about
+        # quiet hours returned pet sitting and a community hall), so an empty
+        # result is not the signal. Shape and confidence together are.
+        if _is_policy_question(message):
+            # No extra score gate here on purpose. Shape has already ruled out
+            # booking requests, so the index's own floor is the right test of
+            # coverage, and the model refusing is the second one: both return
+            # None and the catalogue search below runs as normal. An earlier
+            # 0.45 gate was rejecting "how much for a copy of the condo docs",
+            # which the amenities sheet answers outright at $25.00, because it
+            # only scored 0.382.
+            grounded = _document_answer(message)
+            if grounded:
+                logger.info("[CHAT] answered from the community documents")
+                return _finish(db, session, grounded, [], None,
+                               speech="Here is what the community documents say.",
+                               intent_type="documents")
+
         services = rag.search_products(query=intent.query, db=db, top_k=None, category_filter=category_filter)
         session.last_shown_json = response.build_shown(services)
         if services:
@@ -38,6 +101,18 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             reply = ai.search_intro(message, services) or response.search_reply(services)
         if services:
             speech = "Here is the list."
+        else:
+            # Nothing in the catalogue matched, which is exactly when a question
+            # about the community documents lands here: "what are the quiet
+            # hours" is not a service anybody books. Before telling the resident
+            # we found nothing, ask the documents.
+            #
+            # Only on the empty branch, deliberately. A message that did match
+            # real services is a request for a tradesperson and hijacking it
+            # with a policy answer would be worse than not trying.
+            grounded = _document_answer(message)
+            if grounded:
+                reply, speech = grounded, "Here is what the community documents say."
 
     # ── add to cart ──────────────────────────────────────────────────────────
     elif intent.type == "add_to_cart":

@@ -28,8 +28,30 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-SOURCE = ROOT / "knowledge" / "serenity"
+KNOWLEDGE = ROOT / "knowledge"
+SOURCE = KNOWLEDGE / "serenity"
 OUT = ROOT / "app" / "data" / "serenity_docs.json"
+
+# Everything the assistant may answer from. Adding a document is two lines here
+# and a rerun; there is no code to write for an ordinary one.
+#
+# `community` is the thing to get right. Two of the documents the client sent
+# belong to other places entirely: a City of Lauderdale Lakes code handbook,
+# when Serenity Point is in Miami Lakes. Indexed, because he asked for them,
+# but tagged, and `docs_index` will not search outside Serenity unless the
+# question names the other community. A resident asking about their own bins
+# must never be answered out of another city's ordinances.
+MANIFEST = [
+    # path,                                  title,                                              short,                          community
+    ("other-communities/lauderdale-lakes-code-handbook.pdf",
+     "City of Lauderdale Lakes Code Compliance Handbook", "Lauderdale Lakes code handbook", "lauderdale lakes"),
+    ("serenity/arb-form.pdf",
+     "Serenity Point Architectural Modification Form (ARB)", "ARB modification form", "serenity"),
+    ("serenity/amenities-fees.pdf",
+     "Serenity Point Amenities Fees", "Amenities fees", "serenity"),
+    ("serenity/parking-pass.pdf",
+     "Temporary Parking Pass Request", "Temporary parking pass", "serenity"),
+]
 
 # Page furniture: the management company's letterhead repeats on every page and
 # would otherwise be the most "relevant" text in the corpus, since it appears
@@ -37,6 +59,11 @@ OUT = ROOT / "app" / "data" / "serenity_docs.json"
 NOISE = re.compile(
     r"L&C ROYAL MANAGEMENT|A Community Association Management Company|"
     r"13155 SW 42|MIAMI, FL 33175|T \(305\) 228|lcroyal@lcroyalmanagement|"
+    # The second management company. The amenities sheet is on GRS letterhead,
+    # and without this its first chunk was the office address, which is both
+    # useless to a resident and the most repeated text in that document.
+    r"GRS Management|15280 NW 79TH|Miami Lakes, FL 33016|\(305\) 823-|"
+    r"grsmanagement\.com|Customer@grsmanagement|"
     r"^Page \d+ of \d+$|^FOR OFFICE USE ONLY$|^Updated By:|^ONE PER ADULT$",
     re.IGNORECASE,
 )
@@ -235,15 +262,80 @@ def chunk_application(pdf: Path) -> list[dict]:
     return out
 
 
+def chunk_generic(pdf: Path, title: str, short: str, community: str) -> list[dict]:
+    """Any document without a structure worth special casing.
+
+    Paragraph blocks, glued back together and then held to the same word cap as
+    everything else. The two hand written chunkers above exist because the rules
+    sheet and the management pack have real structure worth following; most
+    documents do not, and writing a parser per document would not survive the
+    client sending a fifth one.
+    """
+    lines = clean(text_of(pdf))
+    blocks, current = [], []
+    for ln in lines:
+        if ln.strip():
+            current.append(ln)
+        elif current:
+            blocks.append(current)
+            current = []
+    if current:
+        blocks.append(current)
+
+    # Merge short blocks forward rather than dropping them. The first version
+    # dropped anything under twelve words, which threw away the one line that
+    # answers "how much are the condo docs": "Condo Docs/Bylaws Fee $25.00" is
+    # six words. On a form, the short lines are the facts.
+    merged: list[list[str]] = []
+    for block in blocks:
+        if merged and len(" ".join(merged[-1]).split()) < 35:
+            merged[-1] = merged[-1] + block
+        else:
+            merged.append(block)
+
+    slug = re.sub(r"[^a-z0-9]+", "-", pdf.stem.lower()).strip("-")
+    out: list[dict] = []
+    for i, block in enumerate(merged, 1):
+        text = squash(block)
+        # Keep anything carrying a number: fees, dates, hours and limits are
+        # what people ask about. Drop only short prose with nothing in it.
+        if len(text.split()) < 8 and not re.search(r"\d", text):
+            continue
+        for j, part in enumerate(split_long(text), 1):
+            out.append({
+                "id": f"{slug}-{i}-{j}",
+                "document": title,
+                "document_short": short,
+                "community": community,
+                "approved": "",
+                "section": f"{short}, part {len(out) + 1}",
+                "text": f"{title}: {part}",
+            })
+    return out
+
+
 def main() -> None:
     rules = chunk_rules(SOURCE / "rules.pdf")
     application = chunk_application(SOURCE / "application.pdf")
+    for c in rules + application:
+        c["community"] = "serenity"
     chunks = rules + application
 
-    print(f"  {len(rules):>3} chunks from the rules sheet")
-    print(f"  {len(application):>3} chunks from the management pack")
+    print(f"  {len(rules):>3} chunks  rules sheet")
+    print(f"  {len(application):>3} chunks  management pack")
 
-    if len(chunks) < 40:
+    for rel, title, short, community in MANIFEST:
+        pdf = KNOWLEDGE / rel
+        if not pdf.exists():
+            sys.exit(f"missing document: {pdf}")
+        got = chunk_generic(pdf, title, short, community)
+        if not got:
+            sys.exit(f"{pdf.name} produced no text. A scanned PDF has no text "
+                     f"layer and needs OCR before it can be indexed.")
+        chunks += got
+        print(f"  {len(got):>3} chunks  {short}  [{community}]")
+
+    if len(chunks) < 60:
         sys.exit(f"only {len(chunks)} chunks: the chunker did not match the document")
 
     if "--dry-run" in sys.argv:
