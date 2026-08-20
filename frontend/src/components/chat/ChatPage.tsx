@@ -102,6 +102,12 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   // What the results are answering, so the panel can say so.
   const [resultsFor, setResultsFor] = useState("");
+  /* The last reply came out of the community documents rather than the
+     catalogue. Both leave the results pane empty, and until this existed both
+     read the same on screen: an answer about the quiet hours sat beside
+     "Nobody on the platform lists anything like that", which is true of the
+     catalogue and beside the point of what was asked. */
+  const [fromDocuments, setFromDocuments] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
   const [totalMatches, setTotalMatches] = useState(0);
   const [inputValue, setInputValue] = useState("");
@@ -358,11 +364,13 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setTotalMatches(res.total_services ?? res.services.length);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(heard);
+        setFromDocuments(false);
       } else if (res.action === null) {
         setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
-        setResultsFor(heard);
+        setResultsFor(res.intent === "documents" ? "" : heard);
+        setFromDocuments(res.intent === "documents");
       }
       applyAction(res.action, res.services.length > 0 ? res.services : services);
       // Speak the short version: long lists are shown, not read out.
@@ -467,11 +475,16 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setTotalMatches(response.total_services ?? response.services.length);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(text.trim());
+        setFromDocuments(false);
       } else if (response.action === null) {
+        // A documents answer is not a failed search and must not be dressed as
+        // one. Clearing `resultsFor` keeps "Nothing matches" off the screen;
+        // the flag puts something honest there instead.
         setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
-        setResultsFor(text.trim());
+        setResultsFor(response.intent === "documents" ? "" : text.trim());
+        setFromDocuments(response.intent === "documents");
       }
       applyAction(response.action, response.services.length > 0 ? response.services : services);
     } catch (err) {
@@ -712,17 +725,21 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   ? resultsFor
                     ? `For “${resultsFor}”`
                     : "Services"
-                  : searchedAndFoundNothing
-                    ? `Nothing matches “${resultsFor}”`
-                    : "Services"}
+                  : fromDocuments
+                    ? "From the community documents"
+                    : searchedAndFoundNothing
+                      ? `Nothing matches “${resultsFor}”`
+                      : "Services"}
               </p>
               <p className="mt-0.5 text-xs text-ink-muted">
                 {services.length > 0
                   ? totalMatches > services.length
                     ? `${totalMatches} match, showing the closest ${services.length}`
                     : `${services.length} service${services.length === 1 ? "" : "s"} could cover this`
-                  : searchedAndFoundNothing
-                    ? "Nobody on the platform lists anything like that"
+                  : fromDocuments
+                    ? "The answer is in the conversation, with the rule it came from"
+                    : searchedAndFoundNothing
+                      ? "Nobody on the platform lists anything like that"
                     : "Describe the problem, or start from a category"}
               </p>
             </div>
@@ -789,14 +806,18 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
               <div className={cn("flex h-full flex-col justify-center")}>
                 <div className="mx-auto w-full max-w-2xl">
                   <h2 className="text-base font-semibold text-ink">
-                    {searchedAndFoundNothing
-                      ? `Nothing here matches “${resultsFor}”`
-                      : "What needs doing?"}
+                    {fromDocuments
+                      ? "Answered from the community documents"
+                      : searchedAndFoundNothing
+                        ? `Nothing here matches “${resultsFor}”`
+                        : "What needs doing?"}
                   </h2>
                   <p className="mt-1 text-sm text-ink-muted">
-                    {searchedAndFoundNothing
-                      ? "Try describing it differently, or start from a category."
-                      : "Describe it in your own words, or start from a category."}
+                    {fromDocuments
+                      ? "Ask another question about the rules, or describe a job and I will find someone."
+                      : searchedAndFoundNothing
+                        ? "Try describing it differently, or start from a category."
+                        : "Describe it in your own words, or start from a category."}
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">

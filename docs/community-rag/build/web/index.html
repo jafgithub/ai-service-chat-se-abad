@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Community documents: how the assistant answers</title>
+<style>
+:root {
+  --bg:#FFFFFF; --ink:#14130F; --muted:#77726A; --faint:#A8A29A;
+  --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#131211; --ink:#F0EDE7; --muted:#A29C93; --faint:#736D65;
+          --line:#2B2926; --sunk:#1B1917; --accent:#E8905A; --good:#71C295; }
+}
+:root[data-theme="dark"] {
+  --bg:#131211; --ink:#F0EDE7; --muted:#A29C93; --faint:#736D65;
+  --line:#2B2926; --sunk:#1B1917; --accent:#E8905A; --good:#71C295;
+}
+:root[data-theme="light"] {
+  --bg:#FFFFFF; --ink:#14130F; --muted:#77726A; --faint:#A8A29A;
+  --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+h1, h2 { scroll-margin-top: 22px; }
+.toc {
+  margin: 30px 0 8px; padding: 20px 22px 14px;
+  background: var(--sunk); border: 1px solid var(--line); border-radius: 12px;
+}
+.toc .toch {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--faint);
+}
+.toc a {
+  display: block; text-decoration: none; color: var(--ink);
+  padding: 4px 0; font-size: 15.5px; line-height: 1.45;
+  border-bottom: 1px solid transparent;
+}
+.toc a:hover { color: var(--accent); }
+.toc a.t2 { padding-left: 20px; font-size: 14.5px; color: var(--muted); }
+
+body {
+  margin: 0 auto; max-width: 820px; padding: 64px 28px 120px;
+  background: var(--bg); color: var(--ink);
+  font: 17px/1.62 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+h1 {
+  font-size: 30px; line-height: 1.2; letter-spacing: -0.022em; font-weight: 650;
+  margin: 68px 0 18px; padding-top: 26px; border-top: 1px solid var(--line);
+  text-wrap: balance;
+}
+h1:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+h2 {
+  font-size: 19px; font-weight: 650; margin: 38px 0 12px; letter-spacing: -0.01em;
+}
+p { margin: 0 0 16px; }
+strong { font-weight: 650; }
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.87em;
+  background: var(--sunk); border: 1px solid var(--line); padding: 1px 5px; border-radius: 4px;
+}
+hr { border: none; border-top: 1px solid var(--line); margin: 46px 0; }
+ul, ol { margin: 0 0 16px; padding-left: 22px; }
+li { margin-bottom: 6px; }
+figure { margin: 26px 0; }
+figure img {
+  display: block; width: 100%; height: auto;
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.expect {
+  border-left: 3px solid #2f6b4c;
+  background: #f2f8f4;
+  padding: 10px 16px;
+  margin: -6px 0 16px;
+  font-size: 14.5px;
+  color: #23402f;
+}
+pre {
+  background: #0f1613;
+  color: #d7e0da;
+  border-radius: 6px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin: 14px 0;
+}
+/* The inline `code` pill must not apply inside a command block: its pale
+   background and dark text landed on the dark block and became unreadable. */
+pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #e6ede8;
+  font-size: 13px;
+}
+.tw { overflow-x: auto; margin: 22px 0; border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th {
+  background: var(--sunk); font-size: 11px; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted); font-weight: 650; white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+.masthead { margin-bottom: 40px; }
+.masthead .eyebrow {
+  font-size: 11.5px; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--accent); font-weight: 650; margin: 0 0 12px;
+}
+.masthead .title {
+  font-size: clamp(30px, 4.2vw, 40px); line-height: 1.13; letter-spacing: -0.025em;
+  font-weight: 650; margin: 0 0 14px; text-wrap: balance;
+}
+.masthead .sub { color: var(--muted); font-size: 18px; margin: 0 0 18px; }
+.masthead .by { color: var(--faint); font-size: 14px; margin: 0; }
+@media (max-width: 640px) {
+  body { padding: 40px 18px 80px; font-size: 16px; }
+  h1 { font-size: 25px; }
+}
+</style>
+</head>
+<body>
+<div class="masthead">
+  <p class="eyebrow">Technical reference</p>
+  <p class="title">Community documents: how the assistant answers, and from whose rules</p>
+  <p class="sub">The document assistant end to end: how a question is routed, how a community is recognised, why one community can never be answered from another's documents, and what to do when a new association sends its paperwork.</p>
+  <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 20 August 2026 &nbsp;&middot;&nbsp; every behaviour checked against the live server</p>
+</div>
+<nav class="toc" aria-label="Contents"><p class="toch">Contents</p><a class="t1" href="#s1-what-this-covers">1. What this covers</a><a class="t1" href="#s2-the-two-ways-in">2. The two ways in</a><a class="t1" href="#s3-how-a-question-is-routed">3. How a question is routed</a><a class="t1" href="#s4-retrieval-and-what-grounds-it">4. Retrieval, and what grounds it</a><a class="t1" href="#s5-community-detection-and-scoping">5. Community detection and scoping</a><a class="t2" href="#s5-1-recognising-the-name">5.1 Recognising the name</a><a class="t2" href="#s5-2-scoping-before-ranking">5.2 Scoping before ranking</a><a class="t2" href="#s5-3-a-community-we-hold-nothing-for">5.3 A community we hold nothing for</a><a class="t1" href="#s6-what-is-indexed-today">6. What is indexed today</a><a class="t1" href="#s7-three-lakes-and-the-ocr-dependency">7. Three Lakes, and the OCR dependency</a><a class="t1" href="#s8-contradictions">8. Contradictions</a><a class="t1" href="#s9-adding-a-new-community">9. Adding a new community</a><a class="t1" href="#s10-files-and-what-changed-on-20-august">10. Files, and what changed on 20 August</a><a class="t1" href="#s11-testing-and-verification">11. Testing and verification</a><a class="t1" href="#s12-known-limits">12. Known limits</a></nav>
+<h1 id="s1-what-this-covers">1. What this covers</h1>
+<p>The Service Assistant answers two different kinds of question through one chat box. &quot;My sink is leaking&quot; is a request for a tradesperson and goes to the service catalogue. &quot;What are the quiet hours&quot; is a question about the rules and is answered from the association&#x27;s own documents. This is a reference for the second one: how a question reaches the documents, which community&#x27;s documents it may be answered from, and what to do when a new association sends its paperwork.</p>
+<p>Two rules run through everything below, and both are enforced by code rather than by asking a model nicely.</p>
+<ul><li>**An answer is either supported by a passage we retrieved, or it is a</li></ul>
+<p>refusal.** If nothing clears the retrieval floor, the refusal is returned without a model being called at all, so the usual failure of a document assistant, answering plausibly from its own training, has nowhere to happen.</p>
+<ul><li><strong>One community is never answered from another&#x27;s documents.</strong> Not when the</li></ul>
+<p>names are similar, not when the other document is the better match, not when we hold nothing for the community that was asked about.</p>
+<p>The second rule is why this document exists in the shape it does. On 20 August a resident question about Three Lakes was answered out of the Serenity Point rules, because &quot;Lake&quot; sits close to &quot;lakes&quot; in the embedding space and nothing downstream knew the difference mattered. Rules about somebody&#x27;s home, delivered confidently, from a document that does not govern them.</p>
+<h1 id="s2-the-two-ways-in">2. The two ways in</h1>
+<p>There is one retrieval core and two front doors. Both call the same function over the same index, so a question gets the same answer whichever way it is asked, and a wrong answer has one place to be fixed.</p>
+<figure><img src="img/d01_doors.png" width="1500" height="589" alt="The two front doors and the one core" loading="lazy"></figure>
+<p><strong>The floating panel.</strong> Bottom right of every page, on every route. It posts straight to <code>POST /api/v1/docs/ask</code> and has no service catalogue in front of it, so every question it receives is a question about the documents.</p>
+<p><strong>The booking chat.</strong> <code>POST /api/v1/chat</code> is a booking pipeline first. The message is classified by <code>intent.parse</code> into checkout, add, remove, set quantity, view cart, conversational or search, and only a <code>search</code> can reach the documents at all. Inside that branch the routing gate below decides whether the documents are asked before the catalogue, after it, or not at all.</p>
+<h1 id="s3-how-a-question-is-routed">3. How a question is routed</h1>
+<p>Three things decide, in this order.</p>
+<p><strong>Booking wins outright.</strong> <code>_BOOKING_SHAPE</code> matches book, order, arrange, send, hire, come out, quote, appointment, &quot;I need a&quot;, &quot;I need someone&quot;, and &quot;my X is broken or leaking or blocked&quot;. If it matches, the documents are not consulted. This is not a nicety: measured over twenty real phrasings, &quot;someone to cut my grass&quot; scores 0.470 against the lawn rule, higher than several genuine policy questions score, so the retrieval score cannot make this call and the shape of the message has to.</p>
+<p><strong>Then either shape sends it to the documents.</strong> A question shape (<code>_POLICY_SHAPE</code>: what, when, where, which, who, how much, how many, how long, how do I, can I, may I, am I allowed, do I need, is there, are there, are we, is it ok) or the documents&#x27; own vocabulary (<code>_DOC_SHAPE</code>: rules, regulations, bylaws, covenants, guidelines, restrictions, policy, HOA, association, ordinances, handbook, quiet hours, curfew, noise, architectural, ARB, approval, violation, fines, lease, leasing, tenant, pets, trash, recycling, amenities).</p>
+<p>The vocabulary half is what was missing until 20 August. &quot;Lauderdale Lake community rules&quot; is how people actually search: a noun phrase, no verb, no question mark. It opened with none of the question words, so it was treated as a service search, the catalogue matched &quot;Community hall booking&quot; weakly, and a resident asking about the rules was shown a hall to hire. One loose catalogue match was enough to hide the documents entirely.</p>
+<p><strong>Then, if the message names a community, the documents own the answer.</strong> A miss is reported as a miss rather than falling through to a service list. Falling through is what produced the screenshot above: a tradesperson is not a worse answer to &quot;Lauderdale Lake community rules&quot;, it is not an answer to it.</p>
+<figure><img src="img/d02_routing.png" width="1500" height="646" alt="The routing gate" loading="lazy"></figure>
+<p>Being wrong in the direction of the documents is cheap. When they do not cover the question the lookup returns nothing and the catalogue search runs exactly as before, so the cost is one extra retrieval against 189 chunks held in memory.</p>
+<h1 id="s4-retrieval-and-what-grounds-it">4. Retrieval, and what grounds it</h1>
+<p><code>app/services/docs_index.py</code> holds the index in memory: 189 chunks at 384 dimensions is about 124 KB of floats, and the whole search is one matrix multiply. It follows what <code>catalog_index.py</code> already does for the service catalogue, so there is one pattern in this codebase rather than two.</p>
+<div class="tw"><table>
+<thead><tr><th>Step</th><th>What happens</th></tr></thead>
+<tbody>
+<tr><td>Load</td><td><code>app/data/serenity_docs.json</code> is read once, on first use. Chunks and their vectors are separated, and each community&#x27;s row numbers are recorded so a scoped search is a slice rather than a scan.</td></tr>
+<tr><td>Scope</td><td>The communities named in the question, or Serenity if none are named. See section 5.</td></tr>
+<tr><td>Embed</td><td>The query only. Through <code>rag.embed_text</code>, which is the model the booking search already holds open.</td></tr>
+<tr><td>Score</td><td>Dot product against the rows in scope. Vectors were normalised at build time, so the dot product is the cosine.</td></tr>
+<tr><td>Floor</td><td><code>MIN_SCORE = 0.30</code>. Anything below it is not returned.</td></tr>
+<tr><td>Answer</td><td>The top four passages are the only context the model sees, and it is told to reply <code>NO_ANSWER</code> if they do not cover the question.</td></tr>
+</tbody></table></div>
+<p><strong>The embedding model is shared on purpose.</strong> The first version of this file loaded its own <code>SentenceTransformer</code>, roughly 90 MB of weights plus torch&#x27;s allocator on top. The <code>plumber</code> service runs under a <code>MemoryMax</code> cgroup limit and already sits at about 500 MB, so every question failed on the live box with &quot;embedding model unavailable&quot; while passing in the test suite, because pytest runs outside the cgroup. The index is built with the same model, so the vectors are directly comparable.</p>
+<p><strong>Where the floor came from.</strong> Genuine questions score 0.35 to 0.75. Things the documents say nothing about sit under 0.30. The gap is comfortable and the cost of being wrong is asymmetric: a refusal is a small annoyance, an invented rule about someone&#x27;s home is not.</p>
+<p>The floor is not the only guard, and should not be. &quot;What are your opening hours on Christmas Day&quot; pulls the nuisance rule at about 0.40, because that rule really does discuss holidays and curfews. It is the nearest thing in the corpus and retrieval is right to return it. The documents still do not state opening hours, so refusing that one is the model&#x27;s job. Raising the floor to swallow it would cost real answers: &quot;what colour can I paint my house&quot; scores 0.478.</p>
+<h1 id="s5-community-detection-and-scoping">5. Community detection and scoping</h1>
+<p>Every chunk carries a <code>community</code> tag. <code>HOME_COMMUNITY</code> is <code>serenity</code>.</p>
+<h2 id="s5-1-recognising-the-name">5.1 Recognising the name</h2>
+<p><code>COMMUNITIES</code> in <code>docs_index.py</code> is a small registry: a key, a label to say back to the resident, and the aliases a resident might type. A question&#x27;s words are compared against those aliases after both sides are normalised.</p>
+<p>Normalisation lowercases, singularises crudely, and drops filler that decorates a name without identifying it: the, a, of, in, city, town, community, association, HOA, homeowners, point, village, estates, subdivision, neighbourhood.</p>
+<div class="tw"><table>
+<thead><tr><th>Typed</th><th>Normalised</th><th>Resolves to</th></tr></thead>
+<tbody>
+<tr><td>Lauderdale Lake community rules</td><td>lauderdale lake rule</td><td>lauderdale lakes</td></tr>
+<tr><td>rules at Serenity Point</td><td>rule serenity</td><td>serenity</td></tr>
+<tr><td>Three Lake Community quiet hours</td><td>three lake quiet hour</td><td>three lakes</td></tr>
+<tr><td>can I fish in the lake</td><td>can i fish lake</td><td>nobody</td></tr>
+</tbody></table></div>
+<p>The singular rule is deliberately crude. It only has to make &quot;lakes&quot; and &quot;lake&quot; the same word, which is the whole of the bug it was written for: the client typed &quot;Lauderdale Lake&quot;, the tag said &quot;lauderdale lakes&quot;, and the substring test that used to live here missed by one letter.</p>
+<p>Matching is on <strong>consecutive words</strong>, not substrings, so &quot;Lakeview Drive&quot; cannot match &quot;lake&quot; and a name only matches where it was actually written.</p>
+<h2 id="s5-2-scoping-before-ranking">5.2 Scoping before ranking</h2>
+<p>Naming a community <strong>scopes to</strong> that community. It does not add it to home.</p>
+<p>Only the rows belonging to the communities in scope are scored at all, so a document from anywhere else cannot appear in the results however well it matches. This is the change that stopped the second failure in the client&#x27;s screenshots. The Lauderdale handbook is 93 chunks against Serenity&#x27;s 96, so under the old behaviour, which searched both and filtered afterwards, naming Lauderdale was enough for its ordinances to fill the top four and push the Serenity answer out.</p>
+<p>Naming nothing means Serenity only, which is unchanged. Naming two communities searches both, which is a fair question: &quot;how do Serenity and Lauderdale Lakes differ on parking&quot; is a comparison, and mixing is what was asked for.</p>
+<h2 id="s5-3-a-community-we-hold-nothing-for">5.3 A community we hold nothing for</h2>
+<p>If the question names a community that has no chunks in the index, the assistant says so and stops.</p>
+<p class="expect">I do not have the Three Lakes documents, so I cannot answer from them, and I will not answer from another community&#x27;s rules instead.</p>
+<p>This is checked before any search runs, and <code>search()</code> refuses again if it is reached directly, so no path through the module can answer a question about one community out of another&#x27;s documents. Both front doors return this message rather than nothing, because in the booking chat &quot;nothing&quot; would send the resident on to a service search and their question would go unanswered.</p>
+<figure><img src="img/d03_scope.png" width="1500" height="546" alt="Serenity, Lauderdale Lakes, Three Lakes" loading="lazy"></figure>
+<p>Availability is read off the loaded index, never declared. A community becomes answerable the moment its chunks are in the index, with no code change.</p>
+<h1 id="s6-what-is-indexed-today">6. What is indexed today</h1>
+<p>189 chunks, built from six PDFs.</p>
+<div class="tw"><table>
+<thead><tr><th>Community</th><th>Document</th><th>Chunks</th></tr></thead>
+<tbody>
+<tr><td>serenity</td><td>Serenity Community Association Rules and Regulations (management pack)</td><td>55</td></tr>
+<tr><td>serenity</td><td>Serenity Point Rules and Regulations</td><td>19</td></tr>
+<tr><td>serenity</td><td>Application Package</td><td>7</td></tr>
+<tr><td>serenity</td><td>ARB modification form</td><td>6</td></tr>
+<tr><td>serenity</td><td>Temporary parking pass</td><td>5</td></tr>
+<tr><td>serenity</td><td>Amenities fees</td><td>4</td></tr>
+<tr><td>lauderdale lakes</td><td>City of Lauderdale Lakes Code Compliance Handbook</td><td>93</td></tr>
+</tbody></table></div>
+<p>Lauderdale Lakes is a different city: Serenity Point is in Miami Lakes. It is indexed because the client sent it, and tagged so that a resident asking about their own bin day is never answered out of another city&#x27;s ordinances.</p>
+<h1 id="s7-three-lakes-and-the-ocr-dependency">7. Three Lakes, and the OCR dependency</h1>
+<p><strong>Three Lakes is not available.</strong> Its design standards and covenant guidelines PDF is a scan: an image of a page, with no text layer. <code>pdftotext</code> returns zero characters from it. There is nothing to chunk and nothing to embed, so it is not in the index and questions about it are refused by name.</p>
+<p>The same is true of the Serenity occupancy application. Both files sit in <code>backend/knowledge/needs-ocr/</code> rather than in a community folder, which is what keeps them out of the build.</p>
+<p><strong>What it would take.</strong> The index is built offline, on a laptop, and shipped as JSON, so this needs no server dependency: only an OCR engine, <code>tesseract</code> or <code>ocrmypdf</code>, on whichever machine runs the build script. That is a small install.</p>
+<p><strong>Why it has not been done.</strong> OCR of a scanned covenant document will contain errors, and those errors would become rules about someone&#x27;s home. The honest sequence is to OCR it, read the extracted text against the PDF by eye, correct it, and only then index it. That is an hour of careful work, not a switch, and it is worth asking the association for a text PDF first: a document that was printed and scanned usually still exists as a file somewhere.</p>
+<p>Until then the assistant says it does not hold them. That is the correct behaviour, and it is deliberately not a silent gap.</p>
+<h1 id="s8-contradictions">8. Contradictions</h1>
+<p>The documents disagree with each other in at least five places. The assistant does not pick a winner. It states both and names the document each came from, because choosing silently would be inventing a rule.</p>
+<div class="tw"><table>
+<thead><tr><th>Subject</th><th>One document says</th><th>The other says</th></tr></thead>
+<tbody>
+<tr><td>Quiet hours</td><td>Rule 18: no loud music from 11:00PM, resuming 9:00AM</td><td>Rule 2: nothing after 10pm Sunday to Thursday, midnight Friday and Saturday</td></tr>
+<tr><td>Lease term</td><td>Application requirements: minimum one year</td><td>Use restrictions: no lease less than six months</td></tr>
+<tr><td>Pets</td><td>Rules sheet: reads as a blanket ban</td><td>Management pack: domestic pets allowed, on a leash, per County ordinance</td></tr>
+<tr><td>Decision timescales</td><td>Stated differently in two places</td><td></td></tr>
+<tr><td>Site working hours</td><td>Stated differently in two places</td><td></td></tr>
+</tbody></table></div>
+<p>Retrieval has to hand the model both sides or it cannot report the disagreement, which is why the chunker keeps both documents rather than deduplicating them, and why a test asserts that both quiet hours rules are retrieved together for the same question.</p>
+<p>These need a decision from the association about which document is authoritative. Until one is given, showing both is the only honest answer.</p>
+<h1 id="s9-adding-a-new-community">9. Adding a new community</h1>
+<p>Two things, and the second is the one that is easy to forget.</p>
+<p><strong>1. Index the documents.</strong> Put the PDF under <code>backend/knowledge/&lt;community&gt;/</code>, add a line to <code>MANIFEST</code> in <code>scripts/build_doc_index.py</code> giving its path, title, short name and community tag, and rerun the builder on a laptop:</p>
+<pre><code>cd backend
+python3 scripts/build_doc_index.py</code></pre>
+<p>The builder extracts text with <code>pdftotext -layout</code> into a <code>.txt</code> sidecar committed beside the PDF, chunks by structure, embeds, and writes <code>app/data/serenity_docs.json</code>. It exits with an error if a PDF produces no text, which is how a scan announces itself.</p>
+<p><strong>2. Declare the community name.</strong> Add a <code>Community</code> entry to <code>COMMUNITIES</code> in <code>app/services/docs_index.py</code>:</p>
+<pre><code>Community(&quot;three lakes&quot;, &quot;Three Lakes&quot;,
+          (&quot;three lakes&quot;, &quot;three lake&quot;, &quot;three lakes community&quot;)),</code></pre>
+<p><strong>This step is not optional and it is not cosmetic.</strong> A community name that has never been declared is not recognised as a name at all, so a question about it is treated as an ordinary question and answered from <strong>Serenity&#x27;s</strong> documents. That is the exact failure this whole design exists to prevent, and it comes back the moment a document is indexed without its name being registered.</p>
+<p>The registry is the one hand maintained list in this feature. Everything else, including whether a community can be answered at all, is read off the index. Declare the name even when there are no documents yet: that is what turns a silent wrong answer into &quot;I do not have the Three Lakes documents&quot;.</p>
+<p>Then run the tests, redeploy the backend, and restart the service. The index is loaded once at first use, so a restart is required for a new index to be seen.</p>
+<h1 id="s10-files-and-what-changed-on-20-august">10. Files, and what changed on 20 August</h1>
+<div class="tw"><table>
+<thead><tr><th>File</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>app/services/docs_index.py</code></td><td>The index, the community registry, name normalisation, scoping, retrieval</td></tr>
+<tr><td><code>app/api/docs.py</code></td><td>The prompt, the refusals, small talk, <code>/docs/ask</code>, <code>/docs/suggestions</code>, and <code>answer_from_documents()</code> which both front doors call</td></tr>
+<tr><td><code>app/services/conversation.py</code></td><td>The routing gate in the booking chat</td></tr>
+<tr><td><code>scripts/build_doc_index.py</code></td><td>The offline builder: extraction, chunking, embedding</td></tr>
+<tr><td><code>app/data/serenity_docs.json</code></td><td>The shipped index, 189 chunks, 920 KB</td></tr>
+<tr><td><code>backend/knowledge/</code></td><td>The source PDFs and their text sidecars</td></tr>
+<tr><td><code>frontend/src/components/chat/HelpWidget.tsx</code></td><td>The floating panel</td></tr>
+<tr><td><code>frontend/src/components/chat/ChatPage.tsx</code></td><td>The booking chat, including the results pane</td></tr>
+</tbody></table></div>
+<p>Changed on 20 August, in response to the client&#x27;s screenshots:</p>
+<p><strong><code>docs_index.py</code>.</strong> Added the <code>COMMUNITIES</code> registry, <code>named_communities()</code>, <code>unavailable()</code>, <code>documents_for()</code> and word based normalisation, replacing a substring test that missed &quot;Lauderdale Lake&quot; by one letter. Community rows are now indexed at load and retrieval scores only the rows in scope, replacing rank then filter. Naming a community scopes to it instead of adding it to home.</p>
+<p><strong><code>api/docs.py</code>.</strong> A named community with no documents is now refused by name, in both front doors, before any search runs. An ordinary miss now names the documents that were actually searched, and lists what is held for that community, because &quot;I could not find that in the community documents&quot; is misleading when the question named Lauderdale Lakes and the Lauderdale handbook is what was searched.</p>
+<p><strong><code>conversation.py</code>.</strong> Added <code>_DOC_SHAPE</code> and <code>_wants_documents()</code>, so a noun phrase reaches the documents. A named community&#x27;s question is answered by the documents or reported as a miss, never handed to the catalogue. The document lookup no longer runs twice for a question the documents cannot answer.</p>
+<p><strong><code>ChatPage.tsx</code>.</strong> The results pane no longer describes a documents answer as a failed search. It said &quot;Nobody on the platform lists anything like that&quot; beside every correct answer about the rules, which is true of the catalogue and beside the point of what was asked.</p>
+<p>No change to the index format, the chunker, the embedding model, the prompt, or the grounding rules.</p>
+<h1 id="s11-testing-and-verification">11. Testing and verification</h1>
+<p><strong>289 automated tests pass.</strong> 55 of them are new, in <code>backend/tests/test_community_scope.py</code>, and they use the real index and the real embedding model. Nothing in that file calls a language model, so the retrieval and scoping behaviour is asserted without a network round trip.</p>
+<pre><code>cd backend
+.venv/bin/python -m pytest -q --ignore=tests/legacy_shop</code></pre>
+<p>What the new tests assert:</p>
+<ul><li>Every phrasing of a community name resolves, singular or plural, with or</li></ul>
+<p>without &quot;community&quot; and &quot;point&quot;</p>
+<ul><li>&quot;lake&quot; on its own resolves to nobody, so Serenity&#x27;s own rules about the lakes</li></ul>
+<p>are not read as a question about Lauderdale Lakes</p>
+<ul><li>A community with no documents is never searched, and the shared core returns</li></ul>
+<p>the refusal itself rather than nothing</p>
+<ul><li>Naming Lauderdale returns only Lauderdale, naming Serenity returns only</li></ul>
+<p>Serenity, naming nobody stays at home, naming both searches both</p>
+<ul><li>Both quiet hours rules are still retrieved together, so the contradiction can</li></ul>
+<p>still be reported</p>
+<ul><li>Eleven community questions reach the documents, ten service requests do not</li><li>The documents named on a miss are the ones actually indexed</li></ul>
+<p>The 21 failures in <code>tests/legacy_shop/</code> are pre-existing and unrelated. They fail on <code>no such table: items</code>, a schema from the grocery application this codebase was forked from.</p>
+<p><strong>Checked live, on the deployed server</strong>, through both front doors and through a real browser:</p>
+<div class="tw"><table>
+<thead><tr><th>Asked</th><th>Answered</th></tr></thead>
+<tbody>
+<tr><td>Lauderdale Lake community rules</td><td>From the Lauderdale documents, naming the handbook it holds</td></tr>
+<tr><td>Lauderdale Lakes quiet hours</td><td>Lauderdale only, honest miss: the handbook states no hours</td></tr>
+<tr><td>Serenity parking rules</td><td>Serenity only, quotes the parking rule</td></tr>
+<tr><td>What are the quiet hours?</td><td>Both rules, reported as a disagreement</td></tr>
+<tr><td>What are the rules in Three Lakes?</td><td>I do not have the Three Lakes documents</td></tr>
+<tr><td>Three Lakes community rules</td><td>The same</td></tr>
+<tr><td>I need someone to cut my grass</td><td>Garden maintenance, from $55.00</td></tr>
+<tr><td>book a plumber</td><td>The booking flow</td></tr>
+<tr><td>I need a boiler repair</td><td>Eight services</td></tr>
+<tr><td>my sink is leaking</td><td>Five services</td></tr>
+</tbody></table></div>
+<figure><img src="img/s01_threelakes.png" width="1500" height="761" alt="The refusal in the booking chat" loading="lazy"></figure>
+<figure><img src="img/s02_booking.png" width="1500" height="761" alt="Service booking, unaffected" loading="lazy"></figure>
+<h1 id="s12-known-limits">12. Known limits</h1>
+<ul><li><strong>Three Lakes needs OCR</strong>, and a careful read of the result before it is</li></ul>
+<p>trusted. Section 7.</p>
+<ul><li><strong>The registry is hand maintained.</strong> Section 9. Indexing a document without</li></ul>
+<p>declaring its community name brings back the silent wrong answer.</p>
+<ul><li><strong>Lauderdale Lakes has no quiet hours</strong> in its handbook, so that question</li></ul>
+<p>refuses honestly. It reads like a fault and is not one.</p>
+<ul><li><strong>The contradictions need a decision</strong> from the association about which</li></ul>
+<p>document is authoritative. Section 8.</p>
+<ul><li><strong>A restart is required</strong> after a new index is deployed. It is loaded once, on</li></ul>
+<p>first use.</p>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1420px;padding:26px 30px;background:#fff;
+ font-family:"DejaVu Sans","Liberation Sans",system-ui,sans-serif;color:#14213a}
+.head{display:flex;align-items:baseline;gap:13px;margin-bottom:6px}
+.badge{font-size:12px;font-weight:700;letter-spacing:1px;color:#fff;
+ background:#c2451b;border-radius:5px;padding:4px 11px;white-space:nowrap}
+h1{font-size:23px;font-weight:700;letter-spacing:-.2px}
+.sub{font-size:14.5px;color:#5b6b86;margin-bottom:18px;line-height:1.5}
+svg{display:block;width:100%;height:auto}
+.note{margin-top:14px;font-size:14.5px;line-height:1.55;border-left:3px solid #c2451b;
+ padding:9px 0 9px 15px;background:#fdf6f2}
+.sys{fill:#eef3fd;stroke:#2258d4;stroke-width:1.8}
+.out{fill:#fff;stroke:#8494ab;stroke-width:1.8}
+.ok{fill:#eaf6ef;stroke:#2f6b4c;stroke-width:1.8}
+.warn{fill:#fdf1ec;stroke:#c2451b;stroke-width:1.8;stroke-dasharray:7 5}
+.you{fill:#fffaf0;stroke:#b1791a;stroke-width:1.8}
+.t{fill:#14213a;font:600 15px "DejaVu Sans",sans-serif;text-anchor:middle}
+.s{fill:#5b6b86;font:13px "DejaVu Sans",sans-serif;text-anchor:middle}
+.n{fill:#fff;font:700 15px "DejaVu Sans",sans-serif;text-anchor:middle}
+.lb{fill:#5b6b86;font:600 12.5px "DejaVu Sans",sans-serif;text-anchor:middle}
+.li{fill:#14213a;font:14.5px "DejaVu Sans",sans-serif;text-anchor:start}
+.hd{fill:#fff;font:700 15px "DejaVu Sans",sans-serif;text-anchor:start}
+</style>
+<div class="head"><span class="badge">Architecture</span><h1>Two ways in, one place that answers</h1></div>
+<p class="sub">The panel asks the documents directly. The booking chat asks them only when the message looks like a question about the rules.</p>
+<svg viewBox="0 0 1360 400"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5b6b86"/></marker></defs><rect x="60" y="40" width="300" height="96" rx="10" class="you"/><text class="t" x="210.0" y="84.0">Floating panel</text><text class="s" x="210.0" y="104.0">every page, bottom right</text><rect x="60" y="210" width="300" height="96" rx="10" class="you"/><text class="t" x="210.0" y="254.0">Booking chat</text><text class="s" x="210.0" y="274.0">text and voice</text><rect x="450" y="40" width="300" height="96" rx="10" class="sys"/><text class="t" x="600.0" y="84.0">POST /docs/ask</text><text class="s" x="600.0" y="104.0">no catalogue in front</text><rect x="450" y="210" width="300" height="96" rx="10" class="sys"/><text class="t" x="600.0" y="254.0">POST /chat</text><text class="s" x="600.0" y="274.0">booking pipeline first</text><line x1="360" y1="88" x2="442" y2="88" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><line x1="360" y1="258" x2="442" y2="258" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><rect x="450" y="330" width="300" height="52" rx="10" class="warn"/><text class="t" x="600" y="362">intent = search, and the gate</text><line x1="600" y1="306" x2="600" y2="326" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><rect x="860" y="118" width="320" height="110" rx="10" class="ok"/><text class="t" x="1020.0" y="169.0">answer_from_documents()</text><text class="s" x="1020.0" y="189.0">retrieve, ground, or refuse</text><line x1="750" y1="88" x2="852" y2="130" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="800" y="76">always</text><line x1="750" y1="356" x2="852" y2="222" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="830" y="300">only if the gate says so</text><rect x="1240" y="118" width="90" height="110" rx="10" class="sys"/><text class="t" x="1285.0" y="178.0">index</text><line x1="1180" y1="173" x2="1234" y2="173" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="1020" y="262">189 chunks, one matrix multiply</text></svg>
+<p class="note"><b>One core on purpose.</b> The same question gets the same answer whichever way a resident asks it, and a wrong answer has one place to be fixed.</p>

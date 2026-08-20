@@ -45,6 +45,55 @@ NO_ANSWER = (
     "For anything else, L&C Royal Management can help on (305) 228-7326."
 )
 
+
+def _no_documents(missing: list) -> str:
+    """We know the place, we do not have its paperwork.
+
+    Said instead of an answer, never alongside one. A resident asking about
+    Three Lakes used to be handed the Serenity rules, because "Lake" sits close
+    to "lakes" in the embedding space and nothing downstream knew the difference
+    mattered. It matters more than a refusal does: rules about somebody's home,
+    delivered confidently, out of a document that does not govern them.
+    """
+    names = " and ".join(c.label for c in missing)
+    return (
+        f"I do not have the {names} documents, so I cannot answer from them, "
+        "and I will not answer from another community's rules instead. "
+        "I hold the Serenity Point documents: the Rules and Regulations, the "
+        "application package, amenities fees, the ARB form and the temporary "
+        f"parking pass.\n\nFor {names} you would need that association directly."
+    )
+
+
+def not_in_documents(question: str) -> str:
+    """The ordinary refusal, naming whichever documents were actually searched.
+
+    "I could not find that in the community documents" is misleading when the
+    question named Lauderdale Lakes and the Lauderdale handbook is what got
+    searched, because the resident cannot tell whether we looked in the right
+    book. Naming it tells them where the edge is.
+    """
+    scoped = [c for c in docs_index.named_communities(question)
+              if c.key != docs_index.HOME_COMMUNITY]
+    if not scoped:
+        return NO_ANSWER
+
+    names = " and ".join(c.label for c in scoped)
+    titles = [t for c in scoped for t in docs_index.documents_for(c.key)]
+    held = f" What I hold for {names} is the {_join(titles)}." if titles else ""
+    return (
+        f"I could not find that in the {names} documents, so I would rather say "
+        f"so than guess.{held} Ask me about a particular thing, parking, bins, "
+        "grass, animals or fines, and I will look it up."
+    )
+
+
+def _join(items: list[str]) -> str:
+    if len(items) == 1:
+        return items[0]
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
 # ── the things people say that are not questions about the documents ─────────
 #
 # Handled here rather than by the model, and before retrieval. A greeting is not
@@ -189,6 +238,14 @@ def answer_from_documents(question: str) -> "str | None":
     if _small_talk(question) is not None:
         return None
 
+    # A community we have no documents for is answered, not passed over. The
+    # caller's fallback is a catalogue search, and letting "what are the rules
+    # in Three Lakes" fall through to that would show somebody a plumber and
+    # leave the question hanging. Say plainly that we do not hold them.
+    missing = docs_index.unavailable(question)
+    if missing:
+        return _no_documents(missing)
+
     hits = docs_index.search(question, k=4)
     if not hits:
         return None
@@ -232,11 +289,17 @@ def ask(payload: AskIn) -> AskOut:
     if chat is not None:
         return AskOut(answer=chat, grounded=False, kind="chat")
 
+    missing = docs_index.unavailable(question)
+    if missing:
+        logger.info("[DOCS] %r names %s, which we hold nothing for",
+                    question[:60], ", ".join(c.label for c in missing))
+        return AskOut(answer=_no_documents(missing), grounded=False, kind="no_answer")
+
     hits = docs_index.search(question, k=4)
     if not hits:
         # No model call at all. Fastest possible path, and the one case where
         # inventing an answer would matter most.
-        return AskOut(answer=NO_ANSWER, grounded=False, kind="no_answer")
+        return AskOut(answer=not_in_documents(question), grounded=False, kind="no_answer")
 
     reply = gemini_service.generate(
         SYSTEM,
@@ -257,7 +320,7 @@ def ask(payload: AskIn) -> AskOut:
 
     reply = _tidy(reply.strip())
     if "NO_ANSWER" in reply.upper() or len(reply) < 2:
-        return AskOut(answer=NO_ANSWER, grounded=False, kind="no_answer")
+        return AskOut(answer=not_in_documents(question), grounded=False, kind="no_answer")
 
     return AskOut(answer=reply, grounded=True, kind="answer", sources=_credits(hits))
 

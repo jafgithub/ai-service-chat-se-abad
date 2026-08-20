@@ -39,6 +39,24 @@ STYLE = """
   --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+h1, h2 { scroll-margin-top: 22px; }
+.toc {
+  margin: 30px 0 8px; padding: 20px 22px 14px;
+  background: var(--sunk); border: 1px solid var(--line); border-radius: 12px;
+}
+.toc .toch {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--faint);
+}
+.toc a {
+  display: block; text-decoration: none; color: var(--ink);
+  padding: 4px 0; font-size: 15.5px; line-height: 1.45;
+  border-bottom: 1px solid transparent;
+}
+.toc a:hover { color: var(--accent); }
+.toc a.t2 { padding-left: 20px; font-size: 14.5px; color: var(--muted); }
+
 body {
   margin: 0 auto; max-width: 820px; padding: 64px 28px 120px;
   background: var(--bg); color: var(--ink);
@@ -123,6 +141,16 @@ tbody tr:last-child td { border-bottom: none; }
 """
 
 
+def slug(text: str) -> str:
+    """A heading's anchor: "3. Retrieval and scoping" -> "s3-retrieval-and-scoping".
+
+    Built from the text rather than a counter, so an anchor someone has
+    bookmarked survives a section being inserted above it.
+    """
+    out = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return "s" + out
+
+
 def inline(text: str) -> str:
     out = html.escape(text)
     out = re.sub(r"`([^`]+)`", r"<code>\1</code>", out)
@@ -130,9 +158,11 @@ def inline(text: str) -> str:
     return out
 
 
-def render(md: str, images: dict[str, str]) -> str:
+def render(md: str, images: dict[str, tuple[str, int, int]]) -> tuple[str, list[tuple[int, str, str]]]:
+    """The document body, and the headings to build a table of contents from."""
     lines = md.splitlines()
     out: list[str] = []
+    toc: list[tuple[int, str, str]] = []
     i = 0
     while i < len(lines):
         line = lines[i].rstrip()
@@ -169,10 +199,16 @@ def render(md: str, images: dict[str, str]) -> str:
 
         image = re.match(r"!\[(.*?)\]\((.+?)\)", stripped)
         if image:
-            src = images.get(Path(image.group(2)).name)
-            if src:
+            found = images.get(Path(image.group(2)).name)
+            if found:
+                # Width and height are written out so the browser reserves the
+                # space before the file arrives. Without them a jump from the
+                # contents lands correctly and is then pushed down the page as
+                # each lazy image below it loads.
+                src, w, h = found
                 alt = html.escape(image.group(1))
-                out.append(f'<figure><img src="{src}" alt="{alt}" loading="lazy"></figure>')
+                out.append(f'<figure><img src="{src}" width="{w}" height="{h}" '
+                           f'alt="{alt}" loading="lazy"></figure>')
             i += 1
             continue
 
@@ -202,7 +238,10 @@ def render(md: str, images: dict[str, str]) -> str:
         heading = re.match(r"(#{1,3})\s+(.*)", stripped)
         if heading:
             level = min(len(heading.group(1)), 2)
-            out.append(f"<h{level}>{inline(heading.group(2))}</h{level}>")
+            text = heading.group(2)
+            anchor = slug(text)
+            toc.append((level, anchor, text))
+            out.append(f'<h{level} id="{anchor}">{inline(text)}</h{level}>')
             i += 1
             continue
 
@@ -229,7 +268,22 @@ def render(md: str, images: dict[str, str]) -> str:
             i += 1
         out.append(f"<p>{inline(' '.join(block))}</p>")
 
-    return "\n".join(out)
+    return "\n".join(out), toc
+
+
+def contents(toc: list[tuple[int, str, str]]) -> str:
+    """The clickable table of contents.
+
+    Both levels are listed. A reference document is read by jumping into it, and
+    a top level list of nine entries does not tell somebody looking for the
+    community registry which of the nine holds it.
+    """
+    rows = []
+    for level, anchor, text in toc:
+        cls = "t1" if level == 1 else "t2"
+        rows.append(f'<a class="{cls}" href="#{anchor}">{inline(text)}</a>')
+    return ('<nav class="toc" aria-label="Contents">'
+            '<p class="toch">Contents</p>' + "".join(rows) + "</nav>")
 
 
 def main() -> None:
@@ -239,7 +293,7 @@ def main() -> None:
         shutil.rmtree(web)
     img_dir.mkdir(parents=True)
 
-    images: dict[str, str] = {}
+    images: dict[str, tuple[str, int, int]] = {}
     total = 0
     for src in sorted((HERE / "build").glob("*.png")):
         image = Image.open(src).convert("RGB")
@@ -252,13 +306,14 @@ def main() -> None:
         image = image.quantize(colors=256, method=Image.MEDIANCUT)
         dest = img_dir / src.name
         image.save(dest, optimize=True)
-        images[src.name] = f"img/{src.name}"
+        images[src.name] = (f"img/{src.name}", image.width, image.height)
         total += dest.stat().st_size
     print(f"{len(images)} images, {total / 1024:.0f} KB after downscaling")
 
     md = SOURCE.read_text()
-    body = render(md, images)
+    body, toc = render(md, images)
 
+    toc_html = contents(toc)
     page = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -275,6 +330,7 @@ def main() -> None:
   <p class="sub">How the booking platform was built from the shop, what changed between them, and the procedure for standing either one up on a new machine.</p>
   <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 14 August 2026 &nbsp;&middot;&nbsp; every command run against the live server</p>
 </div>
+{toc_html}
 {body}
 </body>
 </html>

@@ -57,6 +57,8 @@ applies.
 - Check the document opens and the text can be read
 - Confirm it is Serenity Point's, and not another community's
 - Cut it into sections, one rule or one heading at a time
+- Register the community's name, so questions about it are recognised as being
+  about it. Section 9 explains why this one matters
 - Rebuild the index, which is a single command
 - Test it with real questions before it goes live
 - Tell you what it can now answer, and anything we noticed
@@ -123,7 +125,14 @@ Two ways forward, whichever is easier for you:
   and handwriting
 
 Until then the assistant will say it does not have that information, rather than
-guessing at it.
+guessing at it. Ask it about Three Lakes today and it answers:
+
+> I do not have the Three Lakes documents, so I cannot answer from them, and I
+> will not answer from another community's rules instead.
+
+That is deliberate, and it is checked by a test. Three Lakes is registered by
+name even though we hold nothing for it, precisely so that a question about it
+is refused rather than answered out of the Serenity rules.
 
 ---
 
@@ -135,3 +144,24 @@ be wrong. The assistant will only use it if a question names Lauderdale Lakes.
 
 If you send documents for another community you manage, tell us which community
 they belong to and we will keep them separate in the same way.
+
+**Why we ask every time.** The assistant keeps a list of the community names it
+recognises, and that list is maintained by hand. Loading a document without
+adding its community to that list is the one mistake that brings back the
+problem this design exists to prevent: the name is not recognised as a name, so
+the question is treated as an ordinary one and answered from the Serenity
+documents. Which is why we register the name first and load the document
+second, and why Three Lakes is on the list already even though we cannot read
+its file yet.
+
+So: one line per community, alongside the documents. Not optional, and it is
+the step that is easy to forget.
+
+---
+
+# 10. The technical version of this document
+
+For whoever works on the software: how questions are routed, how a community is
+recognised, how retrieval is scoped, and the exact procedure for adding one.
+
+https://serviceagent.fordev.fun/docs/community-rag/

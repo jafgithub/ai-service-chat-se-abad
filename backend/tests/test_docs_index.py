@@ -213,14 +213,21 @@ def test_another_communitys_rules_are_indexed_but_not_searched_by_default():
         assert hit["community"] == "serenity", hit["section"]
 
 
-def test_naming_the_other_community_opens_it_up():
+def test_naming_the_other_community_scopes_the_search_to_it():
+    """Naming a place now scopes to that place rather than adding it to home.
+
+    Both together was the old behaviour and it cost the home answer: the
+    Lauderdale handbook is ninety three chunks against Serenity's ninety six, so
+    naming Lauderdale was enough for its ordinances to fill the top four.
+    """
     hits = docs_index.search("What does the Lauderdale Lakes code say about grass?")
-    assert any(h["community"] == "lauderdale lakes" for h in hits)
+    assert hits
+    assert {h["community"] for h in hits} == {"lauderdale lakes"}
 
 
 # ── routing between the booking chat and the documents ───────────────────────
 
-from app.services.conversation import _is_policy_question  # noqa: E402
+from app.services.conversation import _wants_documents  # noqa: E402
 
 
 @pytest.mark.parametrize("message", [
@@ -229,7 +236,7 @@ from app.services.conversation import _is_policy_question  # noqa: E402
     "Do I need ARB approval to paint my door?", "How many days is a parking pass?",
 ])
 def test_a_rules_question_routes_to_the_documents(message):
-    assert _is_policy_question(message), message
+    assert _wants_documents(message), message
 
 
 @pytest.mark.parametrize("message", [
@@ -241,4 +248,4 @@ def test_a_booking_request_never_routes_to_the_documents(message):
     """The overlap this exists for. "Someone to cut my grass" reaches the lawn
     rule at 0.470, higher than several genuine policy questions score, so the
     score cannot make this call on its own."""
-    assert not _is_policy_question(message), message
+    assert not _wants_documents(message), message

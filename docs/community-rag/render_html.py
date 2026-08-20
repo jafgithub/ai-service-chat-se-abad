@@ -1,8 +1,8 @@
-"""Build the web version of the walkthrough.
+"""Build the web version of the community documents technical reference.
 
-Same content as the Word file, from the same source.md, so the two cannot drift.
-Screenshots are downscaled on the way out: they are captured at 2x for print and
-that is more than a browser needs.
+One source, `source.md`, and one output. Headings are numbered in the source and
+the table of contents is generated from them here rather than written by hand,
+so a section cannot be renamed in one place and left stale in the other.
 
     python3 render_html.py          # -> build/web/index.html + build/web/img/
 
@@ -320,15 +320,15 @@ def main() -> None:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Service Agent: spin-off and plumbing handover</title>
+<title>Community documents: how the assistant answers</title>
 <style>{STYLE}</style>
 </head>
 <body>
 <div class="masthead">
-  <p class="eyebrow">Handover document</p>
-  <p class="title">Service Agent: application spin-off and plumbing handover</p>
-  <p class="sub">How the booking platform was built from the shop, what changed between them, and the procedure for standing either one up on a new machine.</p>
-  <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 14 August 2026 &nbsp;&middot;&nbsp; every command run against the live server</p>
+  <p class="eyebrow">Technical reference</p>
+  <p class="title">Community documents: how the assistant answers, and from whose rules</p>
+  <p class="sub">The document assistant end to end: how a question is routed, how a community is recognised, why one community can never be answered from another's documents, and what to do when a new association sends its paperwork.</p>
+  <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 20 August 2026 &nbsp;&middot;&nbsp; every behaviour checked against the live server</p>
 </div>
 {toc_html}
 {body}

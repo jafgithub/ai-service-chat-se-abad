@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1420px;padding:26px 30px;background:#fff;
+ font-family:"DejaVu Sans","Liberation Sans",system-ui,sans-serif;color:#14213a}
+.head{display:flex;align-items:baseline;gap:13px;margin-bottom:6px}
+.badge{font-size:12px;font-weight:700;letter-spacing:1px;color:#fff;
+ background:#c2451b;border-radius:5px;padding:4px 11px;white-space:nowrap}
+h1{font-size:23px;font-weight:700;letter-spacing:-.2px}
+.sub{font-size:14.5px;color:#5b6b86;margin-bottom:18px;line-height:1.5}
+svg{display:block;width:100%;height:auto}
+.note{margin-top:14px;font-size:14.5px;line-height:1.55;border-left:3px solid #c2451b;
+ padding:9px 0 9px 15px;background:#fdf6f2}
+.sys{fill:#eef3fd;stroke:#2258d4;stroke-width:1.8}
+.out{fill:#fff;stroke:#8494ab;stroke-width:1.8}
+.ok{fill:#eaf6ef;stroke:#2f6b4c;stroke-width:1.8}
+.warn{fill:#fdf1ec;stroke:#c2451b;stroke-width:1.8;stroke-dasharray:7 5}
+.you{fill:#fffaf0;stroke:#b1791a;stroke-width:1.8}
+.t{fill:#14213a;font:600 15px "DejaVu Sans",sans-serif;text-anchor:middle}
+.s{fill:#5b6b86;font:13px "DejaVu Sans",sans-serif;text-anchor:middle}
+.n{fill:#fff;font:700 15px "DejaVu Sans",sans-serif;text-anchor:middle}
+.lb{fill:#5b6b86;font:600 12.5px "DejaVu Sans",sans-serif;text-anchor:middle}
+.li{fill:#14213a;font:14.5px "DejaVu Sans",sans-serif;text-anchor:start}
+.hd{fill:#fff;font:700 15px "DejaVu Sans",sans-serif;text-anchor:start}
+</style>
+<div class="head"><span class="badge">Routing</span><h1>Which question reaches the documents</h1></div>
+<p class="sub">Booking wins outright. Past that, either a question shape or the documents' own vocabulary is enough.</p>
+<svg viewBox="0 0 1360 430"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5b6b86"/></marker></defs><rect x="40" y="30" width="260" height="80" rx="10" class="you"/><text class="t" x="170.0" y="66.0">Message arrives</text><text class="s" x="170.0" y="86.0">intent = search</text><rect x="370" y="20" width="270" height="100" rx="12" class="warn"/><text class="t" x="505" y="58">Booking words?</text><text class="s" x="505" y="82">book, hire, I need a,</text><text class="s" x="505" y="100">my X is leaking</text><line x1="300" y1="70" x2="362" y2="70" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><rect x="710" y="20" width="300" height="100" rx="10" class="ok"/><text class="t" x="860.0" y="66.0">Service catalogue</text><text class="s" x="860.0" y="86.0">never asks the documents</text><line x1="640" y1="70" x2="702" y2="70" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="671" y="58">yes</text><rect x="370" y="165" width="270" height="100" rx="12" class="warn"/><text class="t" x="505" y="203">Question shape, or</text><text class="t" x="505" y="225">rules vocabulary?</text><text class="s" x="505" y="248">what, can I ... rules, pets, lease</text><line x1="505" y1="120" x2="505" y2="159" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="528" y="145">no</text><rect x="710" y="300" width="300" height="90" rx="10" class="ok"/><text class="t" x="860.0" y="341.0">Service catalogue</text><text class="s" x="860.0" y="361.0">with a documents fallback</text><line x1="505" y1="265" x2="700" y2="340" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="590" y="300">no</text><rect x="710" y="165" width="300" height="100" rx="10" class="sys"/><text class="t" x="860.0" y="211.0">Ask the documents</text><text class="s" x="860.0" y="231.0">retrieve, then ground</text><line x1="640" y1="215" x2="702" y2="215" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="671" y="203">yes</text><rect x="1070" y="100" width="260" height="84" rx="10" class="ok"/><text class="t" x="1200.0" y="138.0">Answer</text><text class="s" x="1200.0" y="158.0">with the rule it came from</text><rect x="1070" y="220" width="260" height="84" rx="10" class="warn"/><text class="t" x="1200.0" y="258.0">Named a community?</text><text class="s" x="1200.0" y="278.0">then say it is a miss</text><line x1="1010" y1="200" x2="1062" y2="150" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="1040" y="130">grounded</text><line x1="1010" y1="232" x2="1062" y2="250" stroke="#5b6b86" stroke-width="1.8" marker-end="url(#a)"/><text class="lb" x="1040" y="232">nothing</text></svg>
+<p class="note"><b>The middle box is what was missing.</b> “Lauderdale Lake community rules” opens with no question word, so it was a service search, and one weak catalogue match hid the documents entirely.</p>

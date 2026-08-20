@@ -41,6 +41,14 @@ Four parts, one machine.
 The two application folders are in different places. Worth knowing before going
 looking for one.
 
+**The community documents.** The plumbing application also answers questions
+from the association's own PDFs, in the floating panel and in the booking chat.
+That index is built offline and shipped as JSON inside the application folder,
+so it needs nothing on the machine and no build step here. How it is routed,
+scoped and rebuilt, and the one hand maintained list that has to be updated when
+a new community is added, are in its own reference:
+https://serviceagent.fordev.fun/docs/community-rag/
+
 ---
 
 # 3. SOP: Spinning Off a New Application

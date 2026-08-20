@@ -23,6 +23,24 @@
   --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+h1, h2 { scroll-margin-top: 22px; }
+.toc {
+  margin: 30px 0 8px; padding: 20px 22px 14px;
+  background: var(--sunk); border: 1px solid var(--line); border-radius: 12px;
+}
+.toc .toch {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--faint);
+}
+.toc a {
+  display: block; text-decoration: none; color: var(--ink);
+  padding: 4px 0; font-size: 15.5px; line-height: 1.45;
+  border-bottom: 1px solid transparent;
+}
+.toc a:hover { color: var(--accent); }
+.toc a.t2 { padding-left: 20px; font-size: 14.5px; color: var(--muted); }
+
 body {
   margin: 0 auto; max-width: 820px; padding: 64px 28px 120px;
   background: var(--bg); color: var(--ink);
@@ -113,14 +131,15 @@ tbody tr:last-child td { border-bottom: none; }
   <p class="sub">How the booking platform was built from the shop, what changed between them, and the procedure for standing either one up on a new machine.</p>
   <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 14 August 2026 &nbsp;&middot;&nbsp; every command run against the live server</p>
 </div>
-<h1>1. Purpose</h1>
+<nav class="toc" aria-label="Contents"><p class="toch">Contents</p><a class="t1" href="#s1-purpose">1. Purpose</a><a class="t1" href="#s2-architecture-overview">2. Architecture Overview</a><a class="t1" href="#s3-sop-spinning-off-a-new-application">3. SOP: Spinning Off a New Application</a><a class="t1" href="#s3-1-route-a-from-a-snapshot-of-service-assistant">3.1 Route A: from a snapshot of Service Assistant</a><a class="t2" href="#sstage-1-take-the-snapshot">Stage 1: Take the snapshot</a><a class="t2" href="#sstage-2-launch-the-new-machine">Stage 2: Launch the new machine</a><a class="t2" href="#sstage-3-give-it-its-own-address">Stage 3: Give it its own address</a><a class="t2" href="#sstage-4-change-the-five-things">Stage 4: Change the five things</a><a class="t2" href="#sstage-5-clear-out-what-came-along">Stage 5: Clear out what came along</a><a class="t2" href="#sstage-6-the-same-four-checks">Stage 6: The same four checks</a><a class="t2" href="#sone-thing-route-a-does-not-fix">One thing route A does not fix</a><a class="t1" href="#s3-2-route-b-from-an-empty-machine">3.2 Route B: from an empty machine</a><a class="t2" href="#sstage-1-prepare">Stage 1: Prepare</a><a class="t2" href="#sstage-2-install">Stage 2: Install</a><a class="t2" href="#sstage-3-data">Stage 3: Data</a><a class="t2" href="#sstage-4-application">Stage 4: Application</a><a class="t2" href="#sstage-5-publish">Stage 5: Publish</a><a class="t2" href="#sstage-6-check">Stage 6: Check</a><a class="t1" href="#s4-product-application">4. Product Application</a><a class="t1" href="#s5-plumbing-application">5. Plumbing Application</a><a class="t1" href="#s6-product-to-plumbing-conversion">6. Product to Plumbing Conversion</a><a class="t1" href="#s7-deployment-rebuild-procedure">7. Deployment &amp; Rebuild Procedure</a><a class="t2" href="#sthe-application">The application</a><a class="t2" href="#sthe-website">The website</a><a class="t2" href="#stwo-things-a-deploy-never-touches">Two things a deploy never touches</a><a class="t2" href="#sdocuments">Documents</a><a class="t1" href="#s8-verification-smoke-tests">8. Verification / Smoke Tests</a><a class="t1" href="#s9-everyday-operations">9. Everyday Operations</a><a class="t1" href="#s10-known-issues-security-notes">10. Known Issues &amp; Security Notes</a><a class="t2" href="#s10-1-the-database-is-open-to-the-internet">10.1 The database is open to the internet</a><a class="t2" href="#s10-2-the-application-is-at-its-memory-ceiling">10.2 The application is at its memory ceiling</a><a class="t2" href="#salso-outstanding">Also outstanding</a><a class="t1" href="#s11-rollback-recovery">11. Rollback / Recovery</a><a class="t1" href="#s12-appendix">12. Appendix</a></nav>
+<h1 id="s1-purpose">1. Purpose</h1>
 <p>Two applications share one codebase. The <strong>Product Application</strong> is a grocery shop. The <strong>Plumbing Application</strong>, Service Agent, is a booking platform. The second was built from the first.</p>
 <p>This document shows how to run either one, and how to build a third the same way. Every command was run against the live servers.</p>
 <p>Wherever a command appears, the line under it says what you should see when it worked. If you see something else, that is where to stop and look.</p>
 <p><strong>Product:</strong> https://dev.agent.fordev.fun <strong>Plumbing:</strong> https://serviceagent.fordev.fun</p>
 <hr>
-<h1>2. Architecture Overview</h1>
-<figure><img src="img/d01_architecture.png" alt="One machine, four parts" loading="lazy"></figure>
+<h1 id="s2-architecture-overview">2. Architecture Overview</h1>
+<figure><img src="img/d01_architecture.png" width="1500" height="646" alt="One machine, four parts" loading="lazy"></figure>
 <p>Four parts, one machine.</p>
 <div class="tw"><table>
 <thead><tr><th>Part</th><th>Its job</th></tr></thead>
@@ -142,21 +161,22 @@ tbody tr:last-child td { border-bottom: none; }
 <tr><td>Database</td><td><code>aidata2prd_dev</code></td><td><code>plumber_assistant</code></td></tr>
 </tbody></table></div>
 <p>The two application folders are in different places. Worth knowing before going looking for one.</p>
+<p><strong>The community documents.</strong> The plumbing application also answers questions from the association&#x27;s own PDFs, in the floating panel and in the booking chat. That index is built offline and shipped as JSON inside the application folder, so it needs nothing on the machine and no build step here. How it is routed, scoped and rebuilt, and the one hand maintained list that has to be updated when a new community is added, are in its own reference: https://serviceagent.fordev.fun/docs/community-rag/</p>
 <hr>
-<h1>3. SOP: Spinning Off a New Application</h1>
-<figure><img src="img/d05_routes.png" alt="Two ways to get a new machine" loading="lazy"></figure>
+<h1 id="s3-sop-spinning-off-a-new-application">3. SOP: Spinning Off a New Application</h1>
+<figure><img src="img/d05_routes.png" width="1500" height="636" alt="Two ways to get a new machine" loading="lazy"></figure>
 <p><strong>Route A</strong> copies the machine we already run. <strong>Route B</strong> builds one from nothing. Route A is the normal way and the rest of this section assumes it. Route B is section 3.2, kept for the day there is no machine left to copy.</p>
 <hr>
-<h1>3.1 Route A: from a snapshot of Service Assistant</h1>
-<figure><img src="img/d06_snapshot.png" alt="Route A: the whole journey" loading="lazy"></figure>
+<h1 id="s3-1-route-a-from-a-snapshot-of-service-assistant">3.1 Route A: from a snapshot of Service Assistant</h1>
+<figure><img src="img/d06_snapshot.png" width="1500" height="480" alt="Route A: the whole journey" loading="lazy"></figure>
 <p>A snapshot is a photograph of a whole machine, disk and all, taken while it runs. Launch a new machine from one and it starts up already finished: nginx, MySQL, Python, ffmpeg, the code, the settings and the data are all there, and the application is already running.</p>
 <p>The work is not building anything. The work is changing the handful of things that still say <strong>serviceagent.fordev.fun</strong>.</p>
-<figure><img src="img/d07_carried.png" alt="What the copy brings with it" loading="lazy"></figure>
-<h2>Stage 1: Take the snapshot</h2>
+<figure><img src="img/d07_carried.png" width="1500" height="513" alt="What the copy brings with it" loading="lazy"></figure>
+<h2 id="sstage-1-take-the-snapshot">Stage 1: Take the snapshot</h2>
 <p>Lightsail console, the Service Assistant instance, the <strong>Snapshots</strong> tab, <strong>Create snapshot</strong>. Name it with the date.</p>
 <p>Nothing stops and nobody is logged out. It takes a few minutes because the disk is about 31 GB.</p>
 <p class="expect">You should see: the snapshot appear in the list, state <strong>Available</strong>. Until it says that, it cannot be launched from.</p>
-<h2>Stage 2: Launch the new machine</h2>
+<h2 id="sstage-2-launch-the-new-machine">Stage 2: Launch the new machine</h2>
 <p>On the snapshot, <strong>Create new instance</strong>.</p>
 <p>Choose a plan with <strong>at least as much disk as the original</strong>. Lightsail will not let you go smaller, and the same size or larger is the safe answer. The original is a 2 GB machine, so pick 2 GB or more.</p>
 <p>Then attach a <strong>static IP</strong>, or the address changes on restart and the subdomain stops working.</p>
@@ -165,11 +185,11 @@ tbody tr:last-child td { border-bottom: none; }
 <pre><code>ssh -i ~/Downloads/your-key.pem ubuntu@NEW.IP.ADDRESS
 systemctl is-active plumber nginx mysql</code></pre>
 <p>Three times <code>active</code>. The application is already up, on a machine you have done nothing to. That is the whole point of route A.</p>
-<h2>Stage 3: Give it its own address</h2>
+<h2 id="sstage-3-give-it-its-own-address">Stage 3: Give it its own address</h2>
 <p>In the DNS for <code>fordev.fun</code>, add an <strong>A record</strong>: name is the new subdomain, value is the new static IP.</p>
 <pre><code>dig +short newname.fordev.fun</code></pre>
 <p class="expect">You should see: the new IP. Nothing, or the old address, means it has not spread yet. Wait. Stage 4 will fail without this.</p>
-<h2>Stage 4: Change the five things</h2>
+<h2 id="sstage-4-change-the-five-things">Stage 4: Change the five things</h2>
 <p>Everything here is a copy of ours until you change it.</p>
 <p><strong>1. The name in the front door.</strong></p>
 <pre><code>sudo nano /etc/nginx/sites-available/serviceagent</code></pre>
@@ -195,7 +215,7 @@ sudo systemctl restart plumber</code></pre>
   TRUNCATE sessions; TRUNCATE customers;
   SET FOREIGN_KEY_CHECKS=1;&quot;</code></pre>
 <p>Take a backup first. <code>mysqldump -u aiorder -p plumber_assistant &gt; before.sql</code>. There is no undo.</p>
-<h2>Stage 5: Clear out what came along</h2>
+<h2 id="sstage-5-clear-out-what-came-along">Stage 5: Clear out what came along</h2>
 <p>The snapshot copied the whole disk, so it copied things that were only ever on our machine. None of it is running on yours. It is about 8 GB of room.</p>
 <pre><code>sudo rm -f /etc/nginx/sites-enabled/aiorder-dev
 sudo systemctl disable --now aiorder-render
@@ -205,18 +225,18 @@ sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
 <p>Also <strong>check who can log in</strong>. Our machine has four keys on it, and they all came with the copy:</p>
 <pre><code>nano ~/.ssh/authorized_keys</code></pre>
 <p>Leave your own line. Delete the rest.</p>
-<h2>Stage 6: The same four checks</h2>
+<h2 id="sstage-6-the-same-four-checks">Stage 6: The same four checks</h2>
 <pre><code>curl -s -o /dev/null -w &quot;home    %{http_code}\n&quot; https://newname.fordev.fun/
 curl -s -o /dev/null -w &quot;health  %{http_code}\n&quot; https://newname.fordev.fun/health
 curl -s https://newname.fordev.fun/api/v1/services | head -c 200</code></pre>
 <p>Two 200s and a list of services. Then the four pictures in section 3.2, stage 6, show what each check looks like when it is right.</p>
-<h2>One thing route A does not fix</h2>
+<h2 id="sone-thing-route-a-does-not-fix">One thing route A does not fix</h2>
 <p>The copy inherits both problems in section 10: the database open to the internet, and the 700 MB memory ceiling. Section 10.1 and 10.2 are worth doing on the new machine on day one, while nobody is using it yet.</p>
 <hr>
-<h1>3.2 Route B: from an empty machine</h1>
-<figure><img src="img/d02_journey.png" alt="Route B: building from an empty machine" loading="lazy"></figure>
+<h1 id="s3-2-route-b-from-an-empty-machine">3.2 Route B: from an empty machine</h1>
+<figure><img src="img/d02_journey.png" width="1500" height="480" alt="Route B: building from an empty machine" loading="lazy"></figure>
 <p>Only needed when there is no machine to copy. Six stages, in order. Allow about an hour.</p>
-<h2>Stage 1: Prepare</h2>
+<h2 id="sstage-1-prepare">Stage 1: Prepare</h2>
 <p><strong>Create the machine.</strong> Lightsail console, <strong>Create instance</strong>, Linux, <strong>Ubuntu 22.04 LTS</strong>, the 2 GB plan or larger. Then attach a <strong>static IP</strong>, or the address changes on restart and the subdomain stops working.</p>
 <p><strong>Let your key be used.</strong> A key file that anyone can read is refused by SSH.</p>
 <pre><code>chmod 600 ~/Downloads/your-key.pem
@@ -227,13 +247,13 @@ ssh -i ~/Downloads/your-key.pem ubuntu@NEW.IP.ADDRESS</code></pre>
 <p><strong>Point the subdomain.</strong> In the DNS for <code>fordev.fun</code>, add an <strong>A record</strong>: name is the subdomain, value is the new static IP.</p>
 <pre><code>dig +short yoursubdomain.fordev.fun</code></pre>
 <p class="expect">You should see: the new IP address. Nothing, or the old address, means it has not spread yet. Wait. Stage 5 will fail without this.</p>
-<h2>Stage 2: Install</h2>
+<h2 id="sstage-2-install">Stage 2: Install</h2>
 <pre><code>sudo apt update
 sudo apt install -y nginx mysql-server ffmpeg git curl
 curl -LsSf https://astral.sh/uv/install.sh | sh</code></pre>
 <p class="expect">You should see: a long list of packages, ending without the word <code>Error</code>.</p>
 <p><code>ffmpeg</code> is not optional. It converts the audio from voice bookings.</p>
-<h2>Stage 3: Data</h2>
+<h2 id="sstage-3-data">Stage 3: Data</h2>
 <p><strong>Make an empty database and a user for it.</strong></p>
 <pre><code>sudo mysql -e &quot;CREATE DATABASE plumber_assistant CHARACTER SET utf8mb4;&quot;
 sudo mysql -e &quot;CREATE USER &#x27;aiorder&#x27;@&#x27;localhost&#x27; IDENTIFIED BY &#x27;A_STRONG_PASSWORD&#x27;;&quot;
@@ -244,8 +264,8 @@ sudo mysql -e &quot;FLUSH PRIVILEGES;&quot;</code></pre>
 <pre><code>mysqldump -h 127.0.0.1 -u aiorder -p plumber_assistant &gt; plumber.sql</code></pre>
 <p>On the new one:</p>
 <pre><code>mysql -h 127.0.0.1 -u aiorder -p plumber_assistant &lt; plumber.sql</code></pre>
-<figure><img src="img/t01_tables.png" alt="The database has its tables" loading="lazy"></figure>
-<h2>Stage 4: Application</h2>
+<figure><img src="img/t01_tables.png" width="1500" height="801" alt="The database has its tables" loading="lazy"></figure>
+<h2 id="sstage-4-application">Stage 4: Application</h2>
 <p><strong>Bring the code.</strong></p>
 <pre><code>git clone git@github.com:jafgithub/ai-service-chat-se-abad.git ~/plumber</code></pre>
 <p>The code is not in that repository yet. Until it is, copy the folder off a running machine instead: <code>rsync -az ubuntu@52.25.174.57:/home/ubuntu/plumber/ ~/plumber/</code>. Route A avoids this question entirely.</p>
@@ -271,7 +291,7 @@ chmod 600 ~/plumber/backend/.env</code></pre>
 <p><strong>Apply the database changes.</strong></p>
 <pre><code>for m in migrations/00*.py; do .venv/bin/python &quot;$m&quot;; done</code></pre>
 <p class="expect">You should see: four short reports. Running this twice is safe, each one checks before it changes anything.</p>
-<h2>Stage 5: Publish</h2>
+<h2 id="sstage-5-publish">Stage 5: Publish</h2>
 <p><strong>Teach the machine to start the application.</strong></p>
 <pre><code>sudo nano /etc/systemd/system/plumber.service</code></pre>
 <pre><code>[Unit]
@@ -293,7 +313,7 @@ RestartSec=3
 WantedBy=multi-user.target</code></pre>
 <pre><code>sudo systemctl daemon-reload
 sudo systemctl enable --now plumber</code></pre>
-<figure><img src="img/t02_service.png" alt="The application is running" loading="lazy"></figure>
+<figure><img src="img/t02_service.png" width="1500" height="636" alt="The application is running" loading="lazy"></figure>
 <p><strong>Set up the front door.</strong></p>
 <pre><code>sudo nano /etc/nginx/sites-available/serviceagent</code></pre>
 <pre><code>server {
@@ -325,7 +345,7 @@ sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
 <pre><code>sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d yoursubdomain.fordev.fun --agree-tos -m you@example.com --redirect</code></pre>
 <p class="expect">You should see: &quot;Congratulations&quot;. Certbot edits the nginx file itself and sets up automatic renewal. If it fails, the subdomain is not pointing here yet: go back to stage 1.</p>
-<figure><img src="img/t03_certs.png" alt="The certificate is valid" loading="lazy"></figure>
+<figure><img src="img/t03_certs.png" width="1500" height="929" alt="The certificate is valid" loading="lazy"></figure>
 <p><strong>One certificate for every subdomain instead.</strong> Possible, but it cannot be checked through a web page, so you must add a DNS record by hand:</p>
 <pre><code>sudo certbot certonly --manual --preferred-challenges dns \
   -d &quot;*.fordev.fun&quot; -d fordev.fun --agree-tos -m you@example.com</code></pre>
@@ -339,21 +359,21 @@ rsync -az --delete out/ ubuntu@NEW.IP:/tmp/fe-stage/
 ssh ubuntu@NEW.IP &#x27;sudo rsync -a --delete /tmp/fe-stage/ /var/www/serviceagent/ \
   &amp;&amp; sudo chown -R www-data:www-data /var/www/serviceagent/&#x27;</code></pre>
 <p>Use <code>build:serviceagent</code>, not <code>build</code>. The plain build is made for the old address where the app sat inside a folder, and its pages look in the wrong place on a subdomain.</p>
-<h2>Stage 6: Check</h2>
+<h2 id="sstage-6-check">Stage 6: Check</h2>
 <pre><code>curl -s -o /dev/null -w &quot;home    %{http_code}\n&quot; https://yoursubdomain.fordev.fun/
 curl -s -o /dev/null -w &quot;health  %{http_code}\n&quot; https://yoursubdomain.fordev.fun/health
 curl -s https://yoursubdomain.fordev.fun/api/v1/services | head -c 200</code></pre>
-<figure><img src="img/t04_verify.png" alt="All three parts answer" loading="lazy"></figure>
+<figure><img src="img/t04_verify.png" width="1500" height="425" alt="All three parts answer" loading="lazy"></figure>
 <p>Two 200s and a list of services means the website, the application and the database are all talking to each other. You are done.</p>
-<figure><img src="img/s01_home.png" alt="The Plumbing Application, running" loading="lazy"></figure>
+<figure><img src="img/s01_home.png" width="1500" height="761" alt="The Plumbing Application, running" loading="lazy"></figure>
 <hr>
-<h1>4. Product Application</h1>
+<h1 id="s4-product-application">4. Product Application</h1>
 <p>A conversational grocery shop. A shopper types or speaks, the assistant searches 25,631 products, results fill a basket. When the catalogue has nothing, a paid search looks at other shops.</p>
 <p>Search never touches the database. The whole catalogue sits in memory, which is why a search answers in about 200 milliseconds.</p>
 <p><strong>Its own settings:</strong> the shopping group (<code>SERPAPI_KEY</code>, <code>SHOPPING_PROVIDER</code>, <code>STORE_COMPARISON_TTL_DAYS</code> and four more) and six <code>BROWSE_</code> settings for an in-app retailer browser that was built and then switched off.</p>
 <p><strong>Its database:</strong> 26 working tables. <code>items</code> for the catalogue, <code>orders</code> and <code>order_details</code> for trade, <code>external_offers</code> for what outside search found.</p>
 <hr>
-<h1>5. Plumbing Application</h1>
+<h1 id="s5-plumbing-application">5. Plumbing Application</h1>
 <p>Same shape, different transaction. A customer describes a problem, the assistant matches a service, shows who does it and what they charge, offers real times from each provider&#x27;s diary, and books one.</p>
 <p><strong>18 tables.</strong> Four migrations built the new ones:</p>
 <div class="tw"><table>
@@ -368,7 +388,7 @@ curl -s https://yoursubdomain.fordev.fun/api/v1/services | head -c 200</code></p
 <p><strong>Its own settings:</strong> seven <code>BOOKING_</code> (working day 8 to 17, no weekends, hourly slots, 3 hours notice, 14 days ahead, 10 minute hold), <code>PROVIDER_RANKING</code>, <code>SESSION_DAYS</code>, and the Calendly group.</p>
 <p><strong>How booking works.</strong> A slot is held for ten minutes while the customer confirms, so two people cannot take the same time. Payment is cash, card or PayPal, and only a signed webhook marks a booking paid.</p>
 <hr>
-<h1>6. Product to Plumbing Conversion</h1>
+<h1 id="s6-product-to-plumbing-conversion">6. Product to Plumbing Conversion</h1>
 <div class="tw"><table>
 <thead><tr><th></th><th>Backend</th><th>Frontend</th></tr></thead>
 <tbody>
@@ -383,33 +403,33 @@ curl -s https://yoursubdomain.fordev.fun/api/v1/services | head -c 200</code></p
 <p><strong>Removed:</strong> everything that assumed goods rather than time. Outside search, store comparison, the retailer browser, orders, and the whole shop interface.</p>
 <p>Routes went from 3 to 15.</p>
 <hr>
-<h1>7. Deployment &amp; Rebuild Procedure</h1>
-<figure><img src="img/d03_deploy.png" alt="What a deploy moves, and what it never touches" loading="lazy"></figure>
+<h1 id="s7-deployment-rebuild-procedure">7. Deployment &amp; Rebuild Procedure</h1>
+<figure><img src="img/d03_deploy.png" width="1500" height="611" alt="What a deploy moves, and what it never touches" loading="lazy"></figure>
 <p>There are two paths, and they are different because the website folder belongs to root while the application folder belongs to you.</p>
-<h2>The application</h2>
+<h2 id="sthe-application">The application</h2>
 <pre><code>rsync -az --delete backend/app/ ubuntu@HOST:/home/ubuntu/plumber/backend/app/
 ssh ubuntu@HOST &#x27;sudo systemctl restart plumber&#x27;</code></pre>
 <p class="expect">You should see: nothing from the first command, which means it worked. Then check with <code>systemctl status plumber</code>.</p>
-<h2>The website</h2>
+<h2 id="sthe-website">The website</h2>
 <p>Three moves, not one: build on your computer, put the files in a waiting room on the server, then move them in with <code>sudo</code>.</p>
 <pre><code>cd frontend &amp;&amp; npm run build:serviceagent
 rsync -az --delete out/ ubuntu@HOST:/tmp/fe-stage/
 ssh ubuntu@HOST &#x27;sudo rsync -a --delete /tmp/fe-stage/ /var/www/serviceagent/ \
   &amp;&amp; sudo chown -R www-data:www-data /var/www/serviceagent/&#x27;</code></pre>
 <p>The waiting room exists because you cannot write into <code>/var/www</code> directly. The <code>chown</code> at the end hands the files to the web server, or nginx cannot read what you just delivered.</p>
-<h2>Two things a deploy never touches</h2>
+<h2 id="stwo-things-a-deploy-never-touches">Two things a deploy never touches</h2>
 <p>The <strong>settings file</strong> and the <strong>database</strong>. That is deliberate, and it is what makes section 11 possible: because a deploy only ever replaces code, undoing one is always safe.</p>
-<h2>Documents</h2>
+<h2 id="sdocuments">Documents</h2>
 <p>These pages live in <code>/var/www/serviceagent-docs/</code>, deliberately <strong>outside</strong> the website folder. The website deploy above uses <code>--delete</code>, which empties whatever it is copying into. Documents kept inside it would be erased on the next deploy.</p>
 <hr>
-<h1>8. Verification / Smoke Tests</h1>
+<h1 id="s8-verification-smoke-tests">8. Verification / Smoke Tests</h1>
 <pre><code>systemctl is-active plumber
 curl -s -o /dev/null -w &quot;%{http_code}\n&quot; https://serviceagent.fordev.fun/health</code></pre>
 <p>Then five things by hand, because these are the paths that fail quietly:</p>
 <ol><li>Describe a problem in the chat. Services come back with prices.</li><li>Pick one. Real times appear.</li><li>Book it. The confirmation email arrives.</li><li>Sign in as a provider. The appointment is on the diary.</li><li>Speak a request. The reply is spoken back.</li></ol>
 <hr>
-<h1>9. Everyday Operations</h1>
-<figure><img src="img/d04_wrong.png" alt="Three things go wrong, and what each looks like" loading="lazy"></figure>
+<h1 id="s9-everyday-operations">9. Everyday Operations</h1>
+<figure><img src="img/d04_wrong.png" width="1500" height="567" alt="Three things go wrong, and what each looks like" loading="lazy"></figure>
 <div class="tw"><table>
 <thead><tr><th>Task</th><th>Command</th></tr></thead>
 <tbody>
@@ -424,22 +444,22 @@ curl -s -o /dev/null -w &quot;%{http_code}\n&quot; https://serviceagent.fordev.f
 </tbody></table></div>
 <p>Two more symptoms worth knowing: a <strong>certificate warning</strong> means the name in nginx and the name on the certificate disagree, and <strong>voice bookings cutting off</strong> means <code>proxy_read_timeout</code> is missing from the nginx file.</p>
 <hr>
-<h1>10. Known Issues &amp; Security Notes</h1>
+<h1 id="s10-known-issues-security-notes">10. Known Issues &amp; Security Notes</h1>
 <p>Both of these travel in a snapshot. A machine launched by route A arrives with them, so fix them there too.</p>
-<h2>10.1 The database is open to the internet</h2>
+<h2 id="s10-1-the-database-is-open-to-the-internet">10.1 The database is open to the internet</h2>
 <p>MySQL is listening on every network connection, port 3306 is reachable from anywhere, and the <code>aiorder</code> user is allowed in from any address. Confirmed by connecting from outside the machine. Anyone who guesses the password reaches the customer and booking records.</p>
 <pre><code>sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf     # bind-address = 127.0.0.1
 sudo mysql -e &quot;DROP USER &#x27;aiorder&#x27;@&#x27;%&#x27;;&quot;
 sudo systemctl restart mysql</code></pre>
 <p>Then remove the 3306 rule in Lightsail. Nothing breaks: the application connects over <code>localhost</code>. Stage 3 sets a new machine up correctly.</p>
-<h2>10.2 The application is at its memory ceiling</h2>
+<h2 id="s10-2-the-application-is-at-its-memory-ceiling">10.2 The application is at its memory ceiling</h2>
 <p>It is using 699.8 MB of the 700 MB it is allowed, on a machine with 1 GB in total. It will be stopped mid request sooner or later. Either raise <code>MemoryMax</code> and move to a 2 GB machine, or keep the limit and accept the restarts.</p>
-<h2>Also outstanding</h2>
+<h2 id="salso-outstanding">Also outstanding</h2>
 <ul><li>Stripe and PayPal webhook addresses are not registered, so a real payment</li></ul>
 <p>cannot confirm itself yet.</p>
 <ul><li>There is no automatic backup. The <code>mysqldump</code> command is the whole of it.</li></ul>
 <hr>
-<h1>11. Rollback / Recovery</h1>
+<h1 id="s11-rollback-recovery">11. Rollback / Recovery</h1>
 <p><strong>A bad deploy.</strong> The code is in git and the server keeps no state of its own, so put the old code back and restart:</p>
 <pre><code>git checkout &lt;previous-commit&gt; -- backend/app
 rsync -az --delete backend/app/ ubuntu@HOST:/home/ubuntu/plumber/backend/app/
@@ -451,7 +471,7 @@ ssh ubuntu@HOST &#x27;sudo systemctl restart plumber&#x27;</code></pre>
 <p><strong>The machine is lost.</strong> Launch a new one from the most recent snapshot, section 3.1. It comes back with the database and the settings file as they were on the day the snapshot was taken, which is the strongest reason to take one on a schedule. Everything after that day has to come from a <code>mysqldump</code>.</p>
 <p>Section 3.2 is the recovery procedure only if there is no snapshot either.</p>
 <hr>
-<h1>12. Appendix</h1>
+<h1 id="s12-appendix">12. Appendix</h1>
 <p><strong>Database, plumbing, 18 tables.</strong> Bookings: <code>service_requests</code>, <code>jobs</code>, <code>appointments</code>, <code>job_lines</code>, <code>payments</code>. Providers: <code>providers</code>, <code>provider_services</code>, <code>provider_availability</code>, <code>provider_time_off</code>. Catalogue: <code>services</code>, <code>service_phrases</code>, <code>categories</code>, <code>stores</code>. People: <code>accounts</code>, <code>customers</code>, <code>sessions</code>, <code>chat_sessions</code>, <code>cart_items</code>. Total 2.2 MB.</p>
 <p><code>services</code> still carries <code>veg</code>, <code>organic</code> and <code>stock</code> from the shop it was built from. Unused. The live ones are <code>price</code>, <code>duration_minutes</code>, <code>emergency</code>.</p>
 <p><strong>Settings, 70 in all,</strong> in <code>/home/ubuntu/plumber/backend/.env</code>, permissions 600: application, database, assistant, audio, email, access, payments, booking, diary.</p>
