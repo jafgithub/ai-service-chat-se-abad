@@ -39,6 +39,16 @@ STYLE = """
   --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
 }
 * { box-sizing: border-box; }
+/* One click back to the index, from every document. */
+.back {
+  display: inline-block; margin: 0 0 30px; text-decoration: none;
+  font-size: 14.5px; font-weight: 600; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+  background: var(--sunk);
+}
+.back:hover { color: var(--accent); border-color: var(--accent); }
+.back::before { content: "\\2190"; margin-right: 7px; }
+
 html { scroll-behavior: smooth; }
 h1, h2 { scroll-margin-top: 22px; }
 .toc {
@@ -320,15 +330,16 @@ def main() -> None:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Service Agent: spin-off and plumbing handover</title>
+<title>Adding a community document</title>
 <style>{STYLE}</style>
 </head>
 <body>
+<a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
 <div class="masthead">
-  <p class="eyebrow">Handover document</p>
-  <p class="title">Service Agent: application spin-off and plumbing handover</p>
-  <p class="sub">How the booking platform was built from the shop, what changed between them, and the procedure for standing either one up on a new machine.</p>
-  <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 14 August 2026 &nbsp;&middot;&nbsp; every command run against the live server</p>
+  <p class="eyebrow">How to</p>
+  <p class="title">Adding a community document</p>
+  <p class="sub">What to send us, what we can and cannot use, what happens to a document after you send it, and what is loaded today.</p>
+  <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 20 August 2026 &nbsp;&middot;&nbsp; for the association and the management office</p>
 </div>
 {toc_html}
 {body}

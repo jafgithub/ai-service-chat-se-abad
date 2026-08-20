@@ -39,6 +39,34 @@ STYLE = """
   --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+h1, h2 { scroll-margin-top: 22px; }
+.toc {
+  margin: 30px 0 8px; padding: 20px 22px 14px;
+  background: var(--sunk); border: 1px solid var(--line); border-radius: 12px;
+}
+.toc .toch {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--faint);
+}
+.toc a {
+  display: block; text-decoration: none; color: var(--ink);
+  padding: 4px 0; font-size: 15.5px; line-height: 1.45;
+  border-bottom: 1px solid transparent;
+}
+.toc a:hover { color: var(--accent); }
+.toc a.t2 { padding-left: 20px; font-size: 14.5px; color: var(--muted); }
+
+/* One click back to the index, from every document. */
+.back {
+  display: inline-block; margin: 0 0 30px; text-decoration: none;
+  font-size: 14.5px; font-weight: 600; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+  background: var(--sunk);
+}
+.back:hover { color: var(--accent); border-color: var(--accent); }
+.back::before { content: "\\2190"; margin-right: 7px; }
+
 body {
   margin: 0 auto; max-width: 820px; padding: 64px 28px 120px;
   background: var(--bg); color: var(--ink);
@@ -94,6 +122,16 @@ tbody tr:last-child td { border-bottom: none; }
 """
 
 
+def slug(text: str) -> str:
+    """A heading's anchor: "3. Retrieval and scoping" -> "s3-retrieval-and-scoping".
+
+    Built from the text rather than a counter, so an anchor someone has
+    bookmarked survives a section being inserted above it.
+    """
+    out = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return "s" + out
+
+
 def inline(text: str) -> str:
     out = html.escape(text)
     out = re.sub(r"`([^`]+)`", r"<code>\1</code>", out)
@@ -101,9 +139,10 @@ def inline(text: str) -> str:
     return out
 
 
-def render(md: str, images: dict[str, str]) -> str:
+def render(md: str, images: dict[str, str]) -> tuple[str, list[tuple[int, str, str]]]:
     lines = md.splitlines()
     out: list[str] = []
+    toc: list[tuple[int, str, str]] = []
     i = 0
     while i < len(lines):
         line = lines[i].rstrip()
@@ -153,7 +192,10 @@ def render(md: str, images: dict[str, str]) -> str:
         heading = re.match(r"(#{1,3})\s+(.*)", stripped)
         if heading:
             level = min(len(heading.group(1)), 2)
-            out.append(f"<h{level}>{inline(heading.group(2))}</h{level}>")
+            text = heading.group(2)
+            anchor = slug(text)
+            toc.append((level, anchor, text))
+            out.append(f'<h{level} id="{anchor}">{inline(text)}</h{level}>')
             i += 1
             continue
 
@@ -180,7 +222,17 @@ def render(md: str, images: dict[str, str]) -> str:
             i += 1
         out.append(f"<p>{inline(' '.join(block))}</p>")
 
-    return "\n".join(out)
+    return "\n".join(out), toc
+
+
+def contents(toc: list[tuple[int, str, str]]) -> str:
+    """The clickable table of contents, built from the headings themselves."""
+    rows = []
+    for level, anchor, text in toc:
+        cls = "t1" if level == 1 else "t2"
+        rows.append(f'<a class="{cls}" href="#{anchor}">{inline(text)}</a>')
+    return ('<nav class="toc" aria-label="Contents">'
+            '<p class="toch">Contents</p>' + "".join(rows) + "</nav>")
 
 
 def main() -> None:
@@ -208,8 +260,9 @@ def main() -> None:
     print(f"{len(images)} images, {total / 1024:.0f} KB after downscaling")
 
     md = SOURCE.read_text()
-    body = render(md, images)
+    body, toc = render(md, images)
 
+    toc_html = contents(toc)
     page = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -220,12 +273,14 @@ def main() -> None:
 <style>{STYLE}</style>
 </head>
 <body>
+<a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
 <div class="masthead">
   <p class="eyebrow">Development walkthrough</p>
   <p class="title">Service Assistant: the booking platform</p>
   <p class="sub">Describe a problem, see who can do it, pick a time, book it. How it works, where it runs, and the result of every test.</p>
   <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 12 August 2026 &nbsp;&middot;&nbsp; captured on the development server, 32 services</p>
 </div>
+{toc_html}
 {body}
 </body>
 </html>

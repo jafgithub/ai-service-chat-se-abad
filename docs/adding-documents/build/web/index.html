@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Service Agent: spin-off and plumbing handover</title>
+<title>Adding a community document</title>
 <style>
 :root {
   --bg:#FFFFFF; --ink:#14130F; --muted:#77726A; --faint:#A8A29A;
@@ -23,6 +23,16 @@
   --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
 }
 * { box-sizing: border-box; }
+/* One click back to the index, from every document. */
+.back {
+  display: inline-block; margin: 0 0 30px; text-decoration: none;
+  font-size: 14.5px; font-weight: 600; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+  background: var(--sunk);
+}
+.back:hover { color: var(--accent); border-color: var(--accent); }
+.back::before { content: "\2190"; margin-right: 7px; }
+
 html { scroll-behavior: smooth; }
 h1, h2 { scroll-margin-top: 22px; }
 .toc {
@@ -125,11 +135,12 @@ tbody tr:last-child td { border-bottom: none; }
 </style>
 </head>
 <body>
+<a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
 <div class="masthead">
-  <p class="eyebrow">Handover document</p>
-  <p class="title">Service Agent: application spin-off and plumbing handover</p>
-  <p class="sub">How the booking platform was built from the shop, what changed between them, and the procedure for standing either one up on a new machine.</p>
-  <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 14 August 2026 &nbsp;&middot;&nbsp; every command run against the live server</p>
+  <p class="eyebrow">How to</p>
+  <p class="title">Adding a community document</p>
+  <p class="sub">What to send us, what we can and cannot use, what happens to a document after you send it, and what is loaded today.</p>
+  <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 20 August 2026 &nbsp;&middot;&nbsp; for the association and the management office</p>
 </div>
 <nav class="toc" aria-label="Contents"><p class="toch">Contents</p><a class="t1" href="#s1-what-this-is-for">1. What this is for</a><a class="t1" href="#s2-what-happens-to-a-document-you-send">2. What happens to a document you send</a><a class="t1" href="#s3-what-we-can-use-and-what-we-cannot">3. What we can use, and what we cannot</a><a class="t1" href="#s4-what-to-tell-us-with-each-document">4. What to tell us with each document</a><a class="t1" href="#s5-what-we-do-at-our-end">5. What we do at our end</a><a class="t1" href="#s6-what-is-loaded-today">6. What is loaded today</a><a class="t1" href="#s7-four-things-we-found-and-need-a-decision-on">7. Four things we found, and need a decision on</a><a class="t1" href="#s8-two-documents-we-cannot-read">8. Two documents we cannot read</a><a class="t1" href="#s9-one-thing-to-know-about-other-communities-documents">9. One thing to know about other communities&#x27; documents</a><a class="t1" href="#s10-the-technical-version-of-this-document">10. The technical version of this document</a></nav>
 <h1 id="s1-what-this-is-for">1. What this is for</h1>
