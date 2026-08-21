@@ -456,3 +456,48 @@ def test_the_same_section_is_never_credited_twice():
 def test_no_more_than_three_are_named():
     for question in ("Lauderdale Lakes tall grass", "how long can I rent my home for"):
         assert len(credits_for(question)) <= MAX_CREDITS, question
+
+
+# ── choosing a community, rather than being guessed at ───────────────────────
+
+def test_only_communities_with_documents_are_offered():
+    """Three Lakes is recognised by name and refused politely, which is right
+    for a typed question and wrong for a menu. A choice that cannot be answered
+    should not be offered."""
+    offered = {c.key for c in docs_index.answerable()}
+    assert "serenity" in offered
+    assert "lauderdale lakes" in offered
+    assert "three lakes" not in offered
+
+
+def test_the_chosen_community_scopes_the_search():
+    for key, expected in (("serenity", "serenity"), ("lauderdale lakes", "lauderdale lakes")):
+        hits = docs_index.search("what are the rules about grass", chosen=key)
+        assert hits, key
+        assert {h["community"] for h in hits} == {expected}, key
+
+
+def test_the_same_question_answers_differently_per_community():
+    """Five inches at Serenity, six at Lauderdale Lakes. Same words, two
+    associations, and a resident must only ever get their own."""
+    serenity = " ".join(h["text"] for h in
+                        docs_index.search("how tall can my grass be", chosen="serenity"))
+    lauderdale = " ".join(h["text"] for h in
+                          docs_index.search("how tall can my grass be", chosen="lauderdale lakes"))
+    assert "five inches" in serenity.lower() or '5"' in serenity
+    assert "six inches" in lauderdale.lower()
+
+
+def test_naming_a_community_in_the_question_still_wins():
+    """Somebody who types the name is asking on purpose, and the credit under
+    the answer says which community it came from."""
+    hits = docs_index.search("Lauderdale Lakes tall grass", chosen="serenity")
+    assert {h["community"] for h in hits} == {"lauderdale lakes"}
+
+
+def test_an_unknown_choice_falls_back_to_home_rather_than_nothing():
+    """A stale choice, from a community whose documents were removed, must not
+    scope every answer to an empty set."""
+    hits = docs_index.search("What are the quiet hours?", chosen="atlantis")
+    assert hits
+    assert {h["community"] for h in hits} == {docs_index.HOME_COMMUNITY}

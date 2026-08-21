@@ -15,6 +15,8 @@ import type { Booked, ServiceResult } from "@/lib/api";
 import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { cn } from "@/lib/utils";
+import { CommunityPicker } from "@/components/chat/CommunityPicker";
+import { useCommunities } from "@/lib/community";
 
 interface ChatPageProps {
   scope?: string;
@@ -108,6 +110,9 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
      "Nobody on the platform lists anything like that", which is true of the
      catalogue and beside the point of what was asked. */
   const [fromDocuments, setFromDocuments] = useState("");
+  // Which association the resident is asking as. Shown above the composer so
+  // it is visible before they type, not discovered after a wrong answer.
+  const { options, chosen, current, choose } = useCommunities();
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
   const [totalMatches, setTotalMatches] = useState(0);
   const [inputValue, setInputValue] = useState("");
@@ -464,6 +469,9 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         message: text.trim(),
         session_id: sessionId || getSessionId(),
         category_filter: scope ?? undefined,
+        // Which association's rules a documents answer may come from. Ignored
+        // for everything else: a blocked drain is a blocked drain.
+        community: chosen || undefined,
         latitude: geo.position?.latitude,
         longitude: geo.position?.longitude,
       });
@@ -499,7 +507,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, services]);
+  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, services, chosen]);
 
   const onBooked = useCallback((made: Booked) => {
     addMessage(
@@ -537,6 +545,15 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
      screen, and as a shared footer on a phone. */
   const composer = (
     <div className="flex-shrink-0 border-t border-line bg-surface px-4 py-3">
+      {/* Above the box rather than buried in a menu: a resident should know
+          whose rules they are about to be told before they ask, not after. It
+          renders nothing when only one association is loaded. */}
+      {options.length > 1 && (
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-ink-faint">Rules for</span>
+          <CommunityPicker options={options} current={current} onChoose={choose} openUp />
+        </div>
+      )}
       <form
         onSubmit={(e) => { e.preventDefault(); sendMessage(inputValue); }}
         className="flex items-center gap-2"

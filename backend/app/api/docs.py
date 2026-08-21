@@ -172,6 +172,9 @@ Rules you must follow:
 
 class AskIn(BaseModel):
     question: str = Field(min_length=2, max_length=500)
+    #: The community the resident is asking as, chosen once and remembered by
+    #: the interface. Empty means we have not asked them yet.
+    community: str = ""
 
 
 class SourceOut(BaseModel):
@@ -290,19 +293,20 @@ def _context(hits: list[dict]) -> str:
     )
 
 
-def answer_with_sources(question: str) -> "tuple[str | None, list[SourceOut]]":
+def answer_with_sources(question: str, chosen: str = "") -> "tuple[str | None, list[SourceOut]]":
     """A grounded answer and the passages it came from.
 
     The booking chat needs both. It was showing the answer with no attribution
     at all, beside a pane that said "with the rule it came from", which was true
     of the floating panel and not of the chat.
     """
-    reply = answer_from_documents(question, _sink := [])
+    reply = answer_from_documents(question, _sink := [], chosen)
     return reply, _sink
 
 
 def answer_from_documents(question: str,
-                          sources: "list[SourceOut] | None" = None) -> "str | None":
+                          sources: "list[SourceOut] | None" = None,
+                          chosen: str = "") -> "str | None":
     """A grounded answer, or None. The shared core, used by two callers.
 
     The floating panel calls it through `/docs/ask` below. The main chat calls
@@ -325,7 +329,7 @@ def answer_from_documents(question: str,
     if missing:
         return _no_documents(missing)
 
-    hits = docs_index.search(question, k=4)
+    hits = docs_index.search(question, k=4, chosen=chosen or None)
     if not hits:
         return None
 
@@ -383,7 +387,7 @@ def ask(payload: AskIn) -> AskOut:
                     question[:60], ", ".join(c.label for c in missing))
         return AskOut(answer=_no_documents(missing), grounded=False, kind="no_answer")
 
-    hits = docs_index.search(question, k=4)
+    hits = docs_index.search(question, k=4, chosen=payload.community or None)
     if not hits:
         # No model call at all. Fastest possible path, and the one case where
         # inventing an answer would matter most.
@@ -411,6 +415,27 @@ def ask(payload: AskIn) -> AskOut:
         return AskOut(answer=not_in_documents(question), grounded=False, kind="no_answer")
 
     return AskOut(answer=reply, grounded=True, kind="answer", sources=_credits(hits))
+
+
+@router.get("/communities", summary="The communities a resident can be answered from")
+def communities() -> dict:
+    """For the interface to offer, so nobody has to type their own address.
+
+    Only the ones we hold documents for. Three Lakes is recognised by name and
+    refused politely, which is right for a typed question and wrong for a menu:
+    a choice that cannot be answered should not be offered.
+    """
+    return {
+        "communities": [
+            {
+                "key": c.key,
+                "label": c.label,
+                "documents": len(docs_index.documents_for(c.key)),
+            }
+            for c in docs_index.answerable()
+        ],
+        "home": docs_index.HOME_COMMUNITY,
+    }
 
 
 @router.get("/suggestions")

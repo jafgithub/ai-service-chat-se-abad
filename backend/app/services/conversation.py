@@ -90,7 +90,8 @@ GREETING_REPLY = (
 )
 
 
-def _document_answer(message: str, sources: list | None = None) -> "str | None":
+def _document_answer(message: str, sources: list | None = None,
+                     chosen: str = "") -> "str | None":
     """The community documents' answer to a question the catalogue could not meet.
 
     Shares one index and one endpoint with the floating help panel, so a resident
@@ -106,7 +107,7 @@ def _document_answer(message: str, sources: list | None = None) -> "str | None":
     """
     try:
         from app.api.docs import answer_from_documents
-        return answer_from_documents(message, sources)
+        return answer_from_documents(message, sources, chosen)
     except Exception:  # noqa: BLE001 - the chat must survive a documents outage
         logger.exception("[CHAT] document lookup failed")
         return None
@@ -122,7 +123,8 @@ def _document_miss(message: str) -> str:
         return "I could not find that in the community documents."
 
 
-def process(message: str, session, db: Session, category_filter: str | None = None) -> dict:
+def process(message: str, session, db: Session, category_filter: str | None = None,
+            community: str | None = None) -> dict:
     intent = intent_svc.parse(message, session, db)
     logger.info(f"[CHAT] intent={intent.type} refs={[(r.item_id, r.quantity) for r in intent.refs]}")
 
@@ -166,7 +168,7 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             # 0.45 gate was rejecting "how much for a copy of the condo docs",
             # which the amenities sheet answers outright at $25.00, because it
             # only scored 0.382.
-            grounded = _document_answer(message, found := [])
+            grounded = _document_answer(message, found := [], community or "")
             if grounded:
                 logger.info("[CHAT] answered from the community documents")
                 return _finish(db, session, grounded, [], None,
@@ -220,7 +222,8 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             # And only if the gate above did not already ask, or a question the
             # documents cannot answer would pay for two retrievals and two model
             # calls to arrive at the same refusal twice.
-            grounded = None if asked_the_documents else _document_answer(message, found := [])
+            grounded = (None if asked_the_documents
+                        else _document_answer(message, found := [], community or ""))
             if grounded:
                 reply, speech = grounded, "Here is what the community documents say."
                 cited, intent_override = found, "documents"

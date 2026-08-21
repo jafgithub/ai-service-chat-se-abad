@@ -234,11 +234,30 @@ export interface DocsSuggestions {
   questions: string[];
 }
 
+/** One association the assistant can answer for. */
+export interface CommunityOption {
+  key: string;
+  label: string;
+  /** How many documents are loaded for it. */
+  documents: number;
+}
+
+export interface CommunityList {
+  communities: CommunityOption[];
+  home: string;
+}
+
 export const docsApi = {
   /** Opening line and the starter questions, all answerable from the documents. */
   suggestions: (signal?: AbortSignal) =>
     apiClient.get<DocsSuggestions>("/api/v1/docs/suggestions", signal),
 
-  ask: (question: string, signal?: AbortSignal) =>
-    apiClient.post<DocsAnswer>("/api/v1/docs/ask", { question }, signal),
+  /** Only the ones with documents behind them. A community that cannot answer
+   *  must not appear in a menu, whatever the registry knows about it. */
+  communities: (signal?: AbortSignal) =>
+    apiClient.get<CommunityList>("/api/v1/docs/communities", signal),
+
+  ask: (question: string, community?: string, signal?: AbortSignal) =>
+    apiClient.post<DocsAnswer>("/api/v1/docs/ask",
+      { question, community: community ?? "" }, signal),
 };

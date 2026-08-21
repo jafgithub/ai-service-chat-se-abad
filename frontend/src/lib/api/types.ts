@@ -5,6 +5,8 @@
 export interface ChatRequest {
   message: string;
   session_id?: string;
+  /** Which association's documents a rules answer may come from. */
+  community?: string;
   category_filter?: string;
   latitude?: number;
   longitude?: number;

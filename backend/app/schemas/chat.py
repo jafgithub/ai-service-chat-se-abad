@@ -7,6 +7,9 @@ from app.schemas.cart import CartOut
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+    #: The community the resident is asking as. The interface asks once and
+    #: remembers; the assistant answers from that community's documents only.
+    community: Optional[str] = None
     category_filter: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None

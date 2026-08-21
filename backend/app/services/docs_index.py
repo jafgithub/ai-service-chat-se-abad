@@ -166,6 +166,18 @@ def documents_for(key: str) -> list[str]:
     return titles
 
 
+def answerable() -> list[Community]:
+    """The communities a resident can actually be answered from, in order.
+
+    Read off the index rather than the registry, so a community appears the
+    moment its documents do and disappears if they are removed. Three Lakes is
+    declared and holds nothing, and must not be offered as a choice: offering it
+    would promise an answer that cannot come.
+    """
+    have = available()
+    return [c for c in COMMUNITIES if c.key in have]
+
+
 def unavailable(query: str) -> list[Community]:
     """Communities the question names that there are no documents for.
 
@@ -283,7 +295,7 @@ def _without_community(query: str, named: list[Community]) -> str:
     return out if len(out) >= 3 else query
 
 
-def search(query: str, k: int = 4) -> list[dict]:
+def search(query: str, k: int = 4, chosen: str | None = None) -> list[dict]:
     """The k passages closest to the question, best first, above MIN_SCORE.
 
     Returns an empty list when nothing clears the floor, and the caller treats
@@ -302,7 +314,11 @@ def search(query: str, k: int = 4) -> list[dict]:
         return []
 
     named = named_communities(query)
-    allowed = {c.key for c in named} or {HOME_COMMUNITY}
+    # Naming a community in the question still wins: somebody who types
+    # "what does Lauderdale Lakes say about bins" is asking for that on purpose,
+    # and the credit under the answer says which community it came from. Failing
+    # that, the community the resident chose. Failing that, home.
+    allowed = {c.key for c in named} or ({chosen} if chosen in _rows else {HOME_COMMUNITY})
     missing = [c.label for c in unavailable(query)]
     if missing:
         # The caller is expected to have checked `unavailable()` and said so.

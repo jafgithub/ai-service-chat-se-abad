@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Lottie } from "lottie-react";
 
+import { CommunityPicker } from "@/components/chat/CommunityPicker";
+import { useCommunities } from "@/lib/community";
 import { docsApi, type DocsKind, type DocsSource } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import wave from "./wave.json";
@@ -16,6 +18,10 @@ import wave from "./wave.json";
  * why a refusal looks different from an answer rather than merely reading
  * differently.
  */
+
+const WHICH_COMMUNITY =
+  "Before I answer: which community are you in? Pick one and I will answer from " +
+  "that association's own documents, and I will remember it next time.";
 
 interface Turn {
   role: "user" | "bot";
@@ -42,6 +48,13 @@ function load<T>(key: string, fallback: T): T {
 
 export function HelpWidget() {
   const [open, setOpen] = useState(false);
+  // Which association the resident is asking as. Asked once, then shown in the
+  // header so an answer is never mysteriously about somebody else's rules.
+  const { options, chosen, current, choose, needsChoice } = useCommunities();
+  //: Asked at most once per panel. The question waits in state, not a ref,
+  //: because the buttons that answer it are part of the render.
+  const askedRef = useRef(false);
+  const [pending, setPending] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [greeting, setGreeting] = useState("");
   const [starters, setStarters] = useState<string[]>([]);
@@ -140,9 +153,21 @@ export function HelpWidget() {
 
       setDraft("");
       setTurns((t) => [...t, { role: "user", text }]);
+
+      // First question and no community chosen yet: ask, once, with the answer
+      // waiting behind it. A resident who picks here never sees this again, and
+      // a resident who ignores it still gets an answer from the home community
+      // with the community named on the source beneath it.
+      if (needsChoice && !askedRef.current) {
+        askedRef.current = true;
+        setPending(text);
+        setTurns((t) => [...t, { role: "bot", text: WHICH_COMMUNITY, kind: "chat" }]);
+        return;
+      }
+
       setBusy(true);
       try {
-        const reply = await docsApi.ask(text);
+        const reply = await docsApi.ask(text, chosen);
         setTurns((t) => [
           ...t,
           { role: "bot", text: reply.answer, kind: reply.kind, sources: reply.sources },
@@ -163,10 +188,34 @@ export function HelpWidget() {
         requestAnimationFrame(() => inputRef.current?.focus());
       }
     },
-    [busy]
+    [busy, chosen, needsChoice]
+  );
+
+  /** They picked from the buttons: remember it, then answer what they asked. */
+  const pickAndContinue = useCallback(
+    (key: string) => {
+      choose(key);
+      const waiting = pending;
+      setPending(null);
+      if (!waiting) return;
+      // Straight through, with the community they just chose, rather than
+      // making them type the question a second time.
+      setBusy(true);
+      docsApi
+        .ask(waiting, key)
+        .then((reply) =>
+          setTurns((t) => [...t,
+            { role: "bot", text: reply.answer, kind: reply.kind, sources: reply.sources }]))
+        .catch(() =>
+          setTurns((t) => [...t,
+            { role: "bot", text: "I could not reach the assistant just now. Please try again in a moment.", kind: "error" }]))
+        .finally(() => setBusy(false));
+    },
+    [choose, pending]
   );
 
   const empty = turns.length === 0;
+  const awaitingChoice = pending !== null;
 
   return (
     <>
@@ -226,7 +275,16 @@ export function HelpWidget() {
                   Lakes as well, and each answer names the community it came
                   from. Promising one association while quoting another is the
                   kind of small untruth that costs trust in the whole thing. */}
-              <p className="truncate text-xs text-ink-muted">Answers from your community documents</p>
+              {options.length > 1 ? (
+                <CommunityPicker
+                  options={options}
+                  current={current}
+                  onChoose={choose}
+                  className="mt-1"
+                />
+              ) : (
+                <p className="truncate text-xs text-ink-muted">Answers from your community documents</p>
+              )}
             </div>
             <button
               type="button"
@@ -329,6 +387,24 @@ export function HelpWidget() {
               )
             )}
 
+            {/* One tap each, straight after the question that prompted it.
+                A list of two buttons beats a dropdown here: the choice is
+                made once, and typing is not involved. */}
+            {awaitingChoice && (
+              <div className="ml-1 flex flex-wrap gap-2">
+                {options.map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => pickAndContinue(option.key)}
+                    className="rounded-full border border-brand-500 bg-surface px-3 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-50"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {busy && (
               <div className="flex items-center gap-1.5 rounded-card bg-surface-sunken px-3.5 py-3 w-fit" aria-label="Looking through the documents">
                 {[0, 150, 300].map((delay) => (
@@ -338,6 +414,7 @@ export function HelpWidget() {
                     style={{ animationDelay: `${delay}ms` }}
                   />
                 ))}
+
               </div>
             )}
           </div>
