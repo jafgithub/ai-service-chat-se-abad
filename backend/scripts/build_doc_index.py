@@ -51,6 +51,28 @@ MANIFEST = [
      "Serenity Point Amenities Fees", "Amenities fees", "serenity"),
     ("serenity/parking-pass.pdf",
      "Temporary Parking Pass Request", "Temporary parking pass", "serenity"),
+
+    # Three Lakes. The design standards and the site map and drainage drawings
+    # are not here: two are scans and one is a map, and none of them has text to
+    # index. They belong in the download list, not the index.
+    ("three-lakes/mailbox-guidelines.pdf",
+     "Three Lakes Mailbox and Post Guidelines", "Mailbox guidelines", "three lakes"),
+    ("three-lakes/design-review-form.pdf",
+     "Three Lakes Design Review Form and Instructions", "Design review form", "three lakes"),
+    ("three-lakes/direct-debit-form.pdf",
+     "Three Lakes Direct Debit Enrollment Form", "Direct debit form", "three lakes"),
+]
+
+# The Sherwin-Williams colour sheets, which have their own chunker because
+# their three columns must not be flattened. Same four fields.
+COLOUR_SHEETS = [
+    ("kendall-square/color-archive.pdf",
+     "Kendall Square Homeowners Association Approved Colours",
+     "Approved colour archive", "kendall square"),
+    ("valencia/color-archive.pdf",
+     "Valencia HOA Approved Colours", "Approved colour archive", "valencia"),
+    ("enclave-old-cutler/color-archive.pdf",
+     "Enclave At Old Cutler Approved Colours", "Approved colour archive", "enclave at old cutler"),
 ]
 
 # Page furniture: the management company's letterhead repeats on every page and
@@ -68,7 +90,11 @@ NOISE = re.compile(
     # The handbook repeats its own name and the page number across the top of
     # every page. Left in, it is both noise and the most repeated text in the
     # document, which is the worst thing a chunk can open with.
-    r"CITY OF LAUDERDALE LAKES CODE COMPLIANCE HANDBOOK|PAGE \| \d+",
+    r"CITY OF LAUDERDALE LAKES CODE COMPLIANCE HANDBOOK|PAGE \| \d+|"
+    # The colour sheets are browser print-outs: a date and time across the top,
+    # the print URL along the bottom, and a stray "Feedback" button.
+    r"^\d{1,2}/\d{1,2}/\d{2}, \d{1,2}:\d{2} [AP]M|sherwin-williams\.com/HOAPrintView|"
+    r"^\s*Feedback\s*$|1-800-4-SHERWIN",
     re.IGNORECASE,
 )
 
@@ -312,6 +338,76 @@ def heading_of(line: str) -> "str | None":
     return text
 
 
+# ── the approved colour sheets: three columns that must not come apart ──────
+
+_CELL = re.compile(r"\S+(?: \S+)*?(?=\s{2,}|$)")
+_SWCODE = re.compile(r"SW \d{3,4}")
+
+
+def _cells(line: str) -> list[tuple[int, str]]:
+    return [(m.start(), m.group().strip()) for m in _CELL.finditer(line) if m.group().strip()]
+
+
+def chunk_colours(pdf: Path, title: str, short: str, community: str) -> list[dict]:
+    """One chunk per association, with each surface paired to its own colour.
+
+    These sheets are three columns wide: the surfaces on one line, the codes a
+    few lines below, the colour names below that. Squashed into prose the way
+    every other document is, they become "Body Trim Accent SW 6106 SW 6076 SW
+    6119 Kilim Beige Turkish Coffee Antique White", and a resident asking what
+    colour to paint their body could be told Turkish Coffee. So the columns are
+    paired by their position on the page before anything else happens, and the
+    chunk says "Body is SW 6106 Kilim Beige" in as many words.
+
+    Everything a resident needs is on one page, so it stays one chunk: splitting
+    it would separate a colour from the surface it belongs to, which is the very
+    thing this function exists to prevent.
+    """
+    lines = [ln for ln in clean(text_of(pdf)) if ln.strip()]
+
+    pairs: list[tuple[str, str, str]] = []
+    #: The line above the first row of surfaces, which is where these sheets
+    #: print the scheme's name: "Exterior Repaint", "Scheme 1A", "Coral Gables 1".
+    scheme = ""
+    i = 0
+    while i < len(lines) - 2:
+        if _SWCODE.search(lines[i + 1]) and not _SWCODE.search(lines[i]):
+            if not scheme and i:
+                scheme = lines[i - 1].strip()
+            codes = [(m.start(), m.group()) for m in _SWCODE.finditer(lines[i + 1])]
+            names = _cells(lines[i + 2])
+            for column, label in _cells(lines[i]):
+                code = min(codes, key=lambda c: abs(c[0] - column))
+                # Within a column's width. A label with no code under it is a
+                # heading, not a surface, and is left alone.
+                if abs(code[0] - column) < 14:
+                    name = min(names, key=lambda n: abs(n[0] - column))
+                    pairs.append((label, code[1],
+                                  name[1] if abs(name[0] - column) < 14 else ""))
+            i += 3
+            continue
+        i += 1
+
+    if not pairs:
+        return []
+
+    said = ". ".join(f"{label} is {code} {name}".strip() for label, code, name in pairs)
+    advisory = ("These schemes were approved by the association. Colour standards can "
+                "change, so check with the community manager before painting.")
+    body = (f"Approved exterior paint colours"
+            f"{f', scheme {scheme}' if scheme else ''}: {said}. {advisory}")
+
+    return [{
+        "id": re.sub(r"[^a-z0-9]+", "-", pdf.stem.lower()).strip("-") + "-colours",
+        "document": title,
+        "document_short": short,
+        "community": community,
+        "approved": "",
+        "section": "Approved exterior colours",
+        "text": body,
+    }]
+
+
 def chunk_generic(pdf: Path, title: str, short: str, community: str) -> list[dict]:
     """Any document without a structure worth special casing.
 
@@ -397,6 +493,18 @@ def main() -> None:
 
     print(f"  {len(rules):>3} chunks  rules sheet")
     print(f"  {len(application):>3} chunks  management pack")
+
+    for rel, title, short, community in COLOUR_SHEETS:
+        pdf = KNOWLEDGE / rel
+        if not pdf.exists():
+            sys.exit(f"missing document: {pdf}")
+        got = chunk_colours(pdf, title, short, community)
+        if not got:
+            sys.exit(f"{pdf.name}: no colour columns found. The sheet's layout "
+                     f"has changed, and guessing at it would pair a surface "
+                     f"with the wrong colour.")
+        chunks += got
+        print(f"  {len(got):>3} chunks  {short}  [{community}]")
 
     for rel, title, short, community in MANIFEST:
         pdf = KNOWLEDGE / rel

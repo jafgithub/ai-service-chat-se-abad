@@ -76,9 +76,18 @@ Turnaround is about a day from the email arriving.
 | Architectural Modification Form (ARB) | Live |
 | Amenities Fees, GRS Management | Live |
 | Temporary Parking Pass Request | Live |
-| City of Lauderdale Lakes Code Compliance Handbook | Loaded, but not used for Serenity answers |
+| City of Lauderdale Lakes Code Compliance Handbook | Live, kept separate from Serenity |
+| Three Lakes: mailbox guidelines, design review form, direct debit form | Live |
+| Kendall Square approved colour archive | Live |
+| Valencia approved colour archive | Live |
+| Enclave At Old Cutler approved colour archive | Live |
 | Application for Occupancy, Serenity Point | **Cannot be used**, scanned image |
 | Three Lakes Design Standards | **Cannot be used**, scanned image |
+| Three Lakes site map and drainage drawing | **Cannot be used**, they are drawings |
+
+Six associations are loaded. When somebody asks a question the assistant asks
+once which community they are in, remembers it, and answers from that
+association's documents only.
 
 ---
 

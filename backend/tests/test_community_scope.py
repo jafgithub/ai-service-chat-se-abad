@@ -65,11 +65,46 @@ def test_two_communities_in_one_question_are_both_found():
 
 # ── a community we hold nothing for ──────────────────────────────────────────
 
-def test_three_lakes_is_known_but_unavailable():
-    """Known by name so it can be refused by name. The PDF the client sent is a
-    scan with no text layer, so there is nothing to index."""
-    missing = docs_index.unavailable("What are the rules in Three Lakes?")
-    assert [c.label for c in missing] == ["Three Lakes"]
+@pytest.fixture
+def declared_but_empty(monkeypatch):
+    """A community on the registry that the index holds nothing for.
+
+    Three Lakes played this part until its documents arrived on 21 August. The
+    mechanism still has to be covered, and covering it with real data means the
+    test breaks every time the client sends a PDF, so it is covered with a
+    community invented for the purpose.
+    """
+    invented = docs_index.Community("brookfield", "Brookfield",
+                                    ("brookfield", "brookfield hoa"))
+    monkeypatch.setattr(docs_index, "COMMUNITIES",
+                        docs_index.COMMUNITIES + (invented,))
+    return invented
+
+
+def test_a_declared_community_with_no_documents_is_refused_by_name(declared_but_empty):
+    """Declared so it can be refused by name. Answering it from Serenity is the
+    failure this whole design exists to prevent."""
+    missing = docs_index.unavailable("What are the rules in Brookfield?")
+    assert [c.label for c in missing] == ["Brookfield"]
+
+
+def test_a_declared_community_with_no_documents_is_never_searched(declared_but_empty):
+    assert docs_index.search("What are the rules in Brookfield?") == []
+
+
+def test_a_declared_community_with_no_documents_is_not_offered(declared_but_empty):
+    """Right for a typed question, wrong for a menu: a choice that cannot be
+    answered should not be on the list."""
+    assert "brookfield" not in {c.key for c in docs_index.answerable()}
+
+
+def test_the_shared_core_refuses_rather_than_falling_through(declared_but_empty):
+    """This is what the booking chat prints. It has to be the refusal itself,
+    not None: None would send the resident on to a catalogue search and their
+    question would go unanswered."""
+    reply = answer_from_documents("What are the rules in Brookfield?")
+    assert reply is not None and "Brookfield" in reply
+    assert "do not have" in reply
 
 
 @pytest.mark.parametrize("question", [
@@ -86,27 +121,15 @@ def test_a_community_we_hold_is_never_reported_missing(question):
     "Three Lake community rules",
     "quiet hours in Three Lake Community",
 ])
-def test_an_unavailable_community_is_never_searched(question):
-    """The heart of it. No passages means no model call and no answer, so there
-    is no path by which Serenity's rules can be offered to somebody asking about
-    Three Lakes."""
-    assert docs_index.search(question) == [], question
-
-
-@pytest.mark.parametrize("question", [
-    "What are the rules in Three Lakes?",
-    "Three Lake community rules",
-])
-def test_the_shared_core_says_so_rather_than_falling_through(question):
-    """This is what the booking chat prints. It has to be the refusal itself,
-    not None: None would send the resident on to a catalogue search and their
-    question would go unanswered."""
-    reply = answer_from_documents(question)
-    assert reply is not None and "Three Lakes" in reply, question
-    assert "do not have" in reply
+def test_a_three_lakes_question_is_answered_from_three_lakes_alone(question):
+    """The client's original failure, now from the other side. It used to be
+    answered out of Serenity's use restrictions; then it was refused because we
+    held nothing; now it has three documents and answers from those, and from
+    nothing else."""
+    hits = docs_index.search(question)
+    assert all(h["community"] == "three lakes" for h in hits), question
     # The exact sentence he was shown instead, from Serenity's use restrictions.
-    assert "fishing" not in reply.lower()
-    assert "prohibited" not in reply.lower()
+    assert not any("fishing" in h["text"].lower() for h in hits), question
 
 
 def test_the_refusal_names_the_community_and_offers_what_we_do_hold():
@@ -129,7 +152,8 @@ def test_the_documents_named_on_a_miss_are_the_ones_actually_indexed():
     """Only ever the truth about what the index holds, never a promise."""
     assert docs_index.documents_for("lauderdale lakes") == ["Lauderdale Lakes code handbook"]
     assert "Rules and Regulations" in docs_index.documents_for("serenity")
-    assert docs_index.documents_for("three lakes") == []
+    assert docs_index.documents_for("three lakes") == [
+        "Mailbox guidelines", "Design review form", "Direct debit form"]
 
 
 # ── scope is applied before ranking ──────────────────────────────────────────
@@ -460,14 +484,11 @@ def test_no_more_than_three_are_named():
 
 # ── choosing a community, rather than being guessed at ───────────────────────
 
-def test_only_communities_with_documents_are_offered():
-    """Three Lakes is recognised by name and refused politely, which is right
-    for a typed question and wrong for a menu. A choice that cannot be answered
-    should not be offered."""
+def test_every_registered_community_that_holds_documents_is_offered():
     offered = {c.key for c in docs_index.answerable()}
-    assert "serenity" in offered
-    assert "lauderdale lakes" in offered
-    assert "three lakes" not in offered
+    for expected in ("serenity", "lauderdale lakes", "three lakes",
+                     "kendall square", "valencia", "enclave at old cutler"):
+        assert expected in offered, expected
 
 
 def test_the_chosen_community_scopes_the_search():
@@ -501,3 +522,66 @@ def test_an_unknown_choice_falls_back_to_home_rather_than_nothing():
     hits = docs_index.search("What are the quiet hours?", chosen="atlantis")
     assert hits
     assert {h["community"] for h in hits} == {docs_index.HOME_COMMUNITY}
+
+
+# ── the four communities added on 21 August ──────────────────────────────────
+
+@pytest.mark.parametrize("query, expected", [
+    ("what colour can I paint my door in Valencia", "valencia"),
+    ("Valencia HOA colours", "valencia"),
+    ("Kendall Square HOA colours", "kendall square"),
+    ("Kendall Square Homeowners Association", "kendall square"),
+    ("Enclave at Old Cutler paint", "enclave at old cutler"),
+    ("old cutler bands colour", "enclave at old cutler"),
+    ("three lakes mailbox", "three lakes"),
+])
+def test_the_new_communities_are_recognised(query, expected):
+    assert expected in [c.key for c in docs_index.named_communities(query)], query
+
+
+def test_three_lakes_now_answers_rather_than_refusing():
+    """It was declared and empty on purpose while its only document was a scan.
+    Three readable documents have arrived, so it is a community like any other
+    and must stop saying we hold nothing for it."""
+    assert docs_index.unavailable("what are the rules in Three Lakes") == []
+    assert "three lakes" in {c.key for c in docs_index.answerable()}
+
+
+@pytest.mark.parametrize("community, expected", [
+    ("valencia", "kilim beige"),
+    ("kendall square", "reliable white"),
+    ("enclave at old cutler", "wool skein"),
+])
+def test_each_association_has_its_own_body_colour(community, expected):
+    hits = docs_index.search("what colour is the body", chosen=community)
+    assert hits, community
+    assert {h["community"] for h in hits} == {community}
+    assert expected in hits[0]["text"].lower(), community
+
+
+def test_a_colour_is_never_attached_to_the_wrong_surface():
+    """The sheets are three columns wide. Flattened the way every other document
+    is, they read "Body Trim Accent SW 6106 SW 6076 SW 6119 Kilim Beige Turkish
+    Coffee Antique White", and a resident could be told to paint their body
+    Turkish Coffee. Each surface is paired to its own colour before anything
+    else happens, and this is the test that says so."""
+    text = docs_index.search("colours", chosen="valencia")[0]["text"]
+    for surface, colour in (("Body", "SW 6106 Kilim Beige"),
+                            ("Trim", "SW 6076 Turkish Coffee"),
+                            ("Accent", "SW 6119 Antique White")):
+        assert f"{surface} is {colour}" in text, (surface, text)
+
+    enclave = docs_index.search("colours", chosen="enclave at old cutler")[0]["text"]
+    assert "Door is SW 6142 Macadamia" in enclave
+    assert "Body is SW 6148 Wool Skein" in enclave
+
+
+def test_one_association_never_gets_another_ones_paint():
+    for community in ("valencia", "kendall square", "enclave at old cutler"):
+        hits = docs_index.search("what colour should the door be", chosen=community)
+        assert {h["community"] for h in hits} == {community}, community
+
+
+def test_serenity_does_not_borrow_three_lakes_mailbox_rules():
+    hits = docs_index.search("mailbox post height", chosen="serenity")
+    assert all(h["community"] == "serenity" for h in hits)

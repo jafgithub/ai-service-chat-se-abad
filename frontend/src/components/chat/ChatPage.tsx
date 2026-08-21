@@ -113,6 +113,10 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   // Which association the resident is asking as. Shown above the composer so
   // it is visible before they type, not discovered after a wrong answer.
   const { options, chosen, current, choose } = useCommunities();
+  // The last answer that came out of the community documents, kept so the
+  // results pane can show it rather than sitting empty behind a list of
+  // plumbing categories that has nothing to do with what was asked.
+  const [docAnswer, setDocAnswer] = useState<{ text: string; sources: { section: string; document: string; community?: string }[] } | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
   const [totalMatches, setTotalMatches] = useState(0);
   const [inputValue, setInputValue] = useState("");
@@ -372,11 +376,13 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setVisibleCount(PAGE_SIZE);
         setResultsFor(heard);
         setFromDocuments("");
+        setDocAnswer(null);
       } else if (res.action === null) {
         setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
         const doc = res.intent === "documents" || res.intent === "documents_miss";
+        setDocAnswer(doc ? { text: res.reply, sources: res.sources ?? [] } : null);
         setResultsFor(doc ? "" : heard);
         setFromDocuments(doc ? res.intent! : "");
       }
@@ -487,6 +493,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setVisibleCount(PAGE_SIZE);
         setResultsFor(text.trim());
         setFromDocuments("");
+        setDocAnswer(null);
       } else if (response.action === null) {
         // A documents answer is not a failed search and must not be dressed as
         // one. Clearing `resultsFor` keeps "Nothing matches" off the screen;
@@ -495,6 +502,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
         const doc = response.intent === "documents" || response.intent === "documents_miss";
+        setDocAnswer(doc ? { text: response.reply, sources: response.sources ?? [] } : null);
         setResultsFor(doc ? "" : text.trim());
         setFromDocuments(doc ? response.intent! : "");
       }
@@ -747,9 +755,9 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                     ? `For “${resultsFor}”`
                     : "Services"
                   : fromDocuments === "documents_miss"
-                    ? "Not in the community documents"
+                    ? `Not in the ${current?.label ?? "community"} documents`
                     : fromDocuments
-                      ? "From the community documents"
+                      ? `${current?.label ?? "Community"} documents`
                     : searchedAndFoundNothing
                       ? `Nothing matches “${resultsFor}”`
                       : "Services"}
@@ -762,7 +770,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   : fromDocuments === "documents_miss"
                     ? "Nothing in them covers that, so nothing was invented"
                     : fromDocuments
-                      ? "The answer is in the conversation, with the rule it came from"
+                      ? "Answered from this association's own documents"
                     : searchedAndFoundNothing
                       ? "Nobody on the platform lists anything like that"
                     : "Describe the problem, or start from a category"}
@@ -826,6 +834,59 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   </div>
                 )}
               </>
+            ) : fromDocuments && docAnswer ? (
+              /* A rules answer. The pane used to show plumbing categories under
+                 one of these, which is two unrelated things side by side and
+                 reads as a mistake. It shows the answer instead: whose rules,
+                 what they say, and which document each line came from. */
+              <div className="flex h-full flex-col overflow-y-auto">
+                <div className="mx-auto w-full max-w-2xl py-2">
+                  {/* The community's name is on the pane header already. This
+                      row is the control, not a second label. */}
+                  {options.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs uppercase tracking-wide text-ink-faint">
+                        Answering as
+                      </span>
+                      <CommunityPicker options={options} current={current} onChoose={choose} />
+                    </div>
+                  )}
+
+                  <div className="mt-4 rounded-card border border-line bg-surface p-5">
+                    {docAnswer.text.split(/\n+/).filter(Boolean).map((line, i) => (
+                      <p key={i} className={cn("text-[15px] leading-relaxed text-ink", i > 0 && "mt-2")}>
+                        {line.replace(/^[-*]\s*/, "")}
+                      </p>
+                    ))}
+                  </div>
+
+                  {docAnswer.sources.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">
+                        Where this came from
+                      </p>
+                      <ul className="mt-2 space-y-2">
+                        {docAnswer.sources.map((src) => (
+                          <li
+                            key={`${src.document}-${src.section}`}
+                            className="rounded-control border border-line bg-surface-sunken px-4 py-3"
+                          >
+                            <p className="text-sm font-semibold text-ink">{src.document}</p>
+                            <p className="text-xs text-ink-muted">
+                              {src.community ? `${src.community} · ` : ""}{src.section}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <p className="mt-5 text-sm text-ink-muted">
+                    Ask another question about the rules, or describe a job and I will
+                    find someone who does it.
+                  </p>
+                </div>
+              </div>
             ) : (
               /* The arrival state: somewhere to start rather than an empty pane. */
               <div className={cn("flex h-full flex-col justify-center")}>

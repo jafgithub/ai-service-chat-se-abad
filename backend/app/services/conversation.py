@@ -113,11 +113,11 @@ def _document_answer(message: str, sources: list | None = None,
         return None
 
 
-def _document_miss(message: str) -> str:
+def _document_miss(message: str, chosen: str = "") -> str:
     """What to say when the documents were the right place and had nothing."""
     try:
         from app.api.docs import not_in_documents
-        return not_in_documents(message)
+        return not_in_documents(message, chosen)
     except Exception:  # noqa: BLE001 - the chat must survive a documents outage
         logger.exception("[CHAT] document lookup failed")
         return "I could not find that in the community documents."
@@ -192,7 +192,7 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                 # label: the results pane reads it, and it was announcing
                 # "Answered from the community documents" beside "I could not
                 # find that in the Lauderdale Lakes documents".
-                return _finish(db, session, _document_miss(message), [], None,
+                return _finish(db, session, _document_miss(message, community or ""), [], None,
                                intent_type="documents_miss")
 
         services = rag.search_products(query=intent.query, db=db, top_k=None, category_filter=category_filter)
@@ -233,7 +233,7 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                 # anything. "Try a different keyword, leaks and blocked drains
                 # are the usual ones" is a poor answer to a question about a
                 # community's rules, so say which documents were searched.
-                reply, speech = _document_miss(message), None
+                reply, speech = _document_miss(message, community or ""), None
 
     # ── add to cart ──────────────────────────────────────────────────────────
     elif intent.type == "add_to_cart":

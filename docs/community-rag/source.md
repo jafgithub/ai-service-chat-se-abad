@@ -184,26 +184,55 @@ answerable the moment its chunks are in the index, with no code change.
 
 # 6. What is indexed today
 
-189 chunks, built from six PDFs.
+208 sections, from twelve documents across six associations.
 
-| Community | Document | Chunks |
+| Community | Documents | Sections |
 |---|---|---|
-| serenity | Serenity Community Association Rules and Regulations (management pack) | 55 |
-| serenity | Serenity Point Rules and Regulations | 19 |
-| serenity | Application Package | 7 |
-| serenity | ARB modification form | 6 |
-| serenity | Temporary parking pass | 5 |
-| serenity | Amenities fees | 4 |
-| lauderdale lakes | City of Lauderdale Lakes Code Compliance Handbook | 93 |
+| Serenity Point | Rules and Regulations, management pack, application package, ARB form, amenities fees, parking pass | 97 |
+| Lauderdale Lakes | City of Lauderdale Lakes Code Compliance Handbook | 92 |
+| Three Lakes | mailbox guidelines, design review form, direct debit form | 16 |
+| Kendall Square | approved colour archive | 1 |
+| Valencia | approved colour archive | 1 |
+| Enclave At Old Cutler | approved colour archive | 1 |
 
-Lauderdale Lakes is a different city: Serenity Point is in Miami Lakes. It is
-indexed because the client sent it, and tagged so that a resident asking about
-their own bin day is never answered out of another city's ordinances.
+Lauderdale Lakes is a different city: Serenity Point is in Miami Lakes. Each of
+the others is a separate association. All of them are tagged, so a resident
+asking about their own bin day is never answered out of another city's
+ordinances, and nobody is told to paint their door with another association's
+colour.
+
+## 6.1 The colour sheets, and why they have their own chunker
+
+The three colour archives are three columns wide: the surfaces on one line, the
+paint codes a few lines below, the colour names below that. Flattened the way
+every other document is, they read "Body Trim Accent SW 6106 SW 6076 SW 6119
+Kilim Beige Turkish Coffee Antique White", and a resident asking what colour to
+paint their body could be told Turkish Coffee.
+
+So the columns are paired by their position on the page before anything else
+happens, and the chunk says "Body is SW 6106 Kilim Beige" in as many words. If
+the layout ever changes so that no pairs are found, the build stops rather than
+guessing, because a wrong pairing here is a wrong instruction about somebody's
+home.
+
+## 6.2 What is held but not indexed
+
+| Document | Why |
+|---|---|
+| Three Lakes Design Standards, 23 pages | a scan, needs OCR and a careful read |
+| Serenity occupancy application, 11 pages | a scan |
+| Three Lakes site map | a drawing: OCR would not help |
+| Three Lakes subsurface drainage | a drawing |
+
+The last two are worth stating plainly: they are pictures. No amount of text
+extraction makes a site map answerable, and they belong in the download list
+rather than the index.
 
 # 7. Three Lakes, and the OCR dependency
 
-**Three Lakes is not available.** Its design standards and covenant guidelines
-PDF is a scan: an image of a page, with no text layer. `pdftotext` returns zero
+**Three Lakes answers now, but not from everything.** Three of its documents
+arrived readable on 21 August and are indexed. Its design standards and covenant
+guidelines PDF is still a scan: an image of a page, with no text layer. `pdftotext` returns zero
 characters from it. There is nothing to chunk and nothing to embed, so it is not
 in the index and questions about it are refused by name.
 

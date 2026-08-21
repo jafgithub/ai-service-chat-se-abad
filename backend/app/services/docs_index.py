@@ -65,9 +65,14 @@ COMMUNITIES: tuple[Community, ...] = (
     Community("serenity", "Serenity Point", ("serenity", "serenity point")),
     Community("lauderdale lakes", "Lauderdale Lakes",
               ("lauderdale lakes", "lauderdale lake", "city of lauderdale lakes")),
-    # No text layer: the PDF the client sent is a scan. See knowledge/needs-ocr.
     Community("three lakes", "Three Lakes",
               ("three lakes", "three lake", "three lakes community")),
+    Community("kendall square", "Kendall Square",
+              ("kendall square", "kendall square homeowners association", "kendall square hoa")),
+    Community("valencia", "Valencia",
+              ("valencia", "valencia hoa")),
+    Community("enclave at old cutler", "Enclave At Old Cutler",
+              ("enclave at old cutler", "enclave old cutler", "enclave", "old cutler")),
 )
 
 # Words that decorate a community's name without identifying it. Stripped from

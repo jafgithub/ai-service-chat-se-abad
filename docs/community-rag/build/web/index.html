@@ -142,7 +142,7 @@ tbody tr:last-child td { border-bottom: none; }
   <p class="sub">The document assistant end to end: how a question is routed, how a community is recognised, why one community can never be answered from another's documents, and what to do when a new association sends its paperwork.</p>
   <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 20 August 2026 &nbsp;&middot;&nbsp; every behaviour checked against the live server</p>
 </div>
-<nav class="toc" aria-label="Contents"><p class="toch">Contents</p><a class="t1" href="#s1-what-this-covers">1. What this covers</a><a class="t1" href="#s2-the-two-ways-in">2. The two ways in</a><a class="t1" href="#s3-how-a-question-is-routed">3. How a question is routed</a><a class="t1" href="#s4-retrieval-and-what-grounds-it">4. Retrieval, and what grounds it</a><a class="t1" href="#s5-community-detection-and-scoping">5. Community detection and scoping</a><a class="t2" href="#s5-1-recognising-the-name">5.1 Recognising the name</a><a class="t2" href="#s5-2-scoping-before-ranking">5.2 Scoping before ranking</a><a class="t2" href="#s5-3-a-community-we-hold-nothing-for">5.3 A community we hold nothing for</a><a class="t1" href="#s6-what-is-indexed-today">6. What is indexed today</a><a class="t1" href="#s7-three-lakes-and-the-ocr-dependency">7. Three Lakes, and the OCR dependency</a><a class="t1" href="#s8-contradictions">8. Contradictions</a><a class="t1" href="#s9-adding-a-new-community">9. Adding a new community</a><a class="t1" href="#s10-files-and-what-changed-on-20-august">10. Files, and what changed on 20 August</a><a class="t1" href="#s11-testing-and-verification">11. Testing and verification</a><a class="t1" href="#s12-known-limits">12. Known limits</a></nav>
+<nav class="toc" aria-label="Contents"><p class="toch">Contents</p><a class="t1" href="#s1-what-this-covers">1. What this covers</a><a class="t1" href="#s2-the-two-ways-in">2. The two ways in</a><a class="t1" href="#s3-how-a-question-is-routed">3. How a question is routed</a><a class="t1" href="#s4-retrieval-and-what-grounds-it">4. Retrieval, and what grounds it</a><a class="t1" href="#s5-community-detection-and-scoping">5. Community detection and scoping</a><a class="t2" href="#s5-1-recognising-the-name">5.1 Recognising the name</a><a class="t2" href="#s5-2-scoping-before-ranking">5.2 Scoping before ranking</a><a class="t2" href="#s5-3-a-community-we-hold-nothing-for">5.3 A community we hold nothing for</a><a class="t1" href="#s6-what-is-indexed-today">6. What is indexed today</a><a class="t2" href="#s6-1-the-colour-sheets-and-why-they-have-their-own-chunker">6.1 The colour sheets, and why they have their own chunker</a><a class="t2" href="#s6-2-what-is-held-but-not-indexed">6.2 What is held but not indexed</a><a class="t1" href="#s7-three-lakes-and-the-ocr-dependency">7. Three Lakes, and the OCR dependency</a><a class="t1" href="#s8-contradictions">8. Contradictions</a><a class="t1" href="#s9-adding-a-new-community">9. Adding a new community</a><a class="t1" href="#s10-files-and-what-changed-on-20-august">10. Files, and what changed on 20 August</a><a class="t1" href="#s11-testing-and-verification">11. Testing and verification</a><a class="t1" href="#s12-known-limits">12. Known limits</a></nav>
 <h1 id="s1-what-this-covers">1. What this covers</h1>
 <p>The Service Assistant answers two different kinds of question through one chat box. &quot;My sink is leaking&quot; is a request for a tradesperson and goes to the service catalogue. &quot;What are the quiet hours&quot; is a question about the rules and is answered from the association&#x27;s own documents. This is a reference for the second one: how a question reaches the documents, which community&#x27;s documents it may be answered from, and what to do when a new association sends its paperwork.</p>
 <p>Two rules run through everything below, and both are enforced by code rather than by asking a model nicely.</p>
@@ -205,21 +205,33 @@ tbody tr:last-child td { border-bottom: none; }
 <figure><img src="img/d03_scope.png" width="1500" height="546" alt="Serenity, Lauderdale Lakes, Three Lakes" loading="lazy"></figure>
 <p>Availability is read off the loaded index, never declared. A community becomes answerable the moment its chunks are in the index, with no code change.</p>
 <h1 id="s6-what-is-indexed-today">6. What is indexed today</h1>
-<p>189 chunks, built from six PDFs.</p>
+<p>208 sections, from twelve documents across six associations.</p>
 <div class="tw"><table>
-<thead><tr><th>Community</th><th>Document</th><th>Chunks</th></tr></thead>
+<thead><tr><th>Community</th><th>Documents</th><th>Sections</th></tr></thead>
 <tbody>
-<tr><td>serenity</td><td>Serenity Community Association Rules and Regulations (management pack)</td><td>55</td></tr>
-<tr><td>serenity</td><td>Serenity Point Rules and Regulations</td><td>19</td></tr>
-<tr><td>serenity</td><td>Application Package</td><td>7</td></tr>
-<tr><td>serenity</td><td>ARB modification form</td><td>6</td></tr>
-<tr><td>serenity</td><td>Temporary parking pass</td><td>5</td></tr>
-<tr><td>serenity</td><td>Amenities fees</td><td>4</td></tr>
-<tr><td>lauderdale lakes</td><td>City of Lauderdale Lakes Code Compliance Handbook</td><td>93</td></tr>
+<tr><td>Serenity Point</td><td>Rules and Regulations, management pack, application package, ARB form, amenities fees, parking pass</td><td>97</td></tr>
+<tr><td>Lauderdale Lakes</td><td>City of Lauderdale Lakes Code Compliance Handbook</td><td>92</td></tr>
+<tr><td>Three Lakes</td><td>mailbox guidelines, design review form, direct debit form</td><td>16</td></tr>
+<tr><td>Kendall Square</td><td>approved colour archive</td><td>1</td></tr>
+<tr><td>Valencia</td><td>approved colour archive</td><td>1</td></tr>
+<tr><td>Enclave At Old Cutler</td><td>approved colour archive</td><td>1</td></tr>
 </tbody></table></div>
-<p>Lauderdale Lakes is a different city: Serenity Point is in Miami Lakes. It is indexed because the client sent it, and tagged so that a resident asking about their own bin day is never answered out of another city&#x27;s ordinances.</p>
+<p>Lauderdale Lakes is a different city: Serenity Point is in Miami Lakes. Each of the others is a separate association. All of them are tagged, so a resident asking about their own bin day is never answered out of another city&#x27;s ordinances, and nobody is told to paint their door with another association&#x27;s colour.</p>
+<h2 id="s6-1-the-colour-sheets-and-why-they-have-their-own-chunker">6.1 The colour sheets, and why they have their own chunker</h2>
+<p>The three colour archives are three columns wide: the surfaces on one line, the paint codes a few lines below, the colour names below that. Flattened the way every other document is, they read &quot;Body Trim Accent SW 6106 SW 6076 SW 6119 Kilim Beige Turkish Coffee Antique White&quot;, and a resident asking what colour to paint their body could be told Turkish Coffee.</p>
+<p>So the columns are paired by their position on the page before anything else happens, and the chunk says &quot;Body is SW 6106 Kilim Beige&quot; in as many words. If the layout ever changes so that no pairs are found, the build stops rather than guessing, because a wrong pairing here is a wrong instruction about somebody&#x27;s home.</p>
+<h2 id="s6-2-what-is-held-but-not-indexed">6.2 What is held but not indexed</h2>
+<div class="tw"><table>
+<thead><tr><th>Document</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Three Lakes Design Standards, 23 pages</td><td>a scan, needs OCR and a careful read</td></tr>
+<tr><td>Serenity occupancy application, 11 pages</td><td>a scan</td></tr>
+<tr><td>Three Lakes site map</td><td>a drawing: OCR would not help</td></tr>
+<tr><td>Three Lakes subsurface drainage</td><td>a drawing</td></tr>
+</tbody></table></div>
+<p>The last two are worth stating plainly: they are pictures. No amount of text extraction makes a site map answerable, and they belong in the download list rather than the index.</p>
 <h1 id="s7-three-lakes-and-the-ocr-dependency">7. Three Lakes, and the OCR dependency</h1>
-<p><strong>Three Lakes is not available.</strong> Its design standards and covenant guidelines PDF is a scan: an image of a page, with no text layer. <code>pdftotext</code> returns zero characters from it. There is nothing to chunk and nothing to embed, so it is not in the index and questions about it are refused by name.</p>
+<p><strong>Three Lakes answers now, but not from everything.</strong> Three of its documents arrived readable on 21 August and are indexed. Its design standards and covenant guidelines PDF is still a scan: an image of a page, with no text layer. <code>pdftotext</code> returns zero characters from it. There is nothing to chunk and nothing to embed, so it is not in the index and questions about it are refused by name.</p>
 <p>The same is true of the Serenity occupancy application. Both files sit in <code>backend/knowledge/needs-ocr/</code> rather than in a community folder, which is what keeps them out of the build.</p>
 <p><strong>What it would take.</strong> The index is built offline, on a laptop, and shipped as JSON, so this needs no server dependency: only an OCR engine, <code>tesseract</code> or <code>ocrmypdf</code>, on whichever machine runs the build script. That is a small install.</p>
 <p><strong>Why it has not been done.</strong> OCR of a scanned covenant document will contain errors, and those errors would become rules about someone&#x27;s home. The honest sequence is to OCR it, read the extracted text against the PDF by eye, correct it, and only then index it. That is an hour of careful work, not a switch, and it is worth asking the association for a text PDF first: a document that was printed and scanned usually still exists as a file somewhere.</p>

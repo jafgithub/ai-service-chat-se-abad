@@ -65,7 +65,7 @@ def _no_documents(missing: list) -> str:
     )
 
 
-def not_in_documents(question: str) -> str:
+def not_in_documents(question: str, chosen: str = "") -> str:
     """The ordinary refusal, naming whichever documents were actually searched.
 
     "I could not find that in the community documents" is misleading when the
@@ -75,16 +75,24 @@ def not_in_documents(question: str) -> str:
     """
     scoped = [c for c in docs_index.named_communities(question)
               if c.key != docs_index.HOME_COMMUNITY]
+    # Nothing named in the question, but the resident has told us which
+    # community they are in. Answering them with Serenity's list of topics
+    # would be the same mistake in a smaller key: it is not their association.
+    if not scoped and chosen and chosen != docs_index.HOME_COMMUNITY:
+        scoped = [c for c in docs_index.COMMUNITIES if c.key == chosen]
     if not scoped:
         return NO_ANSWER
 
     names = " and ".join(c.label for c in scoped)
     titles = [t for c in scoped for t in docs_index.documents_for(c.key)]
     held = f" What I hold for {names} is the {_join(titles)}." if titles else ""
+    # No list of topics here. It used to offer "parking, bins, grass, animals or
+    # fines", which came from the Lauderdale handbook and is nonsense to a
+    # resident of an association whose only document is a paint colour sheet.
+    # Naming what we hold says the same thing and is true of every community.
     return (
         f"I could not find that in the {names} documents, so I would rather say "
-        f"so than guess.{held} Ask me about a particular thing, parking, bins, "
-        "grass, animals or fines, and I will look it up."
+        f"so than guess.{held} Ask me about something in there and I will look it up."
     )
 
 
@@ -391,7 +399,8 @@ def ask(payload: AskIn) -> AskOut:
     if not hits:
         # No model call at all. Fastest possible path, and the one case where
         # inventing an answer would matter most.
-        return AskOut(answer=not_in_documents(question), grounded=False, kind="no_answer")
+        return AskOut(answer=not_in_documents(question, payload.community),
+                      grounded=False, kind="no_answer")
 
     reply = gemini_service.generate(
         SYSTEM,
@@ -412,7 +421,8 @@ def ask(payload: AskIn) -> AskOut:
 
     reply = _tidy(reply.strip())
     if "NO_ANSWER" in reply.upper() or len(reply) < 2:
-        return AskOut(answer=not_in_documents(question), grounded=False, kind="no_answer")
+        return AskOut(answer=not_in_documents(question, payload.community),
+                      grounded=False, kind="no_answer")
 
     return AskOut(answer=reply, grounded=True, kind="answer", sources=_credits(hits))
 
