@@ -27,59 +27,44 @@ confidently, from a document that does not govern them.
 
 # 2. The two ways in
 
-There is one retrieval core and two front doors. Both call the same function
-over the same index, so a question gets the same answer whichever way it is
-asked, and a wrong answer has one place to be fixed.
+**One door, not two.** Every question about the community documents arrives
+through the floating assistant, bottom right of every page. It posts to
+`POST /api/v1/docs/ask` and has no service catalogue in front of it, so every
+question it receives is already known to be about the rules. There is nothing
+to guess.
 
 ![The two front doors and the one core](d01_doors.png)
 
-**The floating panel.** Bottom right of every page, on every route. It posts
-straight to `POST /api/v1/docs/ask` and has no service catalogue in front of it,
-so every question it receives is a question about the documents.
+The booking chat books jobs and nothing else: search the catalogue, add to the
+basket, pick a time, pay. It does not consult the documents.
 
-**The booking chat.** `POST /api/v1/chat` is a booking pipeline first. The
-message is classified by `intent.parse` into checkout, add, remove, set
-quantity, view cart, conversational or search, and only a `search` can reach the
-documents at all. Inside that branch the routing gate below decides whether the
-documents are asked before the catalogue, after it, or not at all.
+**It did, for a day.** The same answers were available inside the booking chat,
+and the machinery worked: shape and vocabulary decided whether a message was
+about the rules, a community name scoped it, and the answer arrived with its
+sources. What it could not fix was the shape of the thing. One box answering
+both "what are the quiet hours" and "my sink is blocked" has to guess which is
+being asked on every message, and every guess it got wrong was visible to a
+resident. Two boxes, each certain what it is for, need no guess at all.
 
-# 3. How a question is routed
+That is why the routing rules that used to be documented here are gone. They
+were a good answer to a question that should not have been asked.
 
-Three things decide, in this order.
+# 3. Which community, and how it is chosen
 
-**Booking wins outright.** `_BOOKING_SHAPE` matches book, order, arrange, send,
-hire, come out, quote, appointment, "I need a", "I need someone", and "my X is
-broken or leaking or blocked". If it matches, the documents are not consulted.
-This is not a nicety: measured over twenty real phrasings, "someone to cut my
-grass" scores 0.470 against the lawn rule, higher than several genuine policy
-questions score, so the retrieval score cannot make this call and the shape of
-the message has to.
+A resident is asked once, on their first question, which association they are
+in. Two taps at most, and it is remembered from then on, shown in the panel
+header where it can be changed.
 
-**Then either shape sends it to the documents.** A question shape
-(`_POLICY_SHAPE`: what, when, where, which, who, how much, how many, how long,
-how do I, can I, may I, am I allowed, do I need, is there, are there, are we, is
-it ok) or the documents' own vocabulary (`_DOC_SHAPE`: rules, regulations,
-bylaws, covenants, guidelines, restrictions, policy, HOA, association,
-ordinances, handbook, quiet hours, curfew, noise, architectural, ARB, approval,
-violation, fines, lease, leasing, tenant, pets, trash, recycling, amenities).
+Asked once rather than on every question, because the common case is a resident
+of one community asking about their own home, and a dropdown in front of every
+question taxes exactly that case. Naming a community in the question still wins
+over the setting: somebody who types "Lauderdale Lakes tall grass" is asking on
+purpose, and the credit under the answer says which community answered.
 
-The vocabulary half is what was missing until 20 August. "Lauderdale Lake
-community rules" is how people actually search: a noun phrase, no verb, no
-question mark. It opened with none of the question words, so it was treated as a
-service search, the catalogue matched "Community hall booking" weakly, and a
-resident asking about the rules was shown a hall to hire. One loose catalogue
-match was enough to hide the documents entirely.
-
-**Then, if the message names a community, the documents own the answer.** A
-miss is reported as a miss rather than falling through to a service list.
-Falling through is what produced the screenshot above: a tradesperson is not a
-worse answer to "Lauderdale Lake community rules", it is not an answer to it.
-
-![The routing gate](d02_routing.png)
-
-Being wrong in the direction of the documents is cheap. When they do not cover
-the question the lookup returns nothing and the catalogue search runs exactly as
-before, so the cost is one extra retrieval against 189 chunks held in memory.
+Only communities the index holds documents for are offered. One that is
+declared but empty is recognised in a typed question and refused by name, which
+is right there and wrong in a menu: a choice that cannot be answered should not
+be on the list.
 
 # 4. Retrieval, and what grounds it
 

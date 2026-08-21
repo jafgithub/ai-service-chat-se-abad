@@ -301,26 +301,15 @@ def _context(hits: list[dict]) -> str:
     )
 
 
-def answer_with_sources(question: str, chosen: str = "") -> "tuple[str | None, list[SourceOut]]":
-    """A grounded answer and the passages it came from.
-
-    The booking chat needs both. It was showing the answer with no attribution
-    at all, beside a pane that said "with the rule it came from", which was true
-    of the floating panel and not of the chat.
-    """
-    reply = answer_from_documents(question, _sink := [], chosen)
-    return reply, _sink
-
-
 def answer_from_documents(question: str,
                           sources: "list[SourceOut] | None" = None,
                           chosen: str = "") -> "str | None":
     """A grounded answer, or None. The shared core, used by two callers.
 
-    The floating panel calls it through `/docs/ask` below. The main chat calls
-    it directly when the service catalogue has nothing, so a resident who types
-    "what are the quiet hours" into the booking chat gets the same answer they
-    would get from the panel, out of the same index, with the same grounding.
+    The floating panel calls it through `/docs/ask` below. The booking chat used
+    to call it as well; it does not any more, because one box answering both
+    "what are the quiet hours" and "my sink is blocked" had to guess which of
+    them was being asked, and guessing wrong is what the client kept seeing.
 
     None means "the documents do not answer this", including small talk and
     model failures, so a caller with its own wording for that case can use it.

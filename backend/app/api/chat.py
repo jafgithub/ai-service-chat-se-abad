@@ -21,9 +21,7 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
     session = cart_service.get_or_create_session(db, payload.session_id, payload.latitude, payload.longitude)
 
     try:
-        result = conversation.process(payload.message, session, db,
-                                      category_filter=payload.category_filter,
-                                      community=payload.community)
+        result = conversation.process(payload.message, session, db, category_filter=payload.category_filter)
         db.commit()
     except Exception:
         # Keep the chat usable: log the traceback, roll back, and reply gracefully
@@ -51,5 +49,4 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
         cart=result["cart"],
         action=result["action"],
         intent=result.get("intent"),
-        sources=result.get("sources", []),
     )

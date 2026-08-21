@@ -154,31 +154,6 @@ export function ChatMessage({ message, large = false }: ChatMessageProps) {
           )}
         </div>
 
-        {/* Where the answer came from. Only the community documents set this,
-            and it is the document as well as the section on purpose: two of
-            the Serenity rulebooks disagree with each other, so which one an
-            answer came out of is the point rather than a footnote. */}
-        {!isUser && message.sources && message.sources.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {message.sources.map((s) => (
-              <span
-                key={`${s.document}-${s.section}`}
-                className="rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-[11px] text-ink-muted"
-              >
-                {/* Community first. With several associations loaded, whose
-                    rules these are is the first thing a reader needs, and an
-                    answer can draw on more than one document at a time. */}
-                {s.community && (
-                  <span className="font-semibold text-accent">{s.community}</span>
-                )}
-                {s.community && " \u00b7 "}
-                <span className="font-medium text-ink">{s.document}</span>
-                {" \u00b7 "}{s.section}
-              </span>
-            ))}
-          </div>
-        )}
-
         {/* Timestamps were under every bubble, including the greeting, which is
             a lot of noise for something nobody reads in a live conversation. */}
         <span className="px-1 text-[11px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100">

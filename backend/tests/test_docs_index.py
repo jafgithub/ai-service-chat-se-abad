@@ -223,29 +223,3 @@ def test_naming_the_other_community_scopes_the_search_to_it():
     hits = docs_index.search("What does the Lauderdale Lakes code say about grass?")
     assert hits
     assert {h["community"] for h in hits} == {"lauderdale lakes"}
-
-
-# ── routing between the booking chat and the documents ───────────────────────
-
-from app.services.conversation import _wants_documents  # noqa: E402
-
-
-@pytest.mark.parametrize("message", [
-    "What are the quiet hours?", "How much is the application fee?",
-    "When are trash days?", "Can I park a boat in my driveway?",
-    "Do I need ARB approval to paint my door?", "How many days is a parking pass?",
-])
-def test_a_rules_question_routes_to_the_documents(message):
-    assert _wants_documents(message), message
-
-
-@pytest.mark.parametrize("message", [
-    "my boiler is leaking", "I need a plumber", "book a dog walker",
-    "someone to cut my grass", "can I book someone to cut the grass",
-    "can you send a plumber", "window cleaning please",
-])
-def test_a_booking_request_never_routes_to_the_documents(message):
-    """The overlap this exists for. "Someone to cut my grass" reaches the lawn
-    rule at 0.470, higher than several genuine policy questions score, so the
-    score cannot make this call on its own."""
-    assert not _wants_documents(message), message

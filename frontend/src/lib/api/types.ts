@@ -5,8 +5,6 @@
 export interface ChatRequest {
   message: string;
   session_id?: string;
-  /** Which association's documents a rules answer may come from. */
-  community?: string;
   category_filter?: string;
   latitude?: number;
   longitude?: number;
@@ -39,13 +37,6 @@ export interface ChatAction {
   items?: { item_id: number; name: string; quantity?: number }[];
 }
 
-export interface DocumentSource {
-  section: string;
-  document: string;
-  /** The community this document governs, named as a resident would say it. */
-  community?: string;
-}
-
 export interface ChatResponse {
   session_id: string;
   reply: string;
@@ -54,8 +45,6 @@ export interface ChatResponse {
   total_services?: number;
   action: ChatAction | null;
   intent?: string | null;
-  /** Where a community documents answer came from. Empty for everything else. */
-  sources?: DocumentSource[];
 }
 
 export interface VoiceResponse {
@@ -69,8 +58,6 @@ export interface VoiceResponse {
   total_services?: number;
   action: ChatAction | null;
   intent?: string | null;
-  /** Voice takes the same pipeline, so it carries the same attribution. */
-  sources?: DocumentSource[];
 }
 
 // ── who is signed in ─────────────────────────────────────────────────────────

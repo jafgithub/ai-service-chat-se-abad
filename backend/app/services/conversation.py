@@ -10,132 +10,36 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.services import rag, ai, intent as intent_svc, cart_service, response, docs_index
+from app.services import rag, ai, intent as intent_svc, cart_service, response
 
 logger = logging.getLogger("chat")
 
 
-# A question about the rules, rather than a request for somebody to come out.
-#
-# Score alone cannot make this call: measured over twenty real phrasings the two
-# overlap, because "someone to cut my grass" is both a service we book and a
-# thing the rules have an opinion about (0.470 against the lawn rule), while
-# "how much for a copy of the condo docs" is a pure policy question that only
-# reaches 0.382. So shape decides what kind of message it is and the score
-# decides whether the documents actually cover it.
-_POLICY_SHAPE = re.compile(
-    r"^\s*(what|when|where|which|who|how much|how many|how long|how do i|"
-    r"can i|may i|am i allowed|do i need|is there|are there|are we|is it ok)\b",
-    re.IGNORECASE,
-)
-# Books a job whatever else it looks like. "I need a plumber" opens with none of
-# the above, but "can I book someone to cut the grass" opens with "can I" and
-# would otherwise be read as a policy question.
-_BOOKING_SHAPE = re.compile(
-    r"\b(book|order|arrange|send|hire|come out|call out|quote|appointment|"
-    r"i need (a|an|someone)|my \w+ (is|has) (broken|leaking|blocked|stopped))\b",
-    re.IGNORECASE,
-)
-
-# The vocabulary of the documents, for questions that are not questions.
-#
-# "Lauderdale Lake community rules" is how people actually search: a noun
-# phrase, no verb, no question mark. It opens with none of the words above, so
-# the shape test called it a service search, the catalogue found "Community hall
-# booking" at a weak score, and a resident asking about the rules was shown a
-# hall to hire. One loose catalogue match was enough to hide the documents
-# entirely, because the fallback below only runs when the catalogue finds
-# nothing at all.
-_DOC_SHAPE = re.compile(
-    r"\b(rules?|regulations?|by-?laws?|covenants?|guidelines?|restrictions?|"
-    r"policy|policies|hoa|association|ordinances?|handbook|"
-    r"quiet hours?|curfew|noise|"
-    r"architectural|arb|approval|violation|fine[sd]?|"
-    r"lease|leasing|tenant|pets?|trash|recycling|amenit(y|ies))\b",
-    re.IGNORECASE,
-)
-
-
-def _wants_documents(message: str) -> bool:
-    """Ask the community documents before the service catalogue?
-
-    Booking still wins outright, whatever else the message contains, because a
-    resident who says "I need someone to cut my grass" wants a gardener and not
-    the lawn rule, and both score about the same. Past that, either shape is
-    enough: a question ("what are the quiet hours") or the documents' own
-    vocabulary ("Serenity parking rules").
-
-    Cheap to be wrong in this direction. When the documents do not cover it the
-    lookup returns None and the catalogue search runs exactly as before, so the
-    worst case is one extra retrieval against 189 chunks in memory.
-    """
-    if _BOOKING_SHAPE.search(message):
-        return False
-    return bool(_POLICY_SHAPE.search(message) or _DOC_SHAPE.search(message))
-
-
 # A greeting, and nothing else. Anchored to the whole message so that
-# "hi, what are the quiet hours" goes to the documents rather than being waved
-# at, which is the same rule the floating panel uses.
+# "hi, my sink is blocked" is treated as the plumbing problem it is.
 _GREETING = re.compile(
     r"^\s*(hi|hey|hello|yo|hiya|howdy|good\s*(morning|afternoon|evening)|"
     r"salaam|assalam[ou]?\s*alaikum)\b[\s!.,]*$",
     re.IGNORECASE,
 )
 
+# Points at the floating assistant rather than answering rules questions here.
+# The booking chat books jobs; the community documents live behind the button in
+# the corner, where every question is already known to be about the rules.
 GREETING_REPLY = (
     "Hello. Tell me what needs doing and I will find someone who does it. "
-    "I can also answer questions about the community rules: quiet hours, "
-    "parking, pets, trash days and the application process."
+    "For questions about your community rules, use the assistant at the "
+    "bottom right of the screen."
 )
 
 
-def _document_answer(message: str, sources: list | None = None,
-                     chosen: str = "") -> "str | None":
-    """The community documents' answer to a question the catalogue could not meet.
-
-    Shares one index and one endpoint with the floating help panel, so a resident
-    gets the same answer whichever way they ask, and there is one place to fix a
-    wrong one. Grounding is unchanged: retrieval has to clear its floor before a
-    model is asked anything, and "the documents do not cover this" returns None
-    so the caller falls back to its own "nothing found" wording rather than
-    printing two.
-
-    One case does return text rather than None: a question naming a community we
-    hold no documents for. That is not a miss to fall through, it is the answer,
-    and the resident has to hear it rather than be shown a tradesperson.
-    """
-    try:
-        from app.api.docs import answer_from_documents
-        return answer_from_documents(message, sources, chosen)
-    except Exception:  # noqa: BLE001 - the chat must survive a documents outage
-        logger.exception("[CHAT] document lookup failed")
-        return None
-
-
-def _document_miss(message: str, chosen: str = "") -> str:
-    """What to say when the documents were the right place and had nothing."""
-    try:
-        from app.api.docs import not_in_documents
-        return not_in_documents(message, chosen)
-    except Exception:  # noqa: BLE001 - the chat must survive a documents outage
-        logger.exception("[CHAT] document lookup failed")
-        return "I could not find that in the community documents."
-
-
-def process(message: str, session, db: Session, category_filter: str | None = None,
-            community: str | None = None) -> dict:
+def process(message: str, session, db: Session, category_filter: str | None = None) -> dict:
     intent = intent_svc.parse(message, session, db)
     logger.info(f"[CHAT] intent={intent.type} refs={[(r.item_id, r.quantity) for r in intent.refs]}")
 
     services: list[dict] = []
     action: dict | None = None
     speech: str | None = None   # short version spoken aloud (long lists aren't read out)
-    #: Set when the reply did not come from the catalogue after all, so the
-    #: results pane can label itself honestly.
-    intent_override: str | None = None
-    #: The passages behind a documents answer, when there was one.
-    cited: list = []
 
     # ── a greeting ───────────────────────────────────────────────────────────
     # Before anything else, because "hi" is not a search. It was reaching the
@@ -147,54 +51,14 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                        speech=GREETING_REPLY, intent_type="greeting")
 
     # ── search ───────────────────────────────────────────────────────────────
+    #
+    # Only the catalogue. The community documents used to be consulted here as
+    # well, and it worked, but it put two unrelated jobs in one box: a resident
+    # asking about the quiet hours and a customer with a blocked drain got the
+    # same screen, and the screen had to guess which of them was talking. The
+    # documents now live entirely behind the floating assistant, where every
+    # question is already known to be about the rules.
     if intent.type == "search":
-        # A question about the community rules, asked in the booking chat. The
-        # catalogue will always return something loosely related (asking about
-        # quiet hours returned pet sitting and a community hall), so an empty
-        # result is not the signal. Shape decides, and retrieval's own floor
-        # decides whether the documents really cover it.
-        # Naming a community is a signal in its own right, separate from the
-        # vocabulary test. The client typed "DUTIES AND POWERS of lauderdale
-        # lake", a heading copied out of the handbook: no question word, none of
-        # the words in _DOC_SHAPE, but unmistakably about a document we hold.
-        names_community = (bool(docs_index.named_communities(message))
-                           and not _BOOKING_SHAPE.search(message))
-        asked_the_documents = _wants_documents(message) or names_community
-        if asked_the_documents:
-            # No extra score gate here on purpose. Shape has already ruled out
-            # booking requests, so the index's own floor is the right test of
-            # coverage, and the model refusing is the second one: both return
-            # None and the catalogue search below runs as normal. An earlier
-            # 0.45 gate was rejecting "how much for a copy of the condo docs",
-            # which the amenities sheet answers outright at $25.00, because it
-            # only scored 0.382.
-            grounded = _document_answer(message, found := [], community or "")
-            if grounded:
-                logger.info("[CHAT] answered from the community documents")
-                return _finish(db, session, grounded, [], None,
-                               speech="Here is what the community documents say.",
-                               intent_type="documents", sources=found)
-
-            # Named a place and asked about its rules, and the documents came
-            # back empty. Say so. Falling through to the catalogue is what the
-            # client photographed: "Lauderdale Lake community rules" answered
-            # with "Community hall booking, from $35.00", because one weak
-            # catalogue match is still a match. A tradesperson is not a worse
-            # answer to this question, it is not an answer to it.
-            # Owned outright only when the message is also about the rules.
-            # A community name on its own is not enough: "plumber in Serenity
-            # Point" is a request for a tradesperson that happens to say where,
-            # and it must still reach the catalogue.
-            if names_community and _wants_documents(message):
-                logger.info("[CHAT] %r names a community; the documents own it",
-                            message[:60])
-                # A miss, not an answer. The two must not arrive under the same
-                # label: the results pane reads it, and it was announcing
-                # "Answered from the community documents" beside "I could not
-                # find that in the Lauderdale Lakes documents".
-                return _finish(db, session, _document_miss(message, community or ""), [], None,
-                               intent_type="documents_miss")
-
         services = rag.search_products(query=intent.query, db=db, top_k=None, category_filter=category_filter)
         session.last_shown_json = response.build_shown(services)
         if services:
@@ -209,31 +73,6 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             reply = ai.search_intro(message, services) or response.search_reply(services)
         if services:
             speech = "Here is the list."
-        else:
-            # Nothing in the catalogue matched, which is exactly when a question
-            # about the community documents lands here: "what are the quiet
-            # hours" is not a service anybody books. Before telling the resident
-            # we found nothing, ask the documents.
-            #
-            # Only on the empty branch, deliberately. A message that did match
-            # real services is a request for a tradesperson and hijacking it
-            # with a policy answer would be worse than not trying.
-            #
-            # And only if the gate above did not already ask, or a question the
-            # documents cannot answer would pay for two retrievals and two model
-            # calls to arrive at the same refusal twice.
-            grounded = (None if asked_the_documents
-                        else _document_answer(message, found := [], community or ""))
-            if grounded:
-                reply, speech = grounded, "Here is what the community documents say."
-                cited, intent_override = found, "documents"
-            elif names_community:
-                intent_override = "documents_miss"
-                # Named a place, and neither the documents nor the catalogue had
-                # anything. "Try a different keyword, leaks and blocked drains
-                # are the usual ones" is a poor answer to a question about a
-                # community's rules, so say which documents were searched.
-                reply, speech = _document_miss(message, community or ""), None
 
     # ── add to cart ──────────────────────────────────────────────────────────
     elif intent.type == "add_to_cart":
@@ -293,8 +132,7 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     else:  # conversational
         reply = ai.small_talk(message) or "Thanks! Is there anything else I can help you with?"
 
-    return _finish(db, session, reply, services, action, speech,
-                   intent_type=intent_override or intent.type, sources=cited)
+    return _finish(db, session, reply, services, action, speech, intent_type=intent.type)
 
 
 # How many services travel to the browser. The search itself still scores the
@@ -306,11 +144,8 @@ MAX_SERVICES_RETURNED = 100
 
 
 def _finish(db: Session, session, reply: str, services: list[dict], action: dict | None,
-            speech: str | None = None, intent_type: str | None = None,
-            sources: list | None = None) -> dict:
+            speech: str | None = None, intent_type: str | None = None) -> dict:
     return {
-        "sources": [{"section": s.section, "document": s.document,
-                     "community": s.community} for s in (sources or [])],
         "reply": reply,
         "speech": speech or reply,   # spoken text falls back to the full reply
         "services": services[:MAX_SERVICES_RETURNED],

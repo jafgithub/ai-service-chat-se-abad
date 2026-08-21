@@ -14,7 +14,6 @@ import pytest
 
 from app.api.docs import _no_documents, answer_from_documents, not_in_documents
 from app.services import docs_index
-from app.services.conversation import _wants_documents
 
 
 # ── naming a community ───────────────────────────────────────────────────────
@@ -210,72 +209,11 @@ def test_both_quiet_hours_rules_are_still_retrieved_together():
     assert any("Rule 18" in s for s in sections), sections
 
 
-# ── routing: does the booking chat consult the documents at all ──────────────
-
-@pytest.mark.parametrize("message", [
-    "Lauderdale Lake community rules",
-    "Lauderdale Lakes quiet hours",
-    "Serenity parking rules",
-    "community rules about pets",
-    "What are the quiet hours?",
-    "Three Lakes community rules",
-    "What are the rules in Three Lakes?",
-    "how much is the application fee",
-    "hoa restrictions on fences",
-    "do I need approval to paint my house",
-    "trash collection days",
-])
-def test_a_question_about_the_community_reaches_the_documents(message):
-    """A noun phrase is how people search. None of these open with a question
-    word, and before this they were all catalogue searches."""
-    assert _wants_documents(message), message
-
-
-@pytest.mark.parametrize("message", [
-    "I need someone to cut my grass",
-    "book a plumber",
-    "I need a boiler repair",
-    "my sink is leaking",
-    "send someone to fix the boiler",
-    "arrange a gardener for Saturday",
-    "can I book someone to cut the grass",
-    "I need an electrician",
-    "gardening",
-    "house cleaning",
-])
-def test_a_request_for_a_tradesperson_still_goes_to_the_catalogue(message):
-    """Booking wins outright. "Someone to cut my grass" scores 0.470 against the
-    lawn rule, higher than several genuine policy questions, so score cannot
-    make this call and shape has to."""
-    assert not _wants_documents(message), message
-
-
-@pytest.mark.parametrize("message", [
-    "Lauderdale Lake community rules",
-    "Lauderdale Lakes quiet hours",
-    "Serenity parking rules",
-    "Three Lake community rules",
-    "What are the rules in Three Lakes?",
-])
-def test_a_named_community_question_is_owned_by_the_documents(message):
-    """Both halves of the rule the booking chat applies.
-
-    The message reaches the documents, and because it names a place, a miss
-    there is reported as a miss rather than falling through to the catalogue.
-    Falling through is what the client photographed: "Lauderdale Lake community
-    rules" answered with "Community hall booking, from $35.00".
-    """
-    assert _wants_documents(message), message
-    assert docs_index.named_communities(message), message
-
-
-@pytest.mark.parametrize("message", [
-    "I need someone to cut my grass",
-    "book a plumber",
-    "window cleaning please",
-])
-def test_a_service_request_is_never_owned_by_the_documents(message):
-    assert not _wants_documents(message), message
+# The booking chat's routing tests used to live here. They are gone with the
+# routing: the documents are no longer consulted from the booking chat at all,
+# because one box answering both "what are the quiet hours" and "my sink is
+# blocked" had to guess which was being asked. Every community question now
+# arrives through the floating assistant, where there is nothing to guess.
 
 
 # ── a heading is a request, not a question ───────────────────────────────────
@@ -314,39 +252,6 @@ def test_the_message_itself_is_never_altered():
     """Whatever framing is chosen, the resident's words go through intact."""
     for message in ("DUTIES AND POWERS of lauderdale lake", "What are the quiet hours?"):
         assert message in _asked(message)
-
-
-# ── naming a community is enough to reach the documents ──────────────────────
-
-from app.services.conversation import _BOOKING_SHAPE  # noqa: E402
-
-
-def routed_to_documents(message: str) -> bool:
-    """The gate as `process` applies it: vocabulary, or a community name that is
-    not a booking request."""
-    names = bool(docs_index.named_communities(message)) and not _BOOKING_SHAPE.search(message)
-    return _wants_documents(message) or names
-
-
-@pytest.mark.parametrize("message", [
-    "DUTIES AND POWERS of lauderdale lake",
-    "lauderdale lakes nuisance animals",
-    "Serenity Point trash",
-    "Three Lakes",
-])
-def test_naming_a_community_reaches_the_documents(message):
-    assert routed_to_documents(message), message
-
-
-@pytest.mark.parametrize("message", [
-    "book a plumber in Serenity Point",
-    "I need someone to cut my grass",
-    "send a plumber to Lauderdale Lakes",
-    "window cleaning please",
-])
-def test_a_booking_request_still_goes_to_the_catalogue(message):
-    """A community name says where somebody lives, not what they want."""
-    assert not routed_to_documents(message), message
 
 
 # ── the community name is used for scoping, then it stops voting ─────────────

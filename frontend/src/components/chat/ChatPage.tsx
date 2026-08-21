@@ -15,8 +15,6 @@ import type { Booked, ServiceResult } from "@/lib/api";
 import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { cn } from "@/lib/utils";
-import { CommunityPicker } from "@/components/chat/CommunityPicker";
-import { useCommunities } from "@/lib/community";
 
 interface ChatPageProps {
   scope?: string;
@@ -109,14 +107,6 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
      read the same on screen: an answer about the quiet hours sat beside
      "Nobody on the platform lists anything like that", which is true of the
      catalogue and beside the point of what was asked. */
-  const [fromDocuments, setFromDocuments] = useState("");
-  // Which association the resident is asking as. Shown above the composer so
-  // it is visible before they type, not discovered after a wrong answer.
-  const { options, chosen, current, choose } = useCommunities();
-  // The last answer that came out of the community documents, kept so the
-  // results pane can show it rather than sitting empty behind a list of
-  // plumbing categories that has nothing to do with what was asked.
-  const [docAnswer, setDocAnswer] = useState<{ text: string; sources: { section: string; document: string; community?: string }[] } | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
   const [totalMatches, setTotalMatches] = useState(0);
   const [inputValue, setInputValue] = useState("");
@@ -157,10 +147,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const STORAGE_KEY = "sa_conversation";
   const RESULTS_KEY = "sa_services";
 
-  const addMessage = useCallback((role: "user" | "assistant", content: string,
-                                  sources?: { section: string; document: string }[]) => {
-    setMessages((prev) => [...prev,
-      { id: crypto.randomUUID(), role, content, timestamp: new Date(), sources }]);
+  const addMessage = useCallback((role: "user" | "assistant", content: string) => {
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, content, timestamp: new Date() }]);
   }, []);
 
   /**
@@ -368,23 +356,18 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         return;
       }
       addMessage("user", heard);
-      addMessage("assistant", res.reply, res.sources);
+      addMessage("assistant", res.reply);
       if (res.services.length > 0) {
         setProblem(heard);
         setServices(res.services);
         setTotalMatches(res.total_services ?? res.services.length);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(heard);
-        setFromDocuments("");
-        setDocAnswer(null);
       } else if (res.action === null) {
         setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
-        const doc = res.intent === "documents" || res.intent === "documents_miss";
-        setDocAnswer(doc ? { text: res.reply, sources: res.sources ?? [] } : null);
-        setResultsFor(doc ? "" : heard);
-        setFromDocuments(doc ? res.intent! : "");
+        setResultsFor(heard);
       }
       applyAction(res.action, res.services.length > 0 ? res.services : services);
       // Speak the short version: long lists are shown, not read out.
@@ -475,13 +458,10 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         message: text.trim(),
         session_id: sessionId || getSessionId(),
         category_filter: scope ?? undefined,
-        // Which association's rules a documents answer may come from. Ignored
-        // for everything else: a blocked drain is a blocked drain.
-        community: chosen || undefined,
         latitude: geo.position?.latitude,
         longitude: geo.position?.longitude,
       });
-      addMessage("assistant", response.reply, response.sources);
+      addMessage("assistant", response.reply);
       // A search that found nothing has to clear the last one, or the assistant
       // says "I couldn't find anything" beside a panel still listing results for
       // the previous question. Only a *search* clears them: choosing a service
@@ -492,8 +472,6 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setTotalMatches(response.total_services ?? response.services.length);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(text.trim());
-        setFromDocuments("");
-        setDocAnswer(null);
       } else if (response.action === null) {
         // A documents answer is not a failed search and must not be dressed as
         // one. Clearing `resultsFor` keeps "Nothing matches" off the screen;
@@ -501,10 +479,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
-        const doc = response.intent === "documents" || response.intent === "documents_miss";
-        setDocAnswer(doc ? { text: response.reply, sources: response.sources ?? [] } : null);
-        setResultsFor(doc ? "" : text.trim());
-        setFromDocuments(doc ? response.intent! : "");
+        setResultsFor(text.trim());
       }
       applyAction(response.action, response.services.length > 0 ? response.services : services);
     } catch (err) {
@@ -515,7 +490,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, services, chosen]);
+  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, services]);
 
   const onBooked = useCallback((made: Booked) => {
     addMessage(
@@ -553,15 +528,6 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
      screen, and as a shared footer on a phone. */
   const composer = (
     <div className="flex-shrink-0 border-t border-line bg-surface px-4 py-3">
-      {/* Above the box rather than buried in a menu: a resident should know
-          whose rules they are about to be told before they ask, not after. It
-          renders nothing when only one association is loaded. */}
-      {options.length > 1 && (
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wide text-ink-faint">Rules for</span>
-          <CommunityPicker options={options} current={current} onChoose={choose} openUp />
-        </div>
-      )}
       <form
         onSubmit={(e) => { e.preventDefault(); sendMessage(inputValue); }}
         className="flex items-center gap-2"
@@ -754,25 +720,17 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   ? resultsFor
                     ? `For “${resultsFor}”`
                     : "Services"
-                  : fromDocuments === "documents_miss"
-                    ? `Not in the ${current?.label ?? "community"} documents`
-                    : fromDocuments
-                      ? `${current?.label ?? "Community"} documents`
-                    : searchedAndFoundNothing
-                      ? `Nothing matches “${resultsFor}”`
-                      : "Services"}
+                  : searchedAndFoundNothing
+                    ? `Nothing matches “${resultsFor}”`
+                    : "Services"}
               </p>
               <p className="mt-0.5 text-xs text-ink-muted">
                 {services.length > 0
                   ? totalMatches > services.length
                     ? `${totalMatches} match, showing the closest ${services.length}`
                     : `${services.length} service${services.length === 1 ? "" : "s"} could cover this`
-                  : fromDocuments === "documents_miss"
-                    ? "Nothing in them covers that, so nothing was invented"
-                    : fromDocuments
-                      ? "Answered from this association's own documents"
-                    : searchedAndFoundNothing
-                      ? "Nobody on the platform lists anything like that"
+                  : searchedAndFoundNothing
+                    ? "Nobody on the platform lists anything like that"
                     : "Describe the problem, or start from a category"}
               </p>
             </div>
@@ -834,78 +792,17 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   </div>
                 )}
               </>
-            ) : fromDocuments && docAnswer ? (
-              /* A rules answer. The pane used to show plumbing categories under
-                 one of these, which is two unrelated things side by side and
-                 reads as a mistake. It shows the answer instead: whose rules,
-                 what they say, and which document each line came from. */
-              <div className="flex h-full flex-col overflow-y-auto">
-                <div className="mx-auto w-full max-w-2xl py-2">
-                  {/* The community's name is on the pane header already. This
-                      row is the control, not a second label. */}
-                  {options.length > 1 && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs uppercase tracking-wide text-ink-faint">
-                        Answering as
-                      </span>
-                      <CommunityPicker options={options} current={current} onChoose={choose} />
-                    </div>
-                  )}
-
-                  <div className="mt-4 rounded-card border border-line bg-surface p-5">
-                    {docAnswer.text.split(/\n+/).filter(Boolean).map((line, i) => (
-                      <p key={i} className={cn("text-[15px] leading-relaxed text-ink", i > 0 && "mt-2")}>
-                        {line.replace(/^[-*]\s*/, "")}
-                      </p>
-                    ))}
-                  </div>
-
-                  {docAnswer.sources.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">
-                        Where this came from
-                      </p>
-                      <ul className="mt-2 space-y-2">
-                        {docAnswer.sources.map((src) => (
-                          <li
-                            key={`${src.document}-${src.section}`}
-                            className="rounded-control border border-line bg-surface-sunken px-4 py-3"
-                          >
-                            <p className="text-sm font-semibold text-ink">{src.document}</p>
-                            <p className="text-xs text-ink-muted">
-                              {src.community ? `${src.community} · ` : ""}{src.section}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <p className="mt-5 text-sm text-ink-muted">
-                    Ask another question about the rules, or describe a job and I will
-                    find someone who does it.
-                  </p>
-                </div>
-              </div>
             ) : (
               /* The arrival state: somewhere to start rather than an empty pane. */
               <div className={cn("flex h-full flex-col justify-center")}>
                 <div className="mx-auto w-full max-w-2xl">
                   <h2 className="text-base font-semibold text-ink">
-                    {fromDocuments === "documents_miss"
-                      ? "Not in the community documents"
-                      : fromDocuments
-                      ? "Answered from the community documents"
-                      : searchedAndFoundNothing
+                    {searchedAndFoundNothing
                         ? `Nothing here matches “${resultsFor}”`
                         : "What needs doing?"}
                   </h2>
                   <p className="mt-1 text-sm text-ink-muted">
-                    {fromDocuments === "documents_miss"
-                      ? "Ask about a particular thing and I will look it up, or describe a job and I will find someone."
-                      : fromDocuments
-                      ? "Ask another question about the rules, or describe a job and I will find someone."
-                      : searchedAndFoundNothing
+                    {searchedAndFoundNothing
                         ? "Try describing it differently, or start from a category."
                         : "Describe it in your own words, or start from a category."}
                   </p>
