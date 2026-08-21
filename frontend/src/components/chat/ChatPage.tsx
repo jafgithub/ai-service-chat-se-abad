@@ -107,7 +107,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
      read the same on screen: an answer about the quiet hours sat beside
      "Nobody on the platform lists anything like that", which is true of the
      catalogue and beside the point of what was asked. */
-  const [fromDocuments, setFromDocuments] = useState(false);
+  const [fromDocuments, setFromDocuments] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
   const [totalMatches, setTotalMatches] = useState(0);
   const [inputValue, setInputValue] = useState("");
@@ -364,13 +364,14 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setTotalMatches(res.total_services ?? res.services.length);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(heard);
-        setFromDocuments(false);
+        setFromDocuments("");
       } else if (res.action === null) {
         setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
-        setResultsFor(res.intent === "documents" ? "" : heard);
-        setFromDocuments(res.intent === "documents");
+        const doc = res.intent === "documents" || res.intent === "documents_miss";
+        setResultsFor(doc ? "" : heard);
+        setFromDocuments(doc ? res.intent! : "");
       }
       applyAction(res.action, res.services.length > 0 ? res.services : services);
       // Speak the short version: long lists are shown, not read out.
@@ -475,7 +476,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setTotalMatches(response.total_services ?? response.services.length);
         setVisibleCount(PAGE_SIZE);
         setResultsFor(text.trim());
-        setFromDocuments(false);
+        setFromDocuments("");
       } else if (response.action === null) {
         // A documents answer is not a failed search and must not be dressed as
         // one. Clearing `resultsFor` keeps "Nothing matches" off the screen;
@@ -483,8 +484,9 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
-        setResultsFor(response.intent === "documents" ? "" : text.trim());
-        setFromDocuments(response.intent === "documents");
+        const doc = response.intent === "documents" || response.intent === "documents_miss";
+        setResultsFor(doc ? "" : text.trim());
+        setFromDocuments(doc ? response.intent! : "");
       }
       applyAction(response.action, response.services.length > 0 ? response.services : services);
     } catch (err) {
@@ -725,8 +727,10 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   ? resultsFor
                     ? `For “${resultsFor}”`
                     : "Services"
-                  : fromDocuments
-                    ? "From the community documents"
+                  : fromDocuments === "documents_miss"
+                    ? "Not in the community documents"
+                    : fromDocuments
+                      ? "From the community documents"
                     : searchedAndFoundNothing
                       ? `Nothing matches “${resultsFor}”`
                       : "Services"}
@@ -736,8 +740,10 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   ? totalMatches > services.length
                     ? `${totalMatches} match, showing the closest ${services.length}`
                     : `${services.length} service${services.length === 1 ? "" : "s"} could cover this`
-                  : fromDocuments
-                    ? "The answer is in the conversation, with the rule it came from"
+                  : fromDocuments === "documents_miss"
+                    ? "Nothing in them covers that, so nothing was invented"
+                    : fromDocuments
+                      ? "The answer is in the conversation, with the rule it came from"
                     : searchedAndFoundNothing
                       ? "Nobody on the platform lists anything like that"
                     : "Describe the problem, or start from a category"}
@@ -806,14 +812,18 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
               <div className={cn("flex h-full flex-col justify-center")}>
                 <div className="mx-auto w-full max-w-2xl">
                   <h2 className="text-base font-semibold text-ink">
-                    {fromDocuments
+                    {fromDocuments === "documents_miss"
+                      ? "Not in the community documents"
+                      : fromDocuments
                       ? "Answered from the community documents"
                       : searchedAndFoundNothing
                         ? `Nothing here matches “${resultsFor}”`
                         : "What needs doing?"}
                   </h2>
                   <p className="mt-1 text-sm text-ink-muted">
-                    {fromDocuments
+                    {fromDocuments === "documents_miss"
+                      ? "Ask about a particular thing and I will look it up, or describe a job and I will find someone."
+                      : fromDocuments
                       ? "Ask another question about the rules, or describe a job and I will find someone."
                       : searchedAndFoundNothing
                         ? "Try describing it differently, or start from a category."

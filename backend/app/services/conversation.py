@@ -113,6 +113,9 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     services: list[dict] = []
     action: dict | None = None
     speech: str | None = None   # short version spoken aloud (long lists aren't read out)
+    #: Set when the reply did not come from the catalogue after all, so the
+    #: results pane can label itself honestly.
+    intent_override: str | None = None
 
     # ── search ───────────────────────────────────────────────────────────────
     if intent.type == "search":
@@ -156,8 +159,12 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             if names_community and _wants_documents(message):
                 logger.info("[CHAT] %r names a community; the documents own it",
                             message[:60])
+                # A miss, not an answer. The two must not arrive under the same
+                # label: the results pane reads it, and it was announcing
+                # "Answered from the community documents" beside "I could not
+                # find that in the Lauderdale Lakes documents".
                 return _finish(db, session, _document_miss(message), [], None,
-                               intent_type="documents")
+                               intent_type="documents_miss")
 
         services = rag.search_products(query=intent.query, db=db, top_k=None, category_filter=category_filter)
         session.last_shown_json = response.build_shown(services)
@@ -190,6 +197,7 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             if grounded:
                 reply, speech = grounded, "Here is what the community documents say."
             elif names_community:
+                intent_override = "documents_miss"
                 # Named a place, and neither the documents nor the catalogue had
                 # anything. "Try a different keyword, leaks and blocked drains
                 # are the usual ones" is a poor answer to a question about a
@@ -254,7 +262,8 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     else:  # conversational
         reply = ai.small_talk(message) or "Thanks! Is there anything else I can help you with?"
 
-    return _finish(db, session, reply, services, action, speech, intent_type=intent.type)
+    return _finish(db, session, reply, services, action, speech,
+                   intent_type=intent_override or intent.type)
 
 
 # How many services travel to the browser. The search itself still scores the
