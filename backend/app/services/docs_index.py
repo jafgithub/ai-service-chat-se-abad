@@ -132,6 +132,20 @@ def available() -> set[str]:
     return {c.get("community", HOME_COMMUNITY) for c in _chunks}
 
 
+def label_for(key: str) -> str:
+    """The community's name as a resident would say it, from its tag.
+
+    Chunks carry the tag ("lauderdale lakes"); people read the label
+    ("Lauderdale Lakes"). An unknown tag is title cased rather than dropped, so
+    a community added to the index before it is added to the registry still
+    shows something truthful.
+    """
+    for community in COMMUNITIES:
+        if community.key == key:
+            return community.label
+    return key.title()
+
+
 def documents_for(key: str) -> list[str]:
     """The titles a community's chunks came from, in the order they appear.
 

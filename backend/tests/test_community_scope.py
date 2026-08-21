@@ -411,3 +411,48 @@ def test_a_greeting_in_the_booking_chat_is_a_greeting(message):
 ])
 def test_a_greeting_carrying_a_real_message_is_not_swallowed(message):
     assert not _GREETING.match(message), message
+
+
+# ── every credit says whose rules it is ──────────────────────────────────────
+
+from app.api.docs import _credits, MAX_CREDITS  # noqa: E402
+
+
+def credits_for(question: str):
+    return _credits(docs_index.search(question, k=4))
+
+
+def test_a_credit_names_the_community_the_document_and_the_section():
+    """The client asked for all three. With several associations loaded,
+    "which rules are these" is the first thing a reader needs."""
+    for source in credits_for("What are the quiet hours?"):
+        assert source.community == "Serenity Point", source
+        assert source.document
+        assert source.section
+
+
+def test_a_lauderdale_answer_is_credited_to_lauderdale():
+    for source in credits_for("Lauderdale Lakes tall grass"):
+        assert source.community == "Lauderdale Lakes", source
+
+
+def test_an_answer_from_two_documents_names_both():
+    """The pets question is answered from both Serenity rulebooks, and they
+    disagree. Naming one of them twice while the other goes unmentioned is the
+    failure this ordering exists to prevent."""
+    documents = {s.document for s in credits_for("Can I keep a dog?")}
+    assert len(documents) >= 2, documents
+
+
+def test_the_same_section_is_never_credited_twice():
+    """A long section split into parts retrieves as several chunks under one
+    label. Three identical chips is a stutter, not evidence."""
+    for question in ("Lauderdale Lakes tall grass", "how long can I rent my home for",
+                     "What are the quiet hours?"):
+        seen = [(s.document, s.section) for s in credits_for(question)]
+        assert len(seen) == len(set(seen)), (question, seen)
+
+
+def test_no_more_than_three_are_named():
+    for question in ("Lauderdale Lakes tall grass", "how long can I rent my home for"):
+        assert len(credits_for(question)) <= MAX_CREDITS, question

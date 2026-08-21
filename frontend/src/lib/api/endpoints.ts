@@ -213,6 +213,8 @@ export const paymentsApi = {
 export interface DocsSource {
   section: string;
   document: string;
+  /** The community this document governs. */
+  community?: string;
   score: number;
 }
 

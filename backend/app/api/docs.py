@@ -177,6 +177,11 @@ class AskIn(BaseModel):
 class SourceOut(BaseModel):
     section: str
     document: str
+    #: The community whose document this is, named as a resident would say it.
+    #: Shown because an answer can draw on more than one document, and with
+    #: several associations loaded, "which rules are these" is the first thing
+    #: a reader needs to know.
+    community: str = ""
     score: float
 
 
@@ -203,6 +208,11 @@ class AskOut(BaseModel):
 # one-line answer invites the resident to go and read two irrelevant sections.
 CREDIT_MARGIN = 0.12
 
+# How many to name. Three rather than two, because a question can genuinely
+# straddle three documents now that several associations are loaded, and the
+# client asked for all of them to be named rather than the best two.
+MAX_CREDITS = 3
+
 
 def _credits(hits: list[dict]) -> list["SourceOut"]:
     """Which passages to name under the answer.
@@ -213,9 +223,39 @@ def _credits(hits: list[dict]) -> list["SourceOut"]:
     place is noise rather than evidence.
     """
     best = hits[0]["score"]
-    keep = [h for h in hits if best - h["score"] <= CREDIT_MARGIN][:2]
+    close = [h for h in hits if best - h["score"] <= CREDIT_MARGIN]
+
+    # One credit per document first, then fill up with the next best. An answer
+    # that draws on two documents has to name both, and naming the same document
+    # twice while the second one goes unmentioned is the failure that matters:
+    # the two Serenity rulebooks disagree with each other.
+    seen: set[str] = set()
+    keep: list[dict] = []
+    for hit in close:
+        if hit["document_short"] not in seen:
+            seen.add(hit["document_short"])
+            keep.append(hit)
+    shown = {(h["document_short"], h["section"]) for h in keep}
+    for hit in close:
+        if len(keep) >= MAX_CREDITS:
+            break
+        # A long section split into parts retrieves as several chunks with the
+        # same label. Three identical chips under one answer is not evidence,
+        # it is a stutter.
+        key = (hit["document_short"], hit["section"])
+        if key in shown:
+            continue
+        shown.add(key)
+        keep.append(hit)
+    keep = sorted(keep[:MAX_CREDITS], key=lambda h: -h["score"])
+
     return [
-        SourceOut(section=h["section"], document=h["document_short"], score=h["score"])
+        SourceOut(
+            section=h["section"],
+            document=h["document_short"],
+            community=docs_index.label_for(h.get("community", docs_index.HOME_COMMUNITY)),
+            score=h["score"],
+        )
         for h in keep
     ]
 

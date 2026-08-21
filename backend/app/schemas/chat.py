@@ -39,6 +39,7 @@ class DocumentSource(BaseModel):
     """
     section: str
     document: str
+    community: str = ""
 
 
 class ChatResponse(BaseModel):

@@ -306,7 +306,8 @@ def _finish(db: Session, session, reply: str, services: list[dict], action: dict
             speech: str | None = None, intent_type: str | None = None,
             sources: list | None = None) -> dict:
     return {
-        "sources": [{"section": s.section, "document": s.document} for s in (sources or [])],
+        "sources": [{"section": s.section, "document": s.document,
+                     "community": s.community} for s in (sources or [])],
         "reply": reply,
         "speech": speech or reply,   # spoken text falls back to the full reply
         "services": services[:MAX_SERVICES_RETURNED],

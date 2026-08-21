@@ -222,7 +222,11 @@ export function HelpWidget() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">Community assistant</p>
-              <p className="truncate text-xs text-ink-muted">Answers from the Serenity documents</p>
+              {/* Not "the Serenity documents" any more: it answers for Lauderdale
+                  Lakes as well, and each answer names the community it came
+                  from. Promising one association while quoting another is the
+                  kind of small untruth that costs trust in the whole thing. */}
+              <p className="truncate text-xs text-ink-muted">Answers from your community documents</p>
             </div>
             <button
               type="button"
@@ -311,6 +315,10 @@ export function HelpWidget() {
                               which a phone never shows, and two of these
                               documents disagree with each other: which one an
                               answer came from is the point. */}
+                          {s.community && (
+                            <span className="font-semibold text-accent">{s.community}</span>
+                          )}
+                          {s.community && " · "}
                           <span className="font-medium text-ink">{s.document}</span>
                           {" · "}{s.section}
                         </span>

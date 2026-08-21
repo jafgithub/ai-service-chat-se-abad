@@ -40,6 +40,8 @@ export interface ChatAction {
 export interface DocumentSource {
   section: string;
   document: string;
+  /** The community this document governs, named as a resident would say it. */
+  community?: string;
 }
 
 export interface ChatResponse {

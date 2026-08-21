@@ -165,6 +165,13 @@ export function ChatMessage({ message, large = false }: ChatMessageProps) {
                 key={`${s.document}-${s.section}`}
                 className="rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-[11px] text-ink-muted"
               >
+                {/* Community first. With several associations loaded, whose
+                    rules these are is the first thing a reader needs, and an
+                    answer can draw on more than one document at a time. */}
+                {s.community && (
+                  <span className="font-semibold text-accent">{s.community}</span>
+                )}
+                {s.community && " \u00b7 "}
                 <span className="font-medium text-ink">{s.document}</span>
                 {" \u00b7 "}{s.section}
               </span>

@@ -13,7 +13,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   /** Set only on an answer taken from the community documents. */
-  sources?: { section: string; document: string }[];
+  sources?: { section: string; document: string; community?: string }[];
 }
 
 export interface Step {
