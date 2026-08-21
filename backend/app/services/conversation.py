@@ -74,6 +74,22 @@ def _wants_documents(message: str) -> bool:
     return bool(_POLICY_SHAPE.search(message) or _DOC_SHAPE.search(message))
 
 
+# A greeting, and nothing else. Anchored to the whole message so that
+# "hi, what are the quiet hours" goes to the documents rather than being waved
+# at, which is the same rule the floating panel uses.
+_GREETING = re.compile(
+    r"^\s*(hi|hey|hello|yo|hiya|howdy|good\s*(morning|afternoon|evening)|"
+    r"salaam|assalam[ou]?\s*alaikum)\b[\s!.,]*$",
+    re.IGNORECASE,
+)
+
+GREETING_REPLY = (
+    "Hello. Tell me what needs doing and I will find someone who does it. "
+    "I can also answer questions about the community rules: quiet hours, "
+    "parking, pets, trash days and the application process."
+)
+
+
 def _document_answer(message: str) -> "str | None":
     """The community documents' answer to a question the catalogue could not meet.
 
@@ -116,6 +132,15 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     #: Set when the reply did not come from the catalogue after all, so the
     #: results pane can label itself honestly.
     intent_override: str | None = None
+
+    # ── a greeting ───────────────────────────────────────────────────────────
+    # Before anything else, because "hi" is not a search. It was reaching the
+    # catalogue, finding nothing, and being answered with "try a different
+    # keyword, leaks and blocked drains are the usual ones", which is a cold
+    # thing to say to somebody who has just said hello.
+    if _GREETING.match(message or ""):
+        return _finish(db, session, GREETING_REPLY, [], None,
+                       speech=GREETING_REPLY, intent_type="greeting")
 
     # ── search ───────────────────────────────────────────────────────────────
     if intent.type == "search":

@@ -302,7 +302,14 @@ def _tidy(reply: str) -> str:
     """
     reply = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", reply)
     reply = re.sub(r"\s*\((?:see |per |from )?[^)]*(?:Rule|Passage)\s*\d+[^)]*\)", "", reply)
-    reply = re.sub(r"(?im)^\s*(?:and\s+)?passage\s*\d+\s*(?:also\s*)?"
+    # The bullet in front defeated the old anchor: "- Passage 1 states ..." kept
+    # the words the resident must never see, because the line no longer began
+    # with "Passage". Allow the list marker before it.
+    reply = re.sub(r"(?im)^(\s*[-*\u2022]?\s*)(?:and\s+)?passage\s*\d+\s*(?:also\s*)?"
+                   r"(?:states|says|notes|adds|indicates)\s*(?:that\s*)?", r"\1", reply)
+    # And the same words mid sentence, which is where they land when the model
+    # is contrasting two of them.
+    reply = re.sub(r"(?i)\b(?:and\s+)?passage\s*\d+\s*(?:also\s*)?"
                    r"(?:states|says|notes|adds|indicates)\s*(?:that\s*)?", "", reply)
     reply = re.sub(r"(?m)^([a-z])", lambda m: m.group(1).upper(), reply)
     return re.sub(r"[ \t]{2,}", " ", reply).strip()

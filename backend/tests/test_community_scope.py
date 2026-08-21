@@ -380,3 +380,34 @@ def test_headings_are_the_label_rather_than_a_part_number():
 def test_the_running_header_is_not_indexed_as_content():
     for chunk in docs_index._chunks:
         assert "PAGE |" not in chunk["text"], chunk["section"]
+
+
+# ── the two blemishes found while building the demo ──────────────────────────
+
+from app.api.docs import _tidy  # noqa: E402
+from app.services.conversation import _GREETING  # noqa: E402
+
+
+@pytest.mark.parametrize("raw, gone", [
+    ("- Passage 1 states loud music may not be played after 11:00PM.", "Passage"),
+    ("Passage 2 says trash is collected on Tuesdays.", "Passage"),
+    ("The documents differ, and Passage 3 also notes that pets must be leashed.", "Passage"),
+])
+def test_the_resident_never_sees_the_word_passage(raw, gone):
+    """They cannot see the passages and do not know what one is. The rule
+    existed; a bullet in front of it was enough to defeat the anchor."""
+    assert gone not in _tidy(raw)
+
+
+@pytest.mark.parametrize("message", ["hi", "Hello", "hey!", "Good morning", "howdy"])
+def test_a_greeting_in_the_booking_chat_is_a_greeting(message):
+    assert _GREETING.match(message), message
+
+
+@pytest.mark.parametrize("message", [
+    "hi, what are the quiet hours",
+    "hello - how much is the application fee?",
+    "my sink is blocked",
+])
+def test_a_greeting_carrying_a_real_message_is_not_swallowed(message):
+    assert not _GREETING.match(message), message
