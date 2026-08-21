@@ -252,3 +252,131 @@ def test_a_named_community_question_is_owned_by_the_documents(message):
 ])
 def test_a_service_request_is_never_owned_by_the_documents(message):
     assert not _wants_documents(message), message
+
+
+# ── a heading is a request, not a question ───────────────────────────────────
+
+from app.api.docs import _asked  # noqa: E402
+
+
+@pytest.mark.parametrize("message", [
+    "What are the quiet hours?",
+    "How much is the application fee?",
+    "Can I keep a dog?",
+    "Do I need approval to paint my house",
+    "is there a fine for long grass",
+])
+def test_a_question_is_put_to_the_model_as_a_question(message):
+    assert _asked(message).startswith("Resident's question:"), message
+
+
+@pytest.mark.parametrize("message", [
+    "DUTIES AND POWERS of lauderdale lake",
+    "quiet hours",
+    "pets",
+    "Serenity parking rules",
+    "VIOLATIONS AND ASSOCIATION REMEDIES",
+])
+def test_a_heading_or_a_topic_is_put_as_a_topic(message):
+    """The client copied "DUTIES AND POWERS" out of the handbook and got a
+    refusal. Retrieval had found the right passage at 0.626; the model then
+    judged it against a question nobody had asked."""
+    framed = _asked(message)
+    assert framed.startswith("Resident asked about:"), message
+    assert "what the community documents say" in framed
+
+
+def test_the_message_itself_is_never_altered():
+    """Whatever framing is chosen, the resident's words go through intact."""
+    for message in ("DUTIES AND POWERS of lauderdale lake", "What are the quiet hours?"):
+        assert message in _asked(message)
+
+
+# ── naming a community is enough to reach the documents ──────────────────────
+
+from app.services.conversation import _BOOKING_SHAPE  # noqa: E402
+
+
+def routed_to_documents(message: str) -> bool:
+    """The gate as `process` applies it: vocabulary, or a community name that is
+    not a booking request."""
+    names = bool(docs_index.named_communities(message)) and not _BOOKING_SHAPE.search(message)
+    return _wants_documents(message) or names
+
+
+@pytest.mark.parametrize("message", [
+    "DUTIES AND POWERS of lauderdale lake",
+    "lauderdale lakes nuisance animals",
+    "Serenity Point trash",
+    "Three Lakes",
+])
+def test_naming_a_community_reaches_the_documents(message):
+    assert routed_to_documents(message), message
+
+
+@pytest.mark.parametrize("message", [
+    "book a plumber in Serenity Point",
+    "I need someone to cut my grass",
+    "send a plumber to Lauderdale Lakes",
+    "window cleaning please",
+])
+def test_a_booking_request_still_goes_to_the_catalogue(message):
+    """A community name says where somebody lives, not what they want."""
+    assert not routed_to_documents(message), message
+
+
+# ── the community name is used for scoping, then it stops voting ─────────────
+
+@pytest.mark.parametrize("query, expected", [
+    ("DUTIES AND POWERS of lauderdale lake", "DUTIES AND POWERS"),
+    ("lauderdale lakes tall grass", "tall grass"),
+    ("Serenity parking rules", "parking rules"),
+    ("what does Three Lakes say about fences", "what does say about fences"),
+    ("rules in Serenity Point", "rules"),
+])
+def test_the_community_name_is_removed_before_embedding(query, expected):
+    """Inside a scoped search the name cannot separate anything, because every
+    chunk being scored already belongs to that community. What it does instead
+    is pull the ranking towards whichever passages happen to say the word."""
+    named = docs_index.named_communities(query)
+    assert docs_index._without_community(query, named) == expected, query
+
+
+def test_a_bare_community_name_is_left_alone():
+    """Stripping it would leave nothing to search for, and "Lauderdale Lakes"
+    on its own is a fair question: show them what the handbook covers."""
+    for query in ("Lauderdale Lakes", "Serenity Point", "lauderdale lake"):
+        named = docs_index.named_communities(query)
+        assert docs_index._without_community(query, named) == query, query
+
+
+def test_a_question_naming_nobody_is_untouched():
+    for query in ("What are the quiet hours?", "how much is the application fee"):
+        assert docs_index._without_community(query, []) == query
+
+
+def test_the_section_a_resident_copied_out_of_the_handbook_is_found():
+    """The client's own test: he opened the handbook, saw the heading on page 3,
+    typed it in, and was told nothing matched. Retrieval had scored the mission
+    statement top at 0.626 and never returned the section he named."""
+    hits = docs_index.search("DUTIES AND POWERS of lauderdale lake")
+    assert hits, "the section he named must come back"
+    assert hits[0]["section"].lower().startswith("duties and powers"), hits[0]["section"]
+    assert "code compliance officers" in hits[0]["text"].lower()
+
+
+def test_headings_are_the_label_rather_than_a_part_number():
+    """"Lauderdale Lakes code handbook, part 6" tells a resident nothing about
+    what they are being shown, and told the retriever nothing either: every
+    chunk opened with the same fifty characters."""
+    sections = {c["section"] for c in docs_index._chunks
+                if c["community"] == "lauderdale lakes"}
+    for expected in ("Duties And Powers", "Lawn, Swale And Landscape Maintenance",
+                     "Garbage, Recycling And Bulk Trash"):
+        assert expected in sections, expected
+    assert not any("part " in s and s.startswith("Lauderdale") for s in sections)
+
+
+def test_the_running_header_is_not_indexed_as_content():
+    for chunk in docs_index._chunks:
+        assert "PAGE |" not in chunk["text"], chunk["section"]

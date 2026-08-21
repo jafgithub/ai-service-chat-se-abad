@@ -159,6 +159,10 @@ Rules you must follow:
   one long paragraph. A wall of text in a small chat panel does not get read.
 - Write for a resident, warm and plain. No legal preamble, no "according to the provided context".
 - Answer directly. No greeting, no "Hi there", no restating the question back.
+- A resident may type a topic, or a heading copied straight out of a document, or just a few
+  words, rather than a full question: "quiet hours", "DUTIES AND POWERS", "pets". That is still
+  a request. Tell them what the passages say about it. Do not reply NO_ANSWER merely because
+  the message was not phrased as a question.
 - Plain text only. No markdown, no asterisks, no bold or italics, no headings.
 - Do not cite rule numbers or passage numbers in your answer; the interface shows the source beside it.
   The one exception is a disagreement, where naming the document is the point.
@@ -216,6 +220,29 @@ def _credits(hits: list[dict]) -> list["SourceOut"]:
     ]
 
 
+_QUESTION_SHAPE = re.compile(
+    r"\?|^\s*(what|when|where|which|who|how|why|can|may|do|does|did|is|are|"
+    r"was|were|should|could|would|will|am|has|have|tell me|explain)\b",
+    re.IGNORECASE,
+)
+
+
+def _asked(message: str) -> str:
+    """How the resident's message is put to the model.
+
+    A question is passed through as one. Anything else is named as a topic,
+    because the client typed "DUTIES AND POWERS of lauderdale lake", copied from
+    a heading in the handbook, and got a refusal: retrieval had found the right
+    passage at 0.626, and the model then judged it against a question nobody had
+    asked. The passages are unchanged and so is the licence to refuse; only the
+    framing of the request differs.
+    """
+    if _QUESTION_SHAPE.search(message):
+        return f"Resident's question: {message}"
+    return (f"Resident asked about: {message}\n\n"
+            "Tell them what the community documents say about that.")
+
+
 def _context(hits: list[dict]) -> str:
     return "\n\n".join(
         f"[Passage {i}] From \"{h['document']}\", {h['section']}:\n{h['text']}"
@@ -252,7 +279,7 @@ def answer_from_documents(question: str) -> "str | None":
 
     reply = gemini_service.generate(
         SYSTEM,
-        f"{_context(hits)}\n\nResident's question: {question}",
+        f"{_context(hits)}\n\n{_asked(question)}",
         max_tokens=320,
         temperature=0.0,
     )
@@ -303,7 +330,7 @@ def ask(payload: AskIn) -> AskOut:
 
     reply = gemini_service.generate(
         SYSTEM,
-        f"{_context(hits)}\n\nResident's question: {question}",
+        f"{_context(hits)}\n\n{_asked(question)}",
         max_tokens=320,
         temperature=0.0,
     )

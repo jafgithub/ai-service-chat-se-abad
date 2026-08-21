@@ -121,7 +121,13 @@ def process(message: str, session, db: Session, category_filter: str | None = No
         # quiet hours returned pet sitting and a community hall), so an empty
         # result is not the signal. Shape decides, and retrieval's own floor
         # decides whether the documents really cover it.
-        asked_the_documents = _wants_documents(message)
+        # Naming a community is a signal in its own right, separate from the
+        # vocabulary test. The client typed "DUTIES AND POWERS of lauderdale
+        # lake", a heading copied out of the handbook: no question word, none of
+        # the words in _DOC_SHAPE, but unmistakably about a document we hold.
+        names_community = (bool(docs_index.named_communities(message))
+                           and not _BOOKING_SHAPE.search(message))
+        asked_the_documents = _wants_documents(message) or names_community
         if asked_the_documents:
             # No extra score gate here on purpose. Shape has already ruled out
             # booking requests, so the index's own floor is the right test of
@@ -143,7 +149,11 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             # with "Community hall booking, from $35.00", because one weak
             # catalogue match is still a match. A tradesperson is not a worse
             # answer to this question, it is not an answer to it.
-            if docs_index.named_communities(message):
+            # Owned outright only when the message is also about the rules.
+            # A community name on its own is not enough: "plumber in Serenity
+            # Point" is a request for a tradesperson that happens to say where,
+            # and it must still reach the catalogue.
+            if names_community and _wants_documents(message):
                 logger.info("[CHAT] %r names a community; the documents own it",
                             message[:60])
                 return _finish(db, session, _document_miss(message), [], None,
@@ -179,6 +189,12 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             grounded = None if asked_the_documents else _document_answer(message)
             if grounded:
                 reply, speech = grounded, "Here is what the community documents say."
+            elif names_community:
+                # Named a place, and neither the documents nor the catalogue had
+                # anything. "Try a different keyword, leaks and blocked drains
+                # are the usual ones" is a poor answer to a question about a
+                # community's rules, so say which documents were searched.
+                reply, speech = _document_miss(message), None
 
     # ── add to cart ──────────────────────────────────────────────────────────
     elif intent.type == "add_to_cart":

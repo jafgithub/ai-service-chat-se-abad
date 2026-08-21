@@ -64,7 +64,11 @@ NOISE = re.compile(
     # useless to a resident and the most repeated text in that document.
     r"GRS Management|15280 NW 79TH|Miami Lakes, FL 33016|\(305\) 823-|"
     r"grsmanagement\.com|Customer@grsmanagement|"
-    r"^Page \d+ of \d+$|^FOR OFFICE USE ONLY$|^Updated By:|^ONE PER ADULT$",
+    r"^Page \d+ of \d+$|^FOR OFFICE USE ONLY$|^Updated By:|^ONE PER ADULT$|"
+    # The handbook repeats its own name and the page number across the top of
+    # every page. Left in, it is both noise and the most repeated text in the
+    # document, which is the worst thing a chunk can open with.
+    r"CITY OF LAUDERDALE LAKES CODE COMPLIANCE HANDBOOK|PAGE \| \d+",
     re.IGNORECASE,
 )
 
@@ -262,54 +266,124 @@ def chunk_application(pdf: Path) -> list[dict]:
     return out
 
 
+# Small capitals come out of the PDF with the first letter split off:
+# "L AWN , S WALE" for "LAWN, SWALE". Glue them back before anything tries to
+# recognise a heading, or every heading in the handbook is invisible.
+_SMALL_CAPS = re.compile(r"\b([A-Z]) ([A-Z]{2,})\b")
+
+
+def unmangle(line: str) -> str:
+    """Glue the split letters back, but only on a line that is really small caps.
+
+    The test is two or more splits on the same line. "A NIMALS AND P ESTS" has
+    two and is small caps; "HOW TO REPORT A POSSIBLE CODE VIOLATION" has one and
+    is ordinary text where "A" is simply the word "a". Gluing unconditionally
+    turned that heading into "APOSSIBLE", which is how this rule earned its
+    condition.
+    """
+    if len(_SMALL_CAPS.findall(line)) >= 2:
+        line = _SMALL_CAPS.sub(r"\1\2", line)
+    else:
+        # A single split on the line. Only "A" and "I" are words on their own,
+        # so anything else is a small capital that lost its word: "B USINESS".
+        line = _SMALL_CAPS.sub(
+            lambda m: m.group(0) if m.group(1) in ("A", "I") else m.group(1) + m.group(2),
+            line)
+    return re.sub(r"\s+([,;:])", r"\1", line).strip()
+
+
+def heading_of(line: str) -> "str | None":
+    """A section heading, or None.
+
+    These documents mark a section with a line in capitals and nothing else on
+    it. That is worth finding, because the heading is what a resident types:
+    the client copied "DUTIES AND POWERS" straight out of the handbook.
+    """
+    text = unmangle(line)
+    if not 4 <= len(text) <= 60:
+        return None
+    if text.endswith("."):
+        return None
+    letters = [c for c in text if c.isalpha()]
+    if len(letters) < 4 or not all(c.isupper() for c in letters):
+        return None
+    if not re.fullmatch(r"[A-Z0-9 &,'/()\-]+", text):
+        return None
+    return text
+
+
 def chunk_generic(pdf: Path, title: str, short: str, community: str) -> list[dict]:
     """Any document without a structure worth special casing.
 
-    Paragraph blocks, glued back together and then held to the same word cap as
-    everything else. The two hand written chunkers above exist because the rules
-    sheet and the management pack have real structure worth following; most
-    documents do not, and writing a parser per document would not survive the
-    client sending a fifth one.
+    Paragraph blocks under the heading they sit beneath. The two hand written
+    chunkers above exist because the rules sheet and the management pack have
+    real structure worth following; most documents do not, and writing a parser
+    per document would not survive the client sending a fifth one.
+
+    **The heading, not the document title, is what goes into the embedding.**
+    Prepending "City of Lauderdale Lakes Code Compliance Handbook: " to all
+    ninety three chunks made every one of them open with the same fifty
+    characters, so "DUTIES AND POWERS of lauderdale lake" matched all of them
+    about equally: the top four came back at 0.626, 0.611, 0.609 and 0.608, the
+    passage that actually holds that section was not among them, and the model
+    was left refusing a question it had been given no way to answer. A repeated
+    prefix is not context, it is noise with the volume turned up.
     """
     lines = clean(text_of(pdf))
-    blocks, current = [], []
+
+    # Blocks, each tagged with the heading in force when it started.
+    blocks: list[tuple[str, list[str]]] = []
+    current: list[str] = []
+    heading = ""
     for ln in lines:
+        found = heading_of(ln) if ln.strip() else None
+        if found:
+            if current:
+                blocks.append((heading, current))
+                current = []
+            heading = found
+            continue
         if ln.strip():
             current.append(ln)
         elif current:
-            blocks.append(current)
+            blocks.append((heading, current))
             current = []
     if current:
-        blocks.append(current)
+        blocks.append((heading, current))
 
     # Merge short blocks forward rather than dropping them. The first version
     # dropped anything under twelve words, which threw away the one line that
     # answers "how much are the condo docs": "Condo Docs/Bylaws Fee $25.00" is
-    # six words. On a form, the short lines are the facts.
-    merged: list[list[str]] = []
-    for block in blocks:
-        if merged and len(" ".join(merged[-1]).split()) < 35:
-            merged[-1] = merged[-1] + block
+    # six words. On a form, the short lines are the facts. Only within one
+    # heading, so a stray line cannot drag the next section's text into itself.
+    merged: list[tuple[str, list[str]]] = []
+    for head, block in blocks:
+        if merged and merged[-1][0] == head and len(" ".join(merged[-1][1]).split()) < 35:
+            merged[-1] = (head, merged[-1][1] + block)
         else:
-            merged.append(block)
+            merged.append((head, block))
 
     slug = re.sub(r"[^a-z0-9]+", "-", pdf.stem.lower()).strip("-")
     out: list[dict] = []
-    for i, block in enumerate(merged, 1):
+    for i, (head, block) in enumerate(merged, 1):
         text = squash(block)
         # Keep anything carrying a number: fees, dates, hours and limits are
         # what people ask about. Drop only short prose with nothing in it.
         if len(text.split()) < 8 and not re.search(r"\d", text):
             continue
-        for j, part in enumerate(split_long(text), 1):
+        # A document with no headings at all, which is most forms, keeps the
+        # short title as its label. There the title is the only context there
+        # is, and with four chunks it cannot drown anything.
+        label = head.title() if head else short
+        for part in split_long(text):
             out.append({
-                "id": f"{slug}-{i}-{j}",
+                "id": f"{slug}-{i}-{len(out) + 1}",
                 "document": title,
                 "document_short": short,
                 "community": community,
                 "approved": "",
-                "section": f"{short}, part {len(out) + 1}",
-                "text": f"{title}: {part}",
+                "section": label,
+                "text": f"{label}: {part}",
             })
     return out
 

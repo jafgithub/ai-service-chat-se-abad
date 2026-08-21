@@ -238,6 +238,37 @@ def scope(query: str) -> set[str]:
     return named or {HOME_COMMUNITY}
 
 
+def _without_community(query: str, named: list[Community]) -> str:
+    """The question with the community's name taken out, for embedding only.
+
+    Inside a scoped search the name is pure noise. Every chunk being scored
+    already belongs to that community, so "lauderdale" cannot separate them, and
+    what it does instead is pull the ranking towards whichever passages happen to
+    say the word: "DUTIES AND POWERS of lauderdale lake" put the mission
+    statement top at 0.619 and never returned the section it named. Take the name
+    out and the same query puts "Duties And Powers" top at 0.518, with the
+    runner up at 0.275.
+
+    Scoping has already used the name. This is the second half of that: use it
+    once, for what it decides, then stop letting it vote.
+    """
+    out = query
+    for community in named:
+        for alias in sorted(community.aliases, key=len, reverse=True):
+            words = []
+            for word in alias.split():
+                if len(word) > 3 and word.endswith("s"):
+                    word = word[:-1]
+                words.append(re.escape(word) + "s?")
+            out = re.sub(r"\b" + r"\s+".join(words) + r"\b", " ", out, flags=re.IGNORECASE)
+    # A dangling "in" or "of" left where the name was helps nothing.
+    out = re.sub(r"\b(in|at|for|of|from|about|the)\s*$", " ", out.strip(), flags=re.IGNORECASE)
+    out = re.sub(r"\s{2,}", " ", out).strip(" ,.-")
+    # "Lauderdale Lakes" on its own is a real question, and stripping it leaves
+    # nothing to search for. Keep the original in that case.
+    return out if len(out) >= 3 else query
+
+
 def search(query: str, k: int = 4) -> list[dict]:
     """The k passages closest to the question, best first, above MIN_SCORE.
 
@@ -256,7 +287,8 @@ def search(query: str, k: int = 4) -> list[dict]:
     if len(query) < 3 or not _load():
         return []
 
-    allowed = scope(query)
+    named = named_communities(query)
+    allowed = {c.key for c in named} or {HOME_COMMUNITY}
     missing = [c.label for c in unavailable(query)]
     if missing:
         # The caller is expected to have checked `unavailable()` and said so.
@@ -271,7 +303,7 @@ def search(query: str, k: int = 4) -> list[dict]:
     if rows is None or rows.size == 0:
         return []
 
-    vec = _embed(query)
+    vec = _embed(_without_community(query, named))
     if vec is None:
         return []
 
