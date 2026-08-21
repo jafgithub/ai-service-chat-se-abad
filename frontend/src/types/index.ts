@@ -12,6 +12,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  /** Set only on an answer taken from the community documents. */
+  sources?: { section: string; document: string }[];
 }
 
 export interface Step {

@@ -90,7 +90,7 @@ GREETING_REPLY = (
 )
 
 
-def _document_answer(message: str) -> "str | None":
+def _document_answer(message: str, sources: list | None = None) -> "str | None":
     """The community documents' answer to a question the catalogue could not meet.
 
     Shares one index and one endpoint with the floating help panel, so a resident
@@ -106,7 +106,7 @@ def _document_answer(message: str) -> "str | None":
     """
     try:
         from app.api.docs import answer_from_documents
-        return answer_from_documents(message)
+        return answer_from_documents(message, sources)
     except Exception:  # noqa: BLE001 - the chat must survive a documents outage
         logger.exception("[CHAT] document lookup failed")
         return None
@@ -132,6 +132,8 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     #: Set when the reply did not come from the catalogue after all, so the
     #: results pane can label itself honestly.
     intent_override: str | None = None
+    #: The passages behind a documents answer, when there was one.
+    cited: list = []
 
     # ── a greeting ───────────────────────────────────────────────────────────
     # Before anything else, because "hi" is not a search. It was reaching the
@@ -164,12 +166,12 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             # 0.45 gate was rejecting "how much for a copy of the condo docs",
             # which the amenities sheet answers outright at $25.00, because it
             # only scored 0.382.
-            grounded = _document_answer(message)
+            grounded = _document_answer(message, found := [])
             if grounded:
                 logger.info("[CHAT] answered from the community documents")
                 return _finish(db, session, grounded, [], None,
                                speech="Here is what the community documents say.",
-                               intent_type="documents")
+                               intent_type="documents", sources=found)
 
             # Named a place and asked about its rules, and the documents came
             # back empty. Say so. Falling through to the catalogue is what the
@@ -218,9 +220,10 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             # And only if the gate above did not already ask, or a question the
             # documents cannot answer would pay for two retrievals and two model
             # calls to arrive at the same refusal twice.
-            grounded = None if asked_the_documents else _document_answer(message)
+            grounded = None if asked_the_documents else _document_answer(message, found := [])
             if grounded:
                 reply, speech = grounded, "Here is what the community documents say."
+                cited, intent_override = found, "documents"
             elif names_community:
                 intent_override = "documents_miss"
                 # Named a place, and neither the documents nor the catalogue had
@@ -288,7 +291,7 @@ def process(message: str, session, db: Session, category_filter: str | None = No
         reply = ai.small_talk(message) or "Thanks! Is there anything else I can help you with?"
 
     return _finish(db, session, reply, services, action, speech,
-                   intent_type=intent_override or intent.type)
+                   intent_type=intent_override or intent.type, sources=cited)
 
 
 # How many services travel to the browser. The search itself still scores the
@@ -300,8 +303,10 @@ MAX_SERVICES_RETURNED = 100
 
 
 def _finish(db: Session, session, reply: str, services: list[dict], action: dict | None,
-            speech: str | None = None, intent_type: str | None = None) -> dict:
+            speech: str | None = None, intent_type: str | None = None,
+            sources: list | None = None) -> dict:
     return {
+        "sources": [{"section": s.section, "document": s.document} for s in (sources or [])],
         "reply": reply,
         "speech": speech or reply,   # spoken text falls back to the full reply
         "services": services[:MAX_SERVICES_RETURNED],

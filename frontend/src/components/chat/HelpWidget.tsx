@@ -304,10 +304,15 @@ export function HelpWidget() {
                       {turn.sources.map((s) => (
                         <span
                           key={s.section}
-                          title={s.document}
                           className="rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-muted"
                         >
-                          {s.section}
+                          {/* The document, then the section. It used to be the
+                              section alone with the document in a tooltip,
+                              which a phone never shows, and two of these
+                              documents disagree with each other: which one an
+                              answer came from is the point. */}
+                          <span className="font-medium text-ink">{s.document}</span>
+                          {" · "}{s.section}
                         </span>
                       ))}
                     </div>

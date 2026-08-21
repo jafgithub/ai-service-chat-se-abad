@@ -49,4 +49,5 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
         cart=result["cart"],
         action=result["action"],
         intent=result.get("intent"),
+        sources=result.get("sources", []),
     )

@@ -148,8 +148,10 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const STORAGE_KEY = "sa_conversation";
   const RESULTS_KEY = "sa_services";
 
-  const addMessage = useCallback((role: "user" | "assistant", content: string) => {
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, content, timestamp: new Date() }]);
+  const addMessage = useCallback((role: "user" | "assistant", content: string,
+                                  sources?: { section: string; document: string }[]) => {
+    setMessages((prev) => [...prev,
+      { id: crypto.randomUUID(), role, content, timestamp: new Date(), sources }]);
   }, []);
 
   /**
@@ -357,7 +359,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         return;
       }
       addMessage("user", heard);
-      addMessage("assistant", res.reply);
+      addMessage("assistant", res.reply, res.sources);
       if (res.services.length > 0) {
         setProblem(heard);
         setServices(res.services);
@@ -465,7 +467,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         latitude: geo.position?.latitude,
         longitude: geo.position?.longitude,
       });
-      addMessage("assistant", response.reply);
+      addMessage("assistant", response.reply, response.sources);
       // A search that found nothing has to clear the last one, or the assistant
       // says "I couldn't find anything" beside a panel still listing results for
       // the previous question. Only a *search* clears them: choosing a service

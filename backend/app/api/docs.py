@@ -250,7 +250,19 @@ def _context(hits: list[dict]) -> str:
     )
 
 
-def answer_from_documents(question: str) -> "str | None":
+def answer_with_sources(question: str) -> "tuple[str | None, list[SourceOut]]":
+    """A grounded answer and the passages it came from.
+
+    The booking chat needs both. It was showing the answer with no attribution
+    at all, beside a pane that said "with the rule it came from", which was true
+    of the floating panel and not of the chat.
+    """
+    reply = answer_from_documents(question, _sink := [])
+    return reply, _sink
+
+
+def answer_from_documents(question: str,
+                          sources: "list[SourceOut] | None" = None) -> "str | None":
     """A grounded answer, or None. The shared core, used by two callers.
 
     The floating panel calls it through `/docs/ask` below. The main chat calls
@@ -288,6 +300,8 @@ def answer_from_documents(question: str) -> "str | None":
     reply = _tidy(reply.strip())
     if "NO_ANSWER" in reply.upper() or len(reply) < 2:
         return None
+    if sources is not None:
+        sources.extend(_credits(hits))
     return reply
 
 

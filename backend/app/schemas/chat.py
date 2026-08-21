@@ -30,6 +30,17 @@ class ServiceResult(BaseModel):
     similarity: float
 
 
+class DocumentSource(BaseModel):
+    """Where a community documents answer came from, for the interface to show.
+
+    Both halves are needed. The section on its own does not say which document
+    it is in, and with two Serenity rulebooks that disagree with each other,
+    that is exactly the thing a resident needs to see.
+    """
+    section: str
+    document: str
+
+
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
@@ -41,6 +52,8 @@ class ChatResponse(BaseModel):
     total_services: int = 0
     cart: CartOut
     action: Optional[dict[str, Any]] = None
+    #: Filled only when the reply came out of the community documents.
+    sources: list[DocumentSource] = []
     # What the shopper's message was understood as: "search", "add_to_cart",
     # "view_cart", "checkout" and so on. The frontend uses it to decide whether
     # looking outside our catalog is even appropriate, which matters because
