@@ -490,3 +490,57 @@ def test_one_association_never_gets_another_ones_paint():
 def test_serenity_does_not_borrow_three_lakes_mailbox_rules():
     hits = docs_index.search("mailbox post height", chosen="serenity")
     assert all(h["community"] == "serenity" for h in hits)
+
+
+# ── the document library: what exists, and what may be answered from ─────────
+
+from app.services import doc_library  # noqa: E402
+
+
+def test_every_indexed_document_is_downloadable():
+    """An answer names its document. If that document is not in the library the
+    resident is told where it came from and then cannot have it."""
+    indexed = {(c["community"], c["document_short"]) for c in docs_index._chunks}
+    library = {(d["community"], d["title"]) for d in doc_library.all_documents()}
+    missing = {(com, doc) for com, doc in indexed
+               # the application PDF holds two documents; it is listed once
+               if doc != "Application Package"} - library
+    assert not missing, missing
+
+
+def test_the_scans_and_drawings_are_download_only():
+    """The client asked to upload documents that cannot be read, so residents
+    can still have them. They must never reach the index."""
+    for doc in doc_library.all_documents():
+        if doc["kind"] == doc_library.DOWNLOAD_ONLY:
+            assert doc["sections"] == 0, doc["title"]
+            assert not any(c.get("doc_id") == doc["id"] for c in docs_index._chunks), doc["title"]
+
+
+def test_a_download_only_document_is_still_offered_to_its_community():
+    titles = {d["title"] for d in doc_library.for_community("three lakes")}
+    for expected in ("Site map", "Subsurface drainage system",
+                     "Design standards and covenant guidelines"):
+        assert expected in titles, expected
+
+
+def test_downloads_are_scoped_to_one_community():
+    for community in ("serenity", "three lakes", "valencia"):
+        for doc in doc_library.for_community(community):
+            assert doc["community"] == community, doc
+
+
+def test_every_document_in_the_library_is_on_disk():
+    """A library entry with no file is a download button that 404s."""
+    for doc in doc_library.all_documents():
+        assert doc_library.path_for(doc).exists(), doc["filename"]
+
+
+def test_a_withdrawn_document_disappears_from_both():
+    """Withdrawal has to reach the index as well as the list, or the interface
+    says a document is gone while the assistant carries on quoting it."""
+    withdrawn = [d for d in doc_library.all_documents(include_withdrawn=True)
+                 if d.get("withdrawn_at")]
+    for doc in withdrawn:
+        assert doc not in doc_library.all_documents()
+        assert not any(c.get("doc_id") == doc["id"] for c in docs_index._chunks), doc["id"]

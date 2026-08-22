@@ -251,14 +251,87 @@ def _load() -> bool:
             return False
         _vectors = np.asarray([c.pop("vector") for c in chunks], dtype=np.float32)
         _chunks = chunks
-        rows: dict[str, list[int]] = {}
-        for i, chunk in enumerate(_chunks):
-            rows.setdefault(chunk.get("community", HOME_COMMUNITY), []).append(i)
-        _rows = {key: np.asarray(idx, dtype=np.int32) for key, idx in rows.items()}
+        _rebuild_rows()
         logger.info("[DOCS] %d chunks loaded, %d dimensions, communities: %s",
                     len(_chunks), _vectors.shape[1],
                     ", ".join(f"{k} ({len(v)})" for k, v in sorted(_rows.items())))
         return True
+
+
+def _rebuild_rows() -> None:
+    """Recompute the per-community row map. Call after the chunks change."""
+    global _rows
+    rows: dict[str, list[int]] = {}
+    for i, chunk in enumerate(_chunks):
+        rows.setdefault(chunk.get("community", HOME_COMMUNITY), []).append(i)
+    _rows = {key: np.asarray(idx, dtype=np.int32) for key, idx in rows.items()}
+
+
+def _persist() -> None:
+    """Write the index back out, chunks and vectors together.
+
+    Written to a temporary file and moved into place, because a half written
+    index read at startup is an assistant that answers from half a document and
+    cannot tell that anything is missing.
+    """
+    payload = {
+        "model": "all-MiniLM-L6-v2",
+        "dimensions": int(_vectors.shape[1]) if _vectors is not None else 384,
+        "chunks": [
+            {**chunk, "vector": [round(float(x), 6) for x in _vectors[i]]}
+            for i, chunk in enumerate(_chunks)
+        ],
+    }
+    tmp = INDEX_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload), encoding="utf-8")
+    tmp.replace(INDEX_PATH)
+
+
+def add_chunks(chunks: list[dict], vectors) -> int:
+    """Put a newly uploaded document's sections into the live index.
+
+    In memory first, then on disk, so a resident asking a question a second
+    after the upload gets the new document without waiting for a restart. The
+    lock matters: two uploads at once would otherwise interleave their appends
+    and leave the vectors and the chunks a row apart, which is not an error
+    anybody would notice until an answer cited the wrong section.
+    """
+    global _vectors, _chunks
+    if not chunks:
+        return 0
+    _load()
+    with _lock:
+        added = np.asarray(vectors, dtype=np.float32)
+        _vectors = added if _vectors is None else np.vstack([_vectors, added])
+        _chunks = _chunks + list(chunks)
+        _rebuild_rows()
+        _persist()
+    logger.info("[DOCS] %d section(s) added, %d in the index", len(chunks), len(_chunks))
+    return len(chunks)
+
+
+def drop_document(doc_id: str) -> int:
+    """Remove every section of one document from the live index.
+
+    The client asked for a document he removes to stop answering immediately,
+    which means the in-memory copy has to lose it too. Leaving it until the next
+    restart would mean the interface says a document is gone while the assistant
+    is still quoting it.
+    """
+    global _vectors, _chunks
+    if not _load():
+        return 0
+    with _lock:
+        keep = [i for i, c in enumerate(_chunks) if c.get("doc_id") != doc_id]
+        removed = len(_chunks) - len(keep)
+        if not removed:
+            return 0
+        _chunks = [_chunks[i] for i in keep]
+        _vectors = _vectors[np.asarray(keep, dtype=np.int32)] if keep else None
+        _rebuild_rows()
+        _persist()
+    logger.info("[DOCS] %d section(s) of %s removed, %d left", removed, doc_id, len(_chunks))
+    return removed
 
 
 def _embed(query: str) -> Optional[np.ndarray]:

@@ -17,8 +17,8 @@ from app.models import (  # noqa: F401 - imported so create_all registers every 
     Account, Session, ServiceRequest,
 )
 from app.api import (
-    admin, auth, booking, cart, chat, docs, jobs, media, payments, providers,
-    requests as service_requests, services, voice,
+    admin, auth, booking, cart, chat, docs, documents, jobs, media, payments,
+    providers, requests as service_requests, services, voice,
 )
 
 
@@ -118,6 +118,7 @@ app.include_router(auth.router,     prefix="/api/v1")
 app.include_router(providers.router, prefix="/api/v1")
 app.include_router(service_requests.router, prefix="/api/v1")
 app.include_router(docs.router,      prefix="/api/v1")
+app.include_router(documents.router, prefix="/api/v1")
 
 
 @app.exception_handler(Exception)

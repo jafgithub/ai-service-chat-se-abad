@@ -1,0 +1,202 @@
+{
+  "documents": [
+    {
+      "id": "serenity-rules-and-regulations",
+      "community": "serenity",
+      "title": "Rules and Regulations",
+      "filename": "knowledge/serenity/rules.pdf",
+      "kind": "answerable",
+      "sections": 19,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "serenity-rules-and-regulations-management-pack",
+      "community": "serenity",
+      "title": "Rules and Regulations (management pack)",
+      "filename": "knowledge/serenity/application.pdf",
+      "kind": "answerable",
+      "sections": 55,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "serenity-arb-modification-form",
+      "community": "serenity",
+      "title": "ARB modification form",
+      "filename": "knowledge/serenity/arb-form.pdf",
+      "kind": "answerable",
+      "sections": 6,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "serenity-amenities-fees",
+      "community": "serenity",
+      "title": "Amenities fees",
+      "filename": "knowledge/serenity/amenities-fees.pdf",
+      "kind": "answerable",
+      "sections": 4,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "serenity-temporary-parking-pass",
+      "community": "serenity",
+      "title": "Temporary parking pass",
+      "filename": "knowledge/serenity/parking-pass.pdf",
+      "kind": "answerable",
+      "sections": 6,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "lauderdale-lakes-lauderdale-lakes-code-handbook",
+      "community": "lauderdale lakes",
+      "title": "Lauderdale Lakes code handbook",
+      "filename": "knowledge/other-communities/lauderdale-lakes-code-handbook.pdf",
+      "kind": "answerable",
+      "sections": 92,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "three-lakes-mailbox-guidelines",
+      "community": "three lakes",
+      "title": "Mailbox guidelines",
+      "filename": "knowledge/three-lakes/mailbox-guidelines.pdf",
+      "kind": "answerable",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "three-lakes-design-review-form",
+      "community": "three lakes",
+      "title": "Design review form",
+      "filename": "knowledge/three-lakes/design-review-form.pdf",
+      "kind": "answerable",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "three-lakes-direct-debit-form",
+      "community": "three lakes",
+      "title": "Direct debit form",
+      "filename": "knowledge/three-lakes/direct-debit-form.pdf",
+      "kind": "answerable",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "kendall-square-approved-colour-archive",
+      "community": "kendall square",
+      "title": "Approved colour archive",
+      "filename": "knowledge/kendall-square/color-archive.pdf",
+      "kind": "answerable",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "valencia-approved-colour-archive",
+      "community": "valencia",
+      "title": "Approved colour archive",
+      "filename": "knowledge/valencia/color-archive.pdf",
+      "kind": "answerable",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "enclave-at-old-cutler-approved-colour-archive",
+      "community": "enclave at old cutler",
+      "title": "Approved colour archive",
+      "filename": "knowledge/enclave-old-cutler/color-archive.pdf",
+      "kind": "answerable",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "three-lakes-design-standards-and-covenant-guidelines",
+      "community": "three lakes",
+      "title": "Design standards and covenant guidelines",
+      "filename": "knowledge/needs-ocr/three lake community rules-Design_Standards_and_Covenant_Guidelines.pdf",
+      "kind": "download_only",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "serenity-application-for-occupancy",
+      "community": "serenity",
+      "title": "Application for occupancy",
+      "filename": "knowledge/needs-ocr/APPLICATION-FOR-OCCUPANCY-SERENITY-POINT.pdf",
+      "kind": "download_only",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "three-lakes-site-map",
+      "community": "three lakes",
+      "title": "Site map",
+      "filename": "knowledge/three-lakes/site-map.pdf",
+      "kind": "download_only",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "three-lakes-subsurface-drainage",
+      "community": "three lakes",
+      "title": "Subsurface drainage system",
+      "filename": "knowledge/three-lakes/subsurface-drainage.pdf",
+      "kind": "download_only",
+      "sections": 0,
+      "source": "repo",
+      "added_at": "2026-08-22T00:00:00+00:00",
+      "withdrawn_at": null
+    },
+    {
+      "id": "harbour-view-mailbox-guidelines-f40335",
+      "community": "harbour view",
+      "title": "Mailbox guidelines",
+      "filename": "mailbox-guidelines-mailbox-specsheet-3-lake.pdf",
+      "kind": "answerable",
+      "sections": 3,
+      "source": "upload",
+      "added_at": "2026-08-22T11:25:00+00:00",
+      "withdrawn_at": "2026-08-22T11:26:00+00:00"
+    },
+    {
+      "id": "harbour-view-site-map-d6944f",
+      "community": "harbour view",
+      "title": "Site map",
+      "filename": "site-map-site-map-3-lakes-pdf.pdf",
+      "kind": "download_only",
+      "sections": 0,
+      "source": "upload",
+      "added_at": "2026-08-22T11:25:03+00:00",
+      "withdrawn_at": "2026-08-22T11:26:01+00:00"
+    }
+  ]
+}
