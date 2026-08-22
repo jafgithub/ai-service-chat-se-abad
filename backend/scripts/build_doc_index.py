@@ -534,6 +534,22 @@ def main() -> None:
     for chunk, vec in zip(chunks, vectors):
         chunk["vector"] = [round(float(x), 6) for x in vec]
 
+    # Every community that just produced a chunk must be in the registry, or its
+    # name goes unrecognised and its residents are answered from Serenity. The
+    # build is the right place to notice: it is the only moment when the
+    # documents and the names are both in front of us.
+    registry_path = OUT.parent / "communities.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8")) if registry_path.exists() else {"communities": []}
+    known = {c["key"] for c in registry["communities"]}
+    for key in sorted({c["community"] for c in chunks}):
+        if key not in known:
+            registry["communities"].append(
+                {"key": key, "label": key.title(), "aliases": [key]})
+            print(f"  registered a new community: {key}. Check its label and "
+                  f"aliases in communities.json")
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
         "model": "all-MiniLM-L6-v2",

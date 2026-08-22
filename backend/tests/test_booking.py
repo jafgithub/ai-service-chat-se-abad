@@ -287,11 +287,17 @@ def test_ranking_puts_the_soonest_first_then_the_cheapest(db, monkeypatch):
     # made the test depend on the hour it was run at: after two in the afternoon
     # all three have the same next free slot, the tie falls to price, and this
     # provider is the cheapest, so it came first and the assertion failed. It
-    # passed every morning. Two days blocked out makes "later" true at any hour.
+    # passed every morning. Blocking the diary out was the fix.
+    #
+    # Two days was not enough, and it failed for the first time on a Saturday.
+    # These providers work Monday to Friday, so everybody's next slot from a
+    # weekend is Monday morning; two days from Saturday expires before Monday
+    # opens, all three tie again, and price decides again. Five days clears the
+    # next working day whatever day the suite is run on.
     db.add(ProviderTimeOff(
         provider_id=later.id,
         starts_at=datetime.utcnow() - timedelta(hours=1),
-        ends_at=datetime.utcnow() + timedelta(days=2),
+        ends_at=datetime.utcnow() + timedelta(days=5),
         reason="Away, so genuinely cannot come sooner",
     ))
     db.commit()

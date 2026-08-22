@@ -56,24 +56,57 @@ class Community:
     aliases: tuple[str, ...]
 
 
-# Every community the assistant recognises by name, including the ones it has
-# no documents for. Naming the ones we cannot answer is the point: "Three Lakes"
-# has to be recognised in order to be refused, because the alternative is what
-# the client saw, a Three Lakes question answered out of the Serenity rules
-# because "Lake" is close to "lakes" in the embedding space.
-COMMUNITIES: tuple[Community, ...] = (
-    Community("serenity", "Serenity Point", ("serenity", "serenity point")),
-    Community("lauderdale lakes", "Lauderdale Lakes",
-              ("lauderdale lakes", "lauderdale lake", "city of lauderdale lakes")),
-    Community("three lakes", "Three Lakes",
-              ("three lakes", "three lake", "three lakes community")),
-    Community("kendall square", "Kendall Square",
-              ("kendall square", "kendall square homeowners association", "kendall square hoa")),
-    Community("valencia", "Valencia",
-              ("valencia", "valencia hoa")),
-    Community("enclave at old cutler", "Enclave At Old Cutler",
-              ("enclave at old cutler", "enclave old cutler", "enclave", "old cutler")),
-)
+REGISTRY_PATH = INDEX_PATH.parent / "communities.json"
+
+# Every community the assistant recognises by name, including any it has no
+# documents for. Naming the ones we cannot answer is the point: a community has
+# to be recognised in order to be refused, because the alternative is what the
+# client saw in August, a Three Lakes question answered out of the Serenity
+# rules because "Lake" is close to "lakes" in the embedding space.
+#
+# **Data, not code.** It lives in `communities.json` beside the index, because an
+# administrator uploading the first document for a new association has to be
+# able to register its name in the same breath. While this was a tuple in the
+# source, that could only happen by editing Python and redeploying, and the
+# failure when somebody forgot was silent: the name went unrecognised and every
+# question about that association was answered from Serenity's rules.
+COMMUNITIES: tuple[Community, ...] = ()
+
+
+def _load_registry() -> tuple[Community, ...]:
+    """Read the registry, or fall back to the home community alone.
+
+    A missing or unreadable file must not leave the assistant with no names at
+    all, because with no names every question resolves to home and one
+    association's rules start answering for another. Home alone is the safe
+    floor: it answers Serenity and refuses to recognise anybody else.
+    """
+    try:
+        data = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+        found = tuple(
+            Community(c["key"], c["label"], tuple(c.get("aliases") or [c["key"]]))
+            for c in data.get("communities", [])
+            if c.get("key") and c.get("label")
+        )
+        if found:
+            return found
+        logger.warning("[DOCS] %s holds no communities", REGISTRY_PATH)
+    except FileNotFoundError:
+        logger.warning("[DOCS] no registry at %s", REGISTRY_PATH)
+    except Exception:  # noqa: BLE001 - a broken file must not take the app down
+        logger.exception("[DOCS] registry unreadable")
+    return (Community(HOME_COMMUNITY, "Serenity Point", ("serenity", "serenity point")),)
+
+
+def reload_registry() -> int:
+    """Re-read the registry. Called after an upload adds a community."""
+    global COMMUNITIES
+    COMMUNITIES = _load_registry()
+    logger.info("[DOCS] registry: %d communities", len(COMMUNITIES))
+    return len(COMMUNITIES)
+
+
+COMMUNITIES = _load_registry()
 
 # Words that decorate a community's name without identifying it. Stripped from
 # both sides, so "Serenity Point" and "serenity" are one name, and so is
