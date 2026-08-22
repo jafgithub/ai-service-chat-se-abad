@@ -24,6 +24,7 @@ from app.core.config import settings
 from app.db.database import get_db
 from app.models.customer import Customer
 from app.models.job import Job
+from app.models.appointment import Appointment
 from app.models.payment import Payment
 from app.services import catalog_index
 
@@ -149,6 +150,16 @@ def list_orders(
 
     # One query for every payment involved, rather than one per order.
     order_ids = [o.id for o, _ in rows]
+
+    # When each booking is, which in this application lives on the appointment
+    # rather than on the job. The shop's version of this endpoint read
+    # `delivery_date` straight off the order, and that attribute does not exist
+    # here, so the staff list has been a 500 since the day it was forked. One
+    # query, not one per row.
+    appointments: dict[int, Appointment] = {}
+    if order_ids:
+        for appt in db.query(Appointment).filter(Appointment.job_id.in_(order_ids)).all():
+            appointments.setdefault(appt.job_id, appt)
     payments: dict[int, list] = {}
     if order_ids:
         for p in db.query(Payment).filter(Payment.order_id.in_(order_ids)).all():
@@ -168,8 +179,10 @@ def list_orders(
             "items": len(o.items_json or []),
             "customer_name": c.name if c else None,
             "customer_email": c.email if c else None,
-            "delivery_date": o.delivery_date,
-            "delivery_time": o.delivery_time,
+            "delivery_date": (appointments[o.id].starts_at.date().isoformat()
+                              if o.id in appointments and appointments[o.id].starts_at else None),
+            "delivery_time": (appointments[o.id].starts_at.strftime("%H:%M")
+                              if o.id in appointments and appointments[o.id].starts_at else None),
             "created_at": o.created_at,
             "payments": payments.get(o.id, []),
         }

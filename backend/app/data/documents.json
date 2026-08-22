@@ -72,7 +72,7 @@
       "title": "Mailbox guidelines",
       "filename": "knowledge/three-lakes/mailbox-guidelines.pdf",
       "kind": "answerable",
-      "sections": 0,
+      "sections": 3,
       "source": "repo",
       "added_at": "2026-08-22T00:00:00+00:00",
       "withdrawn_at": null
@@ -83,7 +83,7 @@
       "title": "Design review form",
       "filename": "knowledge/three-lakes/design-review-form.pdf",
       "kind": "answerable",
-      "sections": 0,
+      "sections": 9,
       "source": "repo",
       "added_at": "2026-08-22T00:00:00+00:00",
       "withdrawn_at": null
@@ -94,7 +94,7 @@
       "title": "Direct debit form",
       "filename": "knowledge/three-lakes/direct-debit-form.pdf",
       "kind": "answerable",
-      "sections": 0,
+      "sections": 4,
       "source": "repo",
       "added_at": "2026-08-22T00:00:00+00:00",
       "withdrawn_at": null
@@ -105,7 +105,7 @@
       "title": "Approved colour archive",
       "filename": "knowledge/kendall-square/color-archive.pdf",
       "kind": "answerable",
-      "sections": 0,
+      "sections": 1,
       "source": "repo",
       "added_at": "2026-08-22T00:00:00+00:00",
       "withdrawn_at": null
@@ -116,7 +116,7 @@
       "title": "Approved colour archive",
       "filename": "knowledge/valencia/color-archive.pdf",
       "kind": "answerable",
-      "sections": 0,
+      "sections": 1,
       "source": "repo",
       "added_at": "2026-08-22T00:00:00+00:00",
       "withdrawn_at": null
@@ -127,7 +127,7 @@
       "title": "Approved colour archive",
       "filename": "knowledge/enclave-old-cutler/color-archive.pdf",
       "kind": "answerable",
-      "sections": 0,
+      "sections": 1,
       "source": "repo",
       "added_at": "2026-08-22T00:00:00+00:00",
       "withdrawn_at": null
@@ -197,6 +197,17 @@
       "source": "upload",
       "added_at": "2026-08-22T11:25:03+00:00",
       "withdrawn_at": "2026-08-22T11:26:01+00:00"
+    },
+    {
+      "id": "kendall-square-mailbox-guidelines-4e470b",
+      "community": "kendall square",
+      "title": "Mailbox guidelines",
+      "filename": "mailbox-guidelines-mailbox-specsheet-3-lake.pdf",
+      "kind": "answerable",
+      "sections": 3,
+      "source": "upload",
+      "added_at": "2026-08-22T13:22:33+00:00",
+      "withdrawn_at": "2026-08-22T13:23:39+00:00"
     }
   ]
 }

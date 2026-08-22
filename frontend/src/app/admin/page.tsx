@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
+import { DocumentLibrary } from "@/components/admin/DocumentLibrary";
 
 /**
  * Staff view: orders, payments and takings.
@@ -177,7 +178,7 @@ export default function AdminPage() {
       <div className="max-w-6xl mx-auto">
         <header className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-semibold text-ink">Orders and payments</h1>
+            <h1 className="text-xl font-semibold text-ink">Orders, payments and documents</h1>
             {summary && (
               <p className="text-sm text-ink-muted">
                 Last {summary.window_days} days
@@ -228,6 +229,10 @@ export default function AdminPage() {
             <Stat label="Customers" value={String(summary.customers)} sub="excludes partner enquiries" />
           </div>
         )}
+
+        <div className="mb-6">
+          <DocumentLibrary token={token} />
+        </div>
 
         <section className="bg-surface rounded-control border border-line overflow-hidden mb-6">
           <h2 className="px-4 py-3 text-sm font-semibold text-ink border-b border-line">

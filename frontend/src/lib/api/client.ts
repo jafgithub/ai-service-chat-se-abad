@@ -115,11 +115,12 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
-async function requestForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
+async function requestForm<T>(path: string, form: FormData, signal?: AbortSignal,
+                              headers: Record<string, string> = {}): Promise<T> {
   // No Content-Type header — the browser sets the multipart boundary itself.
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: { ...authHeaders(), ...headers },
     body: form,
     signal,
   });
@@ -144,11 +145,12 @@ export const apiClient = {
   patch: <T>(path: string, body: unknown, signal?: AbortSignal) =>
     request<T>(path, { method: "PATCH", body, signal }),
 
-  del: <T>(path: string, signal?: AbortSignal) =>
-    request<T>(path, { method: "DELETE", signal }),
+  del: <T>(path: string, signal?: AbortSignal, headers?: Record<string, string>) =>
+    request<T>(path, { method: "DELETE", signal, headers }),
 
-  postForm: <T>(path: string, form: FormData, signal?: AbortSignal) =>
-    requestForm<T>(path, form, signal),
+  postForm: <T>(path: string, form: FormData, signal?: AbortSignal,
+                headers?: Record<string, string>) =>
+    requestForm<T>(path, form, signal, headers),
 };
 
 export { ApiError };
