@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
 import { DocumentLibrary } from "@/components/admin/DocumentLibrary";
+import { ParkingPasses } from "@/components/admin/ParkingPasses";
 
 /**
  * Staff view: orders, payments and takings.
@@ -232,6 +233,10 @@ export default function AdminPage() {
 
         <div className="mb-6">
           <DocumentLibrary token={token} />
+        </div>
+
+        <div className="mb-6">
+          <ParkingPasses token={token} />
         </div>
 
         <section className="bg-surface rounded-control border border-line overflow-hidden mb-6">

@@ -19,10 +19,11 @@ from app.models.provider import (
 )
 from app.models.account import Account, Session
 from app.models.service_request import ServiceRequest
+from app.models.parking import ParkingPass
 
 __all__ = [
     "Service", "Customer", "Job", "JobLine", "Appointment", "Payment",
     "ChatSession", "CartItem",
     "Provider", "ProviderService", "ProviderAvailability", "ProviderTimeOff",
-    "Account", "Session", "ServiceRequest",
+    "Account", "Session", "ServiceRequest", "ParkingPass",
 ]

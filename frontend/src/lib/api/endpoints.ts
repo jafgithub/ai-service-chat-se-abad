@@ -281,3 +281,51 @@ export const docsApi = {
     apiClient.post<DocsAnswer>("/api/v1/docs/ask",
       { question, community: community ?? "" }, signal),
 };
+
+// ── parking ─────────────────────────────────────────────────────────────────
+
+/** A pass to park in a community, issued to one signed in resident. */
+export interface ParkingPass {
+  id: number;
+  community: string;
+  vehicle_registration: string;
+  vehicle_description?: string | null;
+  /** "valid", "used", "expired" or "cancelled". */
+  state: string;
+  issued_at: string;
+  expires_at: string;
+  exited_at?: string | null;
+  /** The code itself, inline, so the screen needs no second request. */
+  qr_svg: string;
+  check_url: string;
+}
+
+export interface ParkingPassHolder extends ParkingPass {
+  holder_name?: string | null;
+  holder_email?: string | null;
+  visiting?: string | null;
+}
+
+export interface ParkingRequest {
+  community: string;
+  vehicle_registration: string;
+  vehicle_description?: string;
+  visiting?: string;
+  days?: number;
+}
+
+export const parkingApi = {
+  request: (body: ParkingRequest, signal?: AbortSignal) =>
+    apiClient.post<ParkingPass>("/api/v1/parking", body, signal),
+
+  mine: (signal?: AbortSignal) =>
+    apiClient.get<ParkingPass[]>("/api/v1/parking", signal),
+
+  /** The resident telling us the car has gone. */
+  leave: (id: number, signal?: AbortSignal) =>
+    apiClient.post<ParkingPass>(`/api/v1/parking/${id}/exit`, {}, signal),
+
+  /** The office: every pass, with who is behind it. */
+  all: (headers: Record<string, string>, signal?: AbortSignal) =>
+    apiClient.get<ParkingPassHolder[]>("/api/v1/parking/all", signal, headers),
+};

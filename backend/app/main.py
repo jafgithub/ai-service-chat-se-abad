@@ -14,11 +14,11 @@ from app.db.database import engine, Base
 from app.models import (  # noqa: F401 - imported so create_all registers every table
     Service, Customer, Job, JobLine, Payment, ChatSession, CartItem, Appointment,
     Provider, ProviderService, ProviderAvailability, ProviderTimeOff,
-    Account, Session, ServiceRequest,
+    Account, Session, ServiceRequest, ParkingPass,
 )
 from app.api import (
-    admin, auth, booking, cart, chat, docs, documents, jobs, media, payments,
-    providers, requests as service_requests, services, voice,
+    admin, auth, booking, cart, chat, docs, documents, jobs, media, parking,
+    payments, providers, requests as service_requests, services, voice,
 )
 
 
@@ -33,7 +33,7 @@ def setup_logging():
     # Explicit allowlist: a logger missing from it has its output silently
     # discarded, so anything new that logs has to be added here too.
     for name in ("rag", "ai", "chat", "docs", "jobs", "payments", "booking", "auth",
-                 "voice", "uvicorn.access"):
+                 "voice", "parking", "uvicorn.access"):
         log = logging.getLogger(name)
         log.setLevel(logging.DEBUG)
         log.addHandler(handler)
@@ -119,6 +119,7 @@ app.include_router(providers.router, prefix="/api/v1")
 app.include_router(service_requests.router, prefix="/api/v1")
 app.include_router(docs.router,      prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
+app.include_router(parking.router,  prefix="/api/v1")
 
 
 @app.exception_handler(Exception)

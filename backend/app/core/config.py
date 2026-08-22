@@ -93,6 +93,12 @@ class Settings(BaseSettings):
     # directly (the media endpoint still works, it just isn't the advertised URL).
     PUBLIC_BASE_URL: str = ""
 
+    #: Where the website is, as a resident's phone would reach it. A parking QR
+    #: points at a page on it, so scanning with any camera lands somewhere
+    #: useful rather than showing hex to somebody at a barrier. Deliberately not
+    #: PUBLIC_BASE_URL, which is the API's origin and is empty here.
+    SITE_BASE_URL: str = "https://serviceagent.fordev.fun"
+
     SMTP_HOST: str = "smtp-relay.brevo.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
