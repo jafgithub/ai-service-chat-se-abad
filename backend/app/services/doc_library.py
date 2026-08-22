@@ -86,6 +86,20 @@ def for_community(community: str) -> list[dict]:
     )
 
 
+def find(community: str, title: str) -> Optional[dict]:
+    """The document a retrieved section came from, so it can be offered.
+
+    Matched on community and title because that is what a chunk carries. An
+    uploaded document also carries its library id directly, and that is used
+    when it is there; this is for the ones that arrived by email before the
+    library existed.
+    """
+    for doc in all_documents():
+        if doc["community"] == community and doc["title"] == title:
+            return doc
+    return None
+
+
 def get(doc_id: str, include_withdrawn: bool = False) -> Optional[dict]:
     for doc in all_documents(include_withdrawn):
         if doc["id"] == doc_id:

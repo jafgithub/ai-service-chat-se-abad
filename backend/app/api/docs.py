@@ -22,7 +22,7 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.services import docs_index, gemini_service
+from app.services import doc_library, docs_index, gemini_service
 
 logger = logging.getLogger("docs")
 
@@ -188,6 +188,11 @@ class AskIn(BaseModel):
 class SourceOut(BaseModel):
     section: str
     document: str
+    #: Where to download the document this came from, when we hold the file.
+    #: The client asked for a resident to be able to take away whatever their
+    #: answer was based on, which is also the honest thing: an answer about a
+    #: form is more use with the form attached to it.
+    download_url: str = ""
     #: The community whose document this is, named as a resident would say it.
     #: Shown because an answer can draw on more than one document, and with
     #: several associations loaded, "which rules are these" is the first thing
@@ -260,15 +265,19 @@ def _credits(hits: list[dict]) -> list["SourceOut"]:
         keep.append(hit)
     keep = sorted(keep[:MAX_CREDITS], key=lambda h: -h["score"])
 
-    return [
-        SourceOut(
+    out = []
+    for h in keep:
+        community = h.get("community", docs_index.HOME_COMMUNITY)
+        doc = (doc_library.get(h["doc_id"]) if h.get("doc_id")
+               else doc_library.find(community, h["document_short"]))
+        out.append(SourceOut(
             section=h["section"],
             document=h["document_short"],
-            community=docs_index.label_for(h.get("community", docs_index.HOME_COMMUNITY)),
+            community=docs_index.label_for(community),
+            download_url=f"/api/v1/documents/{doc['id']}/file" if doc else "",
             score=h["score"],
-        )
-        for h in keep
-    ]
+        ))
+    return out
 
 
 _QUESTION_SHAPE = re.compile(

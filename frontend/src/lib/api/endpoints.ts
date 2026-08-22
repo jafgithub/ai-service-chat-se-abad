@@ -215,7 +215,22 @@ export interface DocsSource {
   document: string;
   /** The community this document governs. */
   community?: string;
+  /** Where to download the document, when we hold the file. */
+  download_url?: string;
   score: number;
+}
+
+/** One document a resident of a community may download. */
+export interface CommunityDocument {
+  id: string;
+  community: string;
+  community_label: string;
+  title: string;
+  kind: string;
+  sections: number;
+  added_at: string;
+  answerable: boolean;
+  download_url: string;
 }
 
 export type DocsKind = "answer" | "chat" | "no_answer" | "error";
@@ -256,6 +271,11 @@ export const docsApi = {
    *  must not appear in a menu, whatever the registry knows about it. */
   communities: (signal?: AbortSignal) =>
     apiClient.get<CommunityList>("/api/v1/docs/communities", signal),
+
+  /** Everything a resident of this community may take away, newest first. */
+  documents: (community: string, signal?: AbortSignal) =>
+    apiClient.get<CommunityDocument[]>(
+      `/api/v1/documents/for/${encodeURIComponent(community)}`, signal),
 
   ask: (question: string, community?: string, signal?: AbortSignal) =>
     apiClient.post<DocsAnswer>("/api/v1/docs/ask",

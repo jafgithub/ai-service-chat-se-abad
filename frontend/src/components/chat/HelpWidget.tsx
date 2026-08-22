@@ -5,7 +5,7 @@ import { Lottie } from "lottie-react";
 
 import { CommunityPicker } from "@/components/chat/CommunityPicker";
 import { useCommunities } from "@/lib/community";
-import { docsApi, type DocsKind, type DocsSource } from "@/lib/api";
+import { apiBase, docsApi, type CommunityDocument, type DocsKind, type DocsSource } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import wave from "./wave.json";
 
@@ -55,6 +55,11 @@ export function HelpWidget() {
   //: because the buttons that answer it are part of the render.
   const askedRef = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
+  //: The community's documents, for a resident who wants the paperwork rather
+  //: than an answer about it. Fetched when the drawer is opened, not on every
+  //: question: most people want the answer.
+  const [library, setLibrary] = useState<CommunityDocument[] | null>(null);
+  const [showLibrary, setShowLibrary] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [greeting, setGreeting] = useState("");
   const [starters, setStarters] = useState<string[]>([]);
@@ -191,6 +196,26 @@ export function HelpWidget() {
     [busy, chosen, needsChoice]
   );
 
+  /* The list is fetched when the drawer is opened, and thrown away when the
+     community changes so it cannot show one association's paperwork under
+     another's name. */
+  useEffect(() => {
+    if (!showLibrary) return;
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setLibrary(null);
+      try {
+        const docs = await docsApi.documents(chosen || current?.key || "");
+        if (!cancelled) setLibrary(docs);
+      } catch {
+        if (!cancelled) setLibrary([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showLibrary, chosen, current?.key]);
+
   /** They picked from the buttons: remember it, then answer what they asked. */
   const pickAndContinue = useCallback(
     (key: string) => {
@@ -276,12 +301,16 @@ export function HelpWidget() {
                   from. Promising one association while quoting another is the
                   kind of small untruth that costs trust in the whole thing. */}
               {options.length > 1 ? (
-                <CommunityPicker
-                  options={options}
-                  current={current}
-                  onChoose={choose}
-                  className="mt-1"
-                />
+                <div className="mt-1 flex items-center gap-2">
+                  <CommunityPicker options={options} current={current} onChoose={choose} />
+                  <button
+                    type="button"
+                    onClick={() => setShowLibrary((v) => !v)}
+                    className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink-muted hover:border-brand-500 hover:text-brand-600"
+                  >
+                    {showLibrary ? "Hide documents" : "Documents"}
+                  </button>
+                </div>
               ) : (
                 <p className="truncate text-xs text-ink-muted">Answers from your community documents</p>
               )}
@@ -311,6 +340,39 @@ export function HelpWidget() {
               </svg>
             </button>
           </header>
+
+          {showLibrary && (
+            <div className="border-b border-line bg-surface-sunken px-4 py-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                {current?.label ?? "Community"} documents
+              </p>
+              {library === null ? (
+                <p className="text-xs text-ink-muted">Loading...</p>
+              ) : library.length === 0 ? (
+                <p className="text-xs text-ink-muted">Nothing loaded for this community yet.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {library.map((doc) => (
+                    <li key={doc.id}>
+                      <a
+                        href={`${apiBase}${doc.download_url}`}
+                        className="flex items-baseline gap-2 text-xs text-ink hover:text-brand-600"
+                      >
+                        <span className="text-brand-600" aria-hidden>&#8595;</span>
+                        <span className="font-medium">{doc.title}</span>
+                        {/* Said plainly, because a resident who downloads the
+                            site map and then asks the assistant about it should
+                            not be surprised by the refusal. */}
+                        {!doc.answerable && (
+                          <span className="text-ink-faint">download only</span>
+                        )}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {empty && (
@@ -363,10 +425,22 @@ export function HelpWidget() {
                   </p>
                   {turn.kind === "answer" && turn.sources && turn.sources.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
-                      {turn.sources.map((s) => (
-                        <span
+                      {turn.sources.map((s) => {
+                        const Chip = s.download_url ? "a" : "span";
+                        return (
+                        <Chip
                           key={s.section}
-                          className="rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-muted"
+                          {...(s.download_url
+                            ? { href: `${apiBase}${s.download_url}`,
+                                // The document the answer came from, to take
+                                // away. An answer about a form is more use with
+                                // the form attached to it.
+                                title: `Download ${s.document}` }
+                            : {})}
+                          className={cn(
+                            "rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-muted",
+                            s.download_url && "hover:border-brand-500 hover:text-brand-600"
+                          )}
                         >
                           {/* The document, then the section. It used to be the
                               section alone with the document in a tooltip,
@@ -379,8 +453,12 @@ export function HelpWidget() {
                           {s.community && " · "}
                           <span className="font-medium text-ink">{s.document}</span>
                           {" · "}{s.section}
-                        </span>
-                      ))}
+                          {s.download_url && (
+                            <span className="ml-1 text-brand-600" aria-hidden>&#8595;</span>
+                          )}
+                        </Chip>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
