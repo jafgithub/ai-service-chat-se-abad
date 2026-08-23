@@ -78,7 +78,10 @@ def verify_url(token: str) -> str:
     standing at a barrier in the rain.
     """
     base = (settings.SITE_BASE_URL or "").rstrip("/")
-    return f"{base}/parking/check/{token}"
+    # A query string rather than a path segment, because the site is a static
+    # export: a page at /parking/check exists as a file, while
+    # /parking/check/<token> would need a file per pass.
+    return f"{base}/parking/check?t={token}"
 
 
 def live_passes(db, account_id: int) -> list[ParkingPass]:

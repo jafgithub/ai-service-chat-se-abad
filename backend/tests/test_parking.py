@@ -50,7 +50,7 @@ def test_the_code_carries_a_token_and_nothing_else():
 def test_the_code_is_a_url_a_phone_can_open():
     url = parking.verify_url("abc123")
     assert url.startswith("https://")
-    assert url.endswith("/parking/check/abc123")
+    assert url.endswith("/parking/check?t=abc123")
 
 
 # ── drawing it ───────────────────────────────────────────────────────────────
