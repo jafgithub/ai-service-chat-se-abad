@@ -122,6 +122,13 @@ class Settings(BaseSettings):
     # catalog changes. Empty (the default) disables that endpoint entirely.
     ADMIN_TOKEN: str = ""
 
+    # How often the background refresher checks whether anything it holds in
+    # memory has gone stale: a service added to the catalog, or a document index
+    # rewritten outside this process. Nothing is rebuilt unless something
+    # actually changed, so the check is a count and two file timestamps. Set to
+    # 0 to switch the refresher off.
+    REFRESH_MINUTES: int = 10
+
     # Safety valve: refuse to build an index larger than this many rows and keep
     # using the database path instead, rather than exhausting a small instance.
     INDEX_MAX_ROWS: int = 200_000

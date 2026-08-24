@@ -83,11 +83,26 @@ def _warmup() -> None:
         log.exception("[WARMUP] failed — the API keeps serving via the database path")
 
 
+def _boot() -> None:
+    """Warm the indexes, then keep them current.
+
+    In this order because the refresher's first reading is what it compares
+    against later: taken before the catalog is built, it would see the first
+    real build as a change and do it twice.
+    """
+    if settings.WARMUP_ON_STARTUP:
+        _warmup()
+    try:
+        from app.services import refresher
+        refresher.start()
+    except Exception:  # noqa: BLE001 - stale indexes beat a service that will not start
+        log.exception("[REFRESH] could not start — indexes will hold until the next restart")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    if settings.WARMUP_ON_STARTUP:
-        threading.Thread(target=_warmup, name="warmup", daemon=True).start()
+    threading.Thread(target=_boot, name="boot", daemon=True).start()
     yield
 
 

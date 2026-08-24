@@ -258,6 +258,36 @@ def _load() -> bool:
         return True
 
 
+def stamps() -> tuple[float, float]:
+    """When the index and the registry were last written.
+
+    The refresher compares these rather than the contents: reading two file
+    timestamps every ten minutes costs nothing, and re-reading a megabyte of
+    vectors to discover nothing changed is the thing worth avoiding.
+    A missing file is 0.0, which differs from any real timestamp, so the file
+    appearing later still counts as a change.
+    """
+    def when(path: Path) -> float:
+        try:
+            return path.stat().st_mtime
+        except OSError:
+            return 0.0
+    return when(INDEX_PATH), when(REGISTRY_PATH)
+
+
+def reload_index() -> bool:
+    """Drop what is in memory and read the index off disk again.
+
+    Uploads through this process update the index in place and never need this.
+    It is here for the other ways the file changes: a rebuild from the source
+    documents, a second process, or a file copied onto the server.
+    """
+    global _vectors
+    with _lock:
+        _vectors = None
+    return _load()
+
+
 def _rebuild_rows() -> None:
     """Recompute the per-community row map. Call after the chunks change."""
     global _rows

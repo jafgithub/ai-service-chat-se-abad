@@ -8,7 +8,11 @@ So adding a document is how the assistant learns something new. This page is
 what to send, what cannot be used, and what happens next.
 
 **Where the assistant is:** https://serviceagent.fordev.fun
-**Where to send documents:** reply to this email with the files attached.
+**Where to add a document:** https://serviceagent.fordev.fun/admin, under
+Community documents. Pick the community, choose the file, and it is answering
+questions a minute later.
+**If you would rather not do it yourself:** reply to this email with the files
+attached and we will load them.
 
 ---
 
@@ -33,15 +37,23 @@ a picture of a page rather than a page, and it has to be re-exported from
 whatever produced it.
 
 Word documents are fine. So are PDFs exported from Word. It is scans and
-photographs of printed paper that cannot be used.
+photographs of printed paper that the assistant cannot read.
+
+A scan is still worth uploading. The screen notices there is no readable text,
+says so, and keeps the file as a download: a resident who asks about that
+subject is not given an answer out of it, but the document is there in the
+community's list for them to open. That is the honest half of the job, and it
+is better than the file sitting in an inbox.
 
 ---
 
 # 4. What to tell us with each document
 
-Four short answers, in the body of the email. They take a minute and they
-prevent the assistant giving confident answers out of a document that no longer
-applies.
+Four short answers, whether you upload the document yourself or send it to
+us. They take a minute and they prevent the assistant giving confident answers
+out of a document that no longer applies. Two of them the screen cannot check
+for you: whether the document replaces one already loaded, and whether anything
+in it should not be quoted to a resident.
 
 | Question | Why it matters |
 |---|---|
@@ -63,7 +75,9 @@ applies.
 - Test it with real questions before it goes live
 - Tell you what it can now answer, and anything we noticed
 
-Turnaround is about a day from the email arriving.
+Uploading it yourself skips the first five: the screen does all of that and
+tells you how many sections it read. What is left is the last two, and those we
+still do. Sending it to us instead is about a day.
 
 ---
 
