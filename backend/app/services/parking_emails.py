@@ -18,7 +18,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from app.core.config import settings
-from app.services import parking
+from app.services import email_service, parking
 
 logger = logging.getLogger("parking")
 
@@ -71,6 +71,10 @@ def send_pass(pass_, to: str, name: str = "") -> bool:
     on screen, so this reports and returns rather than throwing back into the
     request that issued it.
     """
+    if not email_service.sending_is_allowed():
+        logger.warning("[PARKING] test run: pass %s was not emailed to %s", pass_.id, to)
+        return False
+
     if not (settings.SMTP_HOST and settings.SMTP_FROM and to):
         logger.warning("[PARKING] no mail configured; pass %s not emailed", pass_.id)
         return False

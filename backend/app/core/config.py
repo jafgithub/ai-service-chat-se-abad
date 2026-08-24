@@ -106,6 +106,12 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     AI_ORDER_EMAIL: str = ""
 
+    # Where a provider's copy goes when the appointment has no provider on it,
+    # or the business has no address on file. Empty means the address we send
+    # from, which on the live system is the right answer and on a development
+    # box is the client's own inbox. Set it on anything that is not production.
+    BOOKING_FALLBACK_EMAIL: str = ""
+
     # ── search performance ───────────────────────────────────────────────────
     # The catalog's embeddings are held in memory (app/services/catalog_index.py)
     # so a product search doesn't re-read all ~25k rows out of MySQL every time.

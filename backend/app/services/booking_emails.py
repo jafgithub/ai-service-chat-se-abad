@@ -30,8 +30,9 @@ BRAND = "Service Assistant"
 
 #: Where the provider's copy goes when the business has no email on file, so a
 #: job is never silently unannounced. Falls back to the sending address, which
-#: is somebody we know reads it.
-FALLBACK_TO = settings.SMTP_FROM
+#: is somebody we know reads it. On a development box that somebody is the
+#: client, so `BOOKING_FALLBACK_EMAIL` exists to point it elsewhere.
+FALLBACK_TO = settings.BOOKING_FALLBACK_EMAIL or settings.SMTP_FROM
 
 
 def _money(amount: float | None, currency: str = "USD") -> str:

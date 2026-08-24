@@ -1,9 +1,13 @@
+import logging
+import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 
 from app.core.config import settings
+
+logger = logging.getLogger("email")
 
 # Without this every call inherits the default socket timeout of None, so an
 # unresponsive relay blocks the calling thread forever. Orders are committed
@@ -12,7 +16,31 @@ from app.core.config import settings
 SMTP_TIMEOUT_SECONDS = 20
 
 
+def sending_is_allowed() -> bool:
+    """False while a test is running, and the reason is worth the space.
+
+    The suite books through the real endpoint, and the real endpoint really
+    schedules its emails. Those emails were reaching the relay. `send_booking_emails`
+    opens its own database session, so a test's appointment id of 1 resolved to
+    appointment 1 in the live database, whose booking has no provider on it,
+    whose notification therefore falls back to the address we send from, which
+    is the client's own inbox. He got the same BK-00001 notice once per test
+    run, every run, from 12 August.
+
+    Stubbing the sender in a fixture only covers the paths somebody remembered
+    to stub, and the path that leaked was one nobody had thought about. This
+    covers every path, including ones not written yet. `PYTEST_CURRENT_TEST` is
+    set by pytest itself for the duration of each test, so there is nothing for
+    a test author to remember.
+    """
+    return "PYTEST_CURRENT_TEST" not in os.environ
+
+
 def _send(to: str, subject: str, html: str) -> None:
+    if not sending_is_allowed():
+        logger.warning("[EMAIL] test run: %r to %s was not sent", subject, to)
+        return
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"]    = settings.SMTP_FROM

@@ -33,7 +33,7 @@ def setup_logging():
     # Explicit allowlist: a logger missing from it has its output silently
     # discarded, so anything new that logs has to be added here too.
     for name in ("rag", "ai", "chat", "docs", "jobs", "payments", "booking", "auth",
-                 "voice", "parking", "uvicorn.access"):
+                 "voice", "parking", "email", "uvicorn.access"):
         log = logging.getLogger(name)
         log.setLevel(logging.DEBUG)
         log.addHandler(handler)

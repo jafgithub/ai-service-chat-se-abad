@@ -98,6 +98,14 @@ def send_booking_emails(appointment_id: int) -> None:
                 f"[EMAIL] provider {provider.id} has no email; "
                 f"{reference} was sent to {provider_to} instead"
             )
+        elif provider is None:
+            # This branch used to be the silent one, and it was the branch that
+            # leaked: appointment 1 has no provider, so its notification went to
+            # the fallback address with nothing in the log to say why.
+            logger.warning(
+                f"[EMAIL] appointment {appointment_id} has no provider at all; "
+                f"{reference} was sent to {provider_to} instead"
+            )
         try:
             booking_emails.send_provider_notification(
                 to=provider_to,
