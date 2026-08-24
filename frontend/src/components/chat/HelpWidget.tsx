@@ -60,6 +60,7 @@ export function HelpWidget() {
   //: question: most people want the answer.
   const [library, setLibrary] = useState<CommunityDocument[] | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryFilter, setLibraryFilter] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [greeting, setGreeting] = useState("");
   const [starters, setStarters] = useState<string[]>([]);
@@ -240,6 +241,13 @@ export function HelpWidget() {
   );
 
   const empty = turns.length === 0;
+
+  // Filtering here rather than in the fetch: the list is already in memory and
+  // a round trip per keystroke would be slower and no more correct.
+  const needle = libraryFilter.trim().toLowerCase();
+  const matching = (library ?? []).filter(
+    (doc) => !needle || doc.title.toLowerCase().includes(needle),
+  );
   const awaitingChoice = pending !== null;
 
   return (
@@ -351,8 +359,23 @@ export function HelpWidget() {
               ) : library.length === 0 ? (
                 <p className="text-xs text-ink-muted">Nothing loaded for this community yet.</p>
               ) : (
-                <ul className="space-y-1.5">
-                  {library.map((doc) => (
+                <>
+                  {/* An association with a handful of documents does not need a
+                      search box and is worse for having one. One with thirty
+                      cannot be read without it. */}
+                  {library.length > 8 && (
+                    <input
+                      type="search"
+                      value={libraryFilter}
+                      onChange={(e) => setLibraryFilter(e.target.value)}
+                      placeholder={`Search ${library.length} documents`}
+                      className="mb-2 h-8 w-full rounded-control border border-line bg-surface px-2.5 text-xs text-ink placeholder:text-ink-faint"
+                    />
+                  )}
+                  {/* Its own scroll, so the list can never push the
+                      conversation off the bottom of the panel. */}
+                  <ul className="max-h-44 space-y-1.5 overflow-y-auto">
+                  {matching.map((doc) => (
                     <li key={doc.id}>
                       <a
                         href={`${apiBase}${doc.download_url}`}
@@ -369,7 +392,11 @@ export function HelpWidget() {
                       </a>
                     </li>
                   ))}
-                </ul>
+                  </ul>
+                  {matching.length === 0 && (
+                    <p className="text-xs text-ink-muted">No document matches that.</p>
+                  )}
+                </>
               )}
             </div>
           )}
