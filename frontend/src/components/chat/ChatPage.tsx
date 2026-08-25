@@ -12,6 +12,7 @@ import { AccountMenu } from "@/components/layout/AccountMenu";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { getSessionId } from "@/lib/session";
+import { storedCommunity } from "@/lib/community";
 import { chatApi, requestsApi, voiceApi, ApiError } from "@/lib/api";
 import type { Booked, DocumentResult, ServiceResult } from "@/lib/api";
 import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
@@ -123,6 +124,12 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const [documents, setDocuments] = useState<DocumentResult[]>([]);
   /* The parking sheet, opened by the conversation rather than by a button. */
   const [parking, setParking] = useState(false);
+  /* The last reply came out of the community documents rather than the
+     catalogue. Both leave the services pane empty, and without this the two
+     read the same: an answer about the quiet hours sat beside "Nobody on the
+     platform lists anything like that", which is true of the catalogue and
+     beside the point of what was asked. */
+  const [docAnswered, setDocAnswered] = useState(false);
 
   // The service being booked, and the problem it answers. Both drive the sheet.
   const [booking, setBooking] = useState<ServiceResult | null>(null);
@@ -157,8 +164,14 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const STORAGE_KEY = "sa_conversation";
   const RESULTS_KEY = "sa_services";
 
-  const addMessage = useCallback((role: "user" | "assistant", content: string) => {
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, content, timestamp: new Date() }]);
+  const addMessage = useCallback((
+    role: "user" | "assistant",
+    content: string,
+    extra?: { documents?: DocumentResult[]; clarify?: string },
+  ) => {
+    setMessages((prev) => [...prev, {
+      id: crypto.randomUUID(), role, content, timestamp: new Date(), ...extra,
+    }]);
   }, []);
 
   /**
@@ -331,7 +344,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     if (action.type === "parking") { setParking(true); return; }
     // The documents themselves travel in `documents`, not in the action, so
     // there is nothing to do here beyond not treating it as a booking.
-    if (action.type === "documents") return;
+    if (action.type === "documents" || action.type === "clarify") return;
 
     if (action.type !== "added" && action.type !== "checkout") return;
 
@@ -471,9 +484,14 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   }, [services]);
 
   // ── Text chat ──────────────────────────────────────────────────
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (
+    text: string,
+    route?: "documents" | "services",
+  ) => {
     if (!text.trim() || isLoading) return;
-    addMessage("user", text.trim());
+    // A route means they tapped a button rather than typed, and the question is
+    // already in the transcript above. Repeating it reads as a stutter.
+    if (!route) addMessage("user", text.trim());
     setInputValue("");
     setIsLoading(true);
 
@@ -484,8 +502,15 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         category_filter: scope ?? undefined,
         latitude: geo.position?.latitude,
         longitude: geo.position?.longitude,
+        community: storedCommunity() || undefined,
+        route,
       });
-      addMessage("assistant", response.reply);
+      addMessage("assistant", response.reply, {
+        documents: response.documents.length > 0 ? response.documents : undefined,
+        clarify: response.action?.type === "clarify"
+          ? (response.action.question ?? text.trim())
+          : undefined,
+      });
       // A search that found nothing has to clear the last one, or the assistant
       // says "I couldn't find anything" beside a panel still listing results for
       // the previous question. Only a *search* clears them: choosing a service
@@ -494,11 +519,25 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
       // answer to what was just asked. An empty list leaves the last set alone:
       // asking for a pass must not wipe the search behind it.
       if (response.documents.length > 0) {
-        setDocuments(response.documents);
+        // Only a list asked for by name fills the pane. Documents cited under
+        // an answer are already in the bubble, and putting the same two rows in
+        // both places at once reads as a bug rather than as emphasis.
+        const namedOne = response.intent === "document";
+        setDocuments(namedOne ? response.documents : []);
+        setDocAnswered(!namedOne);
+        setServices([]);
+        setTotalMatches(0);
+        setResultsFor(text.trim());
+      } else if (response.intent === "documents" || response.intent === "documents_miss") {
+        // Answered from the documents, or told plainly that they do not cover
+        // it. Either way the catalogue was never asked, so it must not report.
+        setDocAnswered(true);
+        setDocuments([]);
         setServices([]);
         setTotalMatches(0);
         setResultsFor(text.trim());
       } else if (response.services.length > 0) {
+        setDocAnswered(false);
         setProblem(text.trim());
         setDocuments([]);
         setServices(response.services);
@@ -506,9 +545,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         setVisibleCount(PAGE_SIZE);
         setResultsFor(text.trim());
       } else if (response.action === null) {
-        // A documents answer is not a failed search and must not be dressed as
-        // one. Clearing `resultsFor` keeps "Nothing matches" off the screen;
-        // the flag puts something honest there instead.
+        setDocAnswered(false);
         setServices([]);
         setTotalMatches(0);
         setVisibleCount(PAGE_SIZE);
@@ -555,7 +592,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const hasMore = sortedServices.length > visibleCount;
   // A search ran and matched nothing, as opposed to nobody having asked yet.
   // The two look identical in state and must not read the same on screen.
-  const searchedAndFoundNothing = services.length === 0 && resultsFor !== "";
+  const searchedAndFoundNothing = services.length === 0 && resultsFor !== "" && !docAnswered;
 
   /* Defined once, rendered twice: pinned under the conversation on a wide
      screen, and as a shared footer on a phone. */
@@ -720,7 +757,12 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
 
           <div className="chat-scroll flex flex-1 flex-col gap-1 overflow-y-auto px-4 py-5">
             {messages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} large />
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                large
+                onClarify={(question, route) => sendMessage(question, route)}
+              />
             ))}
             {isLoading && <TypingIndicator />}
 
@@ -751,6 +793,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
               <p className="truncate text-sm font-semibold text-ink">
                 {documents.length > 0
                   ? "Documents"
+                  : docAnswered
+                  ? "Your community"
                   : services.length > 0
                     ? resultsFor
                       ? `For “${resultsFor}”`
@@ -762,6 +806,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
               <p className="mt-0.5 text-xs text-ink-muted">
                 {documents.length > 0
                   ? `${documents.length} document${documents.length === 1 ? "" : "s"} to download`
+                  : docAnswered
+                  ? "Answered from your documents, in the conversation"
                   : services.length > 0
                     ? totalMatches > services.length
                       ? `${totalMatches} match, showing the closest ${services.length}`
@@ -836,14 +882,18 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
               <div className={cn("flex h-full flex-col justify-center")}>
                 <div className="mx-auto w-full max-w-2xl">
                   <h2 className="text-base font-semibold text-ink">
-                    {searchedAndFoundNothing
-                        ? `Nothing here matches “${resultsFor}”`
-                        : "What needs doing?"}
+                    {docAnswered
+                        ? "Answered from your community documents"
+                        : searchedAndFoundNothing
+                          ? `Nothing here matches “${resultsFor}”`
+                          : "What needs doing?"}
                   </h2>
                   <p className="mt-1 text-sm text-ink-muted">
-                    {searchedAndFoundNothing
-                        ? "Try describing it differently, or start from a category."
-                        : "Describe it in your own words, or start from a category."}
+                    {docAnswered
+                        ? "The answer and the documents behind it are in the conversation. If you need somebody to come out instead, start here."
+                        : searchedAndFoundNothing
+                          ? "Try describing it differently, or start from a category."
+                          : "Describe it in your own words, or start from a category."}
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">

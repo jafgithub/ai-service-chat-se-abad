@@ -153,6 +153,11 @@ def _small_talk(question: str) -> "str | None":
             return reply
     return None
 
+#: Room for the answer. 320 was right when every reply was two sentences; a
+#: numbered procedure out of the ARB rules runs past it and stops mid clause,
+#: which was reaching residents. Measured: three replies in four were cut.
+MAX_ANSWER_TOKENS = 700
+
 SYSTEM = """You answer questions for residents and applicants of the Serenity community association.
 
 Answer ONLY from the numbered passages given to you. They are the association's own documents.
@@ -165,6 +170,12 @@ Rules you must follow:
 - Be brief. Aim for under 45 words. Two sentences is usually plenty.
 - When the answer really has several parts, use a short dash list, one line each, rather than
   one long paragraph. A wall of text in a small chat panel does not get read.
+- If the question is about how to DO something the association requires (apply, get approval,
+  lease a unit, book the hall, enrol, register), and the passages describe the procedure, write
+  it as a numbered list of the steps in order: "1. ..." on its own line, then "2. ..." and so on.
+  At most six steps, one short line each, and always finish the last one. Do not number anything
+  that is not a sequence of actions, and do not invent a step the passages do not state. The form
+  itself is shown beside your answer, so say what to do with it rather than where to find it.
 - Write for a resident, warm and plain. No legal preamble, no "according to the provided context".
 - Answer directly. No greeting, no "Hi there", no restating the question back.
 - A resident may type a topic, or a heading copied straight out of a document, or just a few
@@ -342,7 +353,7 @@ def answer_from_documents(question: str,
     reply = gemini_service.generate(
         SYSTEM,
         f"{_context(hits)}\n\n{_asked(question)}",
-        max_tokens=320,
+        max_tokens=MAX_ANSWER_TOKENS,
         temperature=0.0,
     )
     if not reply:
@@ -376,7 +387,27 @@ def _tidy(reply: str) -> str:
     reply = re.sub(r"(?i)\b(?:and\s+)?passage\s*\d+\s*(?:also\s*)?"
                    r"(?:states|says|notes|adds|indicates)\s*(?:that\s*)?", "", reply)
     reply = re.sub(r"(?m)^([a-z])", lambda m: m.group(1).upper(), reply)
-    return re.sub(r"[ \t]{2,}", " ", reply).strip()
+    reply = re.sub(r"[ \t]{2,}", " ", reply).strip()
+    return _drop_unfinished(reply)
+
+
+def _drop_unfinished(reply: str) -> str:
+    """Remove a trailing line the model did not finish.
+
+    A reply cut off at "...Building and Zoning Department and" is worse than the
+    same reply one step shorter: a resident cannot tell whether the missing
+    words were a condition or a deadline. So an incomplete last line is dropped
+    rather than shown.
+
+    Only when there is something left afterwards. A single unfinished line is
+    still the whole answer, and an empty reply is read as a failure by the
+    caller, which would turn a partial answer into no answer at all.
+    """
+    lines = [line for line in reply.splitlines() if line.strip()]
+    if len(lines) < 2 or lines[-1].rstrip().endswith((".", "!", "?", ":")):
+        return reply
+    logger.warning("[DOCS] dropped an unfinished last line: %r", lines[-1][-60:])
+    return "\n".join(lines[:-1]).strip()
 
 
 @router.post("/ask", response_model=AskOut)
@@ -403,7 +434,7 @@ def ask(payload: AskIn) -> AskOut:
     reply = gemini_service.generate(
         SYSTEM,
         f"{_context(hits)}\n\n{_asked(question)}",
-        max_tokens=320,
+        max_tokens=MAX_ANSWER_TOKENS,
         temperature=0.0,
     )
 

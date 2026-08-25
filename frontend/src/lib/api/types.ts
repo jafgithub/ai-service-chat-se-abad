@@ -8,6 +8,11 @@ export interface ChatRequest {
   category_filter?: string;
   latitude?: number;
   longitude?: number;
+  /** Which association the resident belongs to, so a rules answer comes from
+   *  their own documents rather than the home community's. */
+  community?: string;
+  /** Only when they answered "community or a service?" with a button. */
+  route?: "documents" | "services";
 }
 
 /** One service the assistant matched. Not the booking target: price and
@@ -35,8 +40,11 @@ export interface ServiceResult {
 export interface ChatAction {
   /** `parking` opens the pass form; `documents` means the files are in
    *  `documents` on the response and there is nothing else to do. */
-  type: "added" | "removed" | "quantity" | "checkout" | "parking" | "documents";
+  type: "added" | "removed" | "quantity" | "checkout" | "parking" | "documents" | "clarify";
   items?: { item_id: number; name: string; quantity?: number }[];
+  /** `clarify` only: the question to ask again once they have said which way
+   *  they meant it. */
+  question?: string;
 }
 
 /** A document the assistant found by name, ready to download.
@@ -50,7 +58,13 @@ export interface DocumentResult {
   community: string;
   /** False for a scan: the file downloads, the assistant cannot quote it. */
   answerable: boolean;
+  /** The section the answer leant on, when this document was cited rather than
+   *  asked for by name. "Rules and Regulations" is 55 sections long, so without
+   *  this a resident opens the PDF and starts reading page one. */
+  section?: string;
   download_url: string;
+  /** The same file served inline, for reading in a tab rather than saving. */
+  view_url?: string;
 }
 
 export interface ChatResponse {

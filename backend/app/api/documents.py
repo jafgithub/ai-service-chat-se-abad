@@ -186,7 +186,14 @@ def for_community(community: str) -> list[DocumentOut]:
 
 
 @router.get("/{doc_id}/file", summary="Download the document itself")
-def download(doc_id: str):
+def download(doc_id: str, view: bool = False):
+    """The file. `?view=1` opens it in the browser instead of saving it.
+
+    Both from one endpoint rather than two, because it is one file and the only
+    difference is a header. A resident checking one line of a rule should not
+    have to put a 900KB PDF in their downloads to read it, and a resident who
+    wants the blank form to print does want it saved.
+    """
     doc = doc_library.get(doc_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="No such document.")
@@ -195,5 +202,12 @@ def download(doc_id: str):
         logger.error("[DOCS] %s is in the library but not on disk: %s", doc_id, path)
         raise HTTPException(status_code=404, detail="That file is missing.")
     filename = re.sub(r"[^A-Za-z0-9 ._-]", "", doc["title"])[:80] or "document"
+    if view:
+        # `filename=` on FileResponse forces an attachment disposition, so the
+        # inline case sets the header itself and leaves the name on it: a tab
+        # showing a PDF still gets titled, and Save from the viewer keeps it.
+        return FileResponse(path, media_type="application/pdf", headers={
+            "Content-Disposition": f'inline; filename="{filename}.pdf"',
+        })
     return FileResponse(path, media_type="application/pdf",
                         filename=f"{filename}.pdf")

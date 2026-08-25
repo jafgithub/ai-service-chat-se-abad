@@ -1,11 +1,14 @@
 "use client";
 
 import type { ChatMessage as ChatMessageType } from "@/types";
+import { DocumentList } from "./DocumentList";
 import { cn } from "@/lib/utils";
 
 interface ChatMessageProps {
   message: ChatMessageType;
   large?: boolean;
+  /** Tapping one of the "community or a service?" buttons. */
+  onClarify?: (question: string, route: "documents" | "services") => void;
 }
 
 /**
@@ -110,7 +113,7 @@ function formatProductLine(text: string): React.ReactNode {
   );
 }
 
-export function ChatMessage({ message, large = false }: ChatMessageProps) {
+export function ChatMessage({ message, large = false, onClarify }: ChatMessageProps) {
   const isUser = message.role === "user";
 
   return (
@@ -150,7 +153,32 @@ export function ChatMessage({ message, large = false }: ChatMessageProps) {
           {isUser ? (
             <span className="text-sm leading-relaxed">{message.content}</span>
           ) : (
-            <FormattedText text={message.content} />
+            <>
+              <FormattedText text={message.content} />
+
+              {message.documents && message.documents.length > 0 && (
+                <DocumentList documents={message.documents} heading="From your documents" />
+              )}
+
+              {message.clarify && onClarify && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onClarify(message.clarify!, "documents")}
+                    className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    About my community
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onClarify(message.clarify!, "services")}
+                    className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    I need a service
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 

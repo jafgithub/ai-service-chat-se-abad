@@ -1,3 +1,5 @@
+import type { DocumentResult } from "@/lib/api";
+
 export interface ServiceCategory {
   id: string;
   title: string;
@@ -12,6 +14,14 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  /** The documents this answer came out of, listed under it. Kept on the
+   *  message rather than in one place on the page so scrolling back to an
+   *  earlier answer still shows what it was based on. */
+  documents?: DocumentResult[];
+  /** Set when the assistant could not tell whether the question was about the
+   *  community or a service. Holds the original question, so a button can ask
+   *  it again down the side it names. */
+  clarify?: string;
 }
 
 export interface Step {

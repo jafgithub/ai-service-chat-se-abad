@@ -8,6 +8,13 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     category_filter: Optional[str] = None
+    #: Which association the resident belongs to, so a rules answer is scoped to
+    #: their own documents rather than the home community's.
+    community: Optional[str] = None
+    #: Set only when they answered "community or a service?" by tapping one of
+    #: the two buttons: "documents" or "services". Skips the guess for that one
+    #: message rather than making them rephrase.
+    route: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
@@ -42,7 +49,14 @@ class DocumentResult(BaseModel):
     #: False for a scan. Said on the card, because a resident who downloads a
     #: site map and then asks a question about it should not be surprised.
     answerable: bool = True
+    #: The section the answer leant on, when this document was cited rather than
+    #: asked for by name. Shown under the title so a reader knows where to look
+    #: once the PDF is open.
+    section: str = ""
     download_url: str
+    #: The same file served inline, so the title can open it in a tab instead of
+    #: putting a 900KB PDF in somebody's downloads to check one line.
+    view_url: str = ""
 
 
 class ChatResponse(BaseModel):
