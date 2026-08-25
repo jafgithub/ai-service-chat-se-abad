@@ -5,13 +5,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatMessage } from "./ChatMessage";
 import { ServiceCard } from "@/components/booking/ServiceCard";
 import { BookingFlow } from "@/components/booking/BookingFlow";
+import { ParkingFlow } from "@/components/parking/ParkingFlow";
+import { DocumentResults } from "./DocumentResults";
 import { AccountMenu } from "@/components/layout/AccountMenu";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { getSessionId } from "@/lib/session";
 import { chatApi, requestsApi, voiceApi, ApiError } from "@/lib/api";
-import type { Booked, ServiceResult } from "@/lib/api";
+import type { Booked, DocumentResult, ServiceResult } from "@/lib/api";
 import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { cn } from "@/lib/utils";
@@ -113,6 +115,14 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  /* Documents found by name, which fill the results pane the way services do.
+     Held separately rather than shoehorned into `services`: nothing here is
+     bookable, priced or scored, and a document drawn as a service card would
+     be offering to send somebody a tradesperson called "Site map". */
+  const [documents, setDocuments] = useState<DocumentResult[]>([]);
+  /* The parking sheet, opened by the conversation rather than by a button. */
+  const [parking, setParking] = useState(false);
 
   // The service being booked, and the problem it answers. Both drive the sheet.
   const [booking, setBooking] = useState<ServiceResult | null>(null);
@@ -315,6 +325,14 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     found: ServiceResult[],
   ) => {
     if (!action) return;
+
+    // Asking for a pass opens the form, the same way asking to check out opens
+    // the checkout on the shop. The conversation stops there and hands over.
+    if (action.type === "parking") { setParking(true); return; }
+    // The documents themselves travel in `documents`, not in the action, so
+    // there is nothing to do here beyond not treating it as a booking.
+    if (action.type === "documents") return;
+
     if (action.type !== "added" && action.type !== "checkout") return;
 
     const wantedId = action.items?.[0]?.item_id;
@@ -357,8 +375,14 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
       }
       addMessage("user", heard);
       addMessage("assistant", res.reply);
-      if (res.services.length > 0) {
+      if (res.documents && res.documents.length > 0) {
+        setDocuments(res.documents);
+        setServices([]);
+        setTotalMatches(0);
+        setResultsFor(heard);
+      } else if (res.services.length > 0) {
         setProblem(heard);
+        setDocuments([]);
         setServices(res.services);
         setTotalMatches(res.total_services ?? res.services.length);
         setVisibleCount(PAGE_SIZE);
@@ -466,8 +490,17 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
       // says "I couldn't find anything" beside a panel still listing results for
       // the previous question. Only a *search* clears them: choosing a service
       // also returns an empty list, and that must leave what is on screen alone.
-      if (response.services.length > 0) {
+      // Documents replace whatever the pane was showing, because they are the
+      // answer to what was just asked. An empty list leaves the last set alone:
+      // asking for a pass must not wipe the search behind it.
+      if (response.documents.length > 0) {
+        setDocuments(response.documents);
+        setServices([]);
+        setTotalMatches(0);
+        setResultsFor(text.trim());
+      } else if (response.services.length > 0) {
         setProblem(text.trim());
+        setDocuments([]);
         setServices(response.services);
         setTotalMatches(response.total_services ?? response.services.length);
         setVisibleCount(PAGE_SIZE);
@@ -716,26 +749,30 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
           <div className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-6 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">
-                {services.length > 0
-                  ? resultsFor
-                    ? `For “${resultsFor}”`
-                    : "Services"
-                  : searchedAndFoundNothing
-                    ? `Nothing matches “${resultsFor}”`
-                    : "Services"}
+                {documents.length > 0
+                  ? "Documents"
+                  : services.length > 0
+                    ? resultsFor
+                      ? `For “${resultsFor}”`
+                      : "Services"
+                    : searchedAndFoundNothing
+                      ? `Nothing matches “${resultsFor}”`
+                      : "Services"}
               </p>
               <p className="mt-0.5 text-xs text-ink-muted">
-                {services.length > 0
-                  ? totalMatches > services.length
-                    ? `${totalMatches} match, showing the closest ${services.length}`
-                    : `${services.length} service${services.length === 1 ? "" : "s"} could cover this`
-                  : searchedAndFoundNothing
-                    ? "Nobody on the platform lists anything like that"
-                    : "Describe the problem, or start from a category"}
+                {documents.length > 0
+                  ? `${documents.length} document${documents.length === 1 ? "" : "s"} to download`
+                  : services.length > 0
+                    ? totalMatches > services.length
+                      ? `${totalMatches} match, showing the closest ${services.length}`
+                      : `${services.length} service${services.length === 1 ? "" : "s"} could cover this`
+                    : searchedAndFoundNothing
+                      ? "Nobody on the platform lists anything like that"
+                      : "Describe the problem, or start from a category"}
               </p>
             </div>
 
-            {services.length > 1 && (
+            {services.length > 1 && documents.length === 0 && (
               <div className="flex flex-shrink-0 items-center gap-1 rounded-control border border-line p-0.5">
                 {SORT_OPTIONS.map((opt) => (
                   <button
@@ -770,6 +807,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   </div>
                 ))}
               </div>
+            ) : documents.length > 0 ? (
+              <DocumentResults documents={documents} />
             ) : services.length > 0 ? (
               <>
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
@@ -825,6 +864,42 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                     ))}
                   </div>
 
+                  {/* Parking sits with the categories rather than under "or
+                      try", because it is a thing the product does, not an
+                      example of something to type. The client asked for it to
+                      be offered at start up alongside the services. */}
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <button
+                      onClick={() => setParking(true)}
+                      className="group flex items-center gap-3 rounded-card border border-line bg-surface p-4 text-left transition-shadow hover:shadow-card-hover"
+                    >
+                      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control bg-brand-50 text-2xl">
+                        🅿️
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-ink">Parking pass</span>
+                        <span className="block text-xs leading-relaxed text-ink-muted">
+                          For a visitor, with the code emailed to you
+                        </span>
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => sendMessage("get me my community documents")}
+                      className="group flex items-center gap-3 rounded-card border border-line bg-surface p-4 text-left transition-shadow hover:shadow-card-hover"
+                    >
+                      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control bg-brand-50 text-2xl">
+                        📄
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-ink">Community documents</span>
+                        <span className="block text-xs leading-relaxed text-ink-muted">
+                          Ask for one by name and I will find it
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+
                   <div className="mt-6">
                     <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">
                       Or try
@@ -847,6 +922,20 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
           </div>
         </div>
       </div>
+
+      {parking && (
+        <ParkingFlow
+          onClose={() => setParking(false)}
+          onIssued={(pass) =>
+            addMessage(
+              "assistant",
+              `Done. The pass for ${pass.vehicle_registration} is valid until ` +
+              `${new Date(pass.expires_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}, ` +
+              "and the code is on its way to your email.",
+            )
+          }
+        />
+      )}
 
       {booking && (
         <BookingFlow

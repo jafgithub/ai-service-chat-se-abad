@@ -86,6 +86,66 @@ def for_community(community: str) -> list[dict]:
     )
 
 
+#: Words that appear in half the titles and identify none of them. Left in the
+#: query they make "the parking pass form" match every form we hold.
+_NOISE = frozenset({
+    "the", "a", "an", "of", "for", "and", "my", "our", "your", "me", "please",
+    "can", "you", "get", "send", "give", "show", "find", "want", "need", "like",
+    "copy", "download", "file", "document", "documents", "pdf", "form", "please",
+    "i", "to", "is", "it", "that", "this", "in", "at", "on", "from", "community",
+    "association", "hoa", "point", "please",
+})
+
+
+def _singular(word: str) -> str:
+    """Enough of a stem that "colours" finds "colour". Not a stemmer: titles are
+    a closed set written by us, so the plural s is the whole problem."""
+    if len(word) > 3 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _terms(text: str) -> list[str]:
+    return [_singular(w) for w in re.findall(r"[a-z0-9]+", (text or "").lower())
+            if w not in _NOISE]
+
+
+def search_titles(query: str, community: str = "") -> list[dict]:
+    """Documents whose *title* matches what was asked for, best first.
+
+    Retrieval elsewhere runs over what is inside a document, which is the right
+    thing for "what are the quiet hours" and useless for "get me the application
+    for occupancy". That document is a scan: it has no readable text at all, so
+    nothing inside it can ever match, and the one way to find it is by its name.
+
+    Scored on how much of the title the asker actually named, so "application"
+    does not beat "application for occupancy" when both were asked for.
+    """
+    wanted = set(_terms(query))
+    if not wanted:
+        return []
+
+    scored = []
+    for doc in all_documents():
+        if community and doc["community"] != community:
+            continue
+        title = set(_terms(doc["title"]))
+        if not title:
+            continue
+        hit = wanted & title
+        if not hit:
+            continue
+        # Every word of the title named counts for more than a long title with
+        # one word in common, and a document whose whole name was said wins.
+        scored.append((len(hit) / len(title), len(hit), doc))
+
+    scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    # One word in common with a five word title is a coincidence, not a request.
+    return [doc for share, _, doc in scored if share >= 0.5]
+
+
 def find(community: str, title: str) -> Optional[dict]:
     """The document a retrieved section came from, so it can be offered.
 

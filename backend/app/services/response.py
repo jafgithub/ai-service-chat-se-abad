@@ -106,6 +106,28 @@ def cart_reply(cart: dict) -> str:
             "\n\nSay \"book item 1\" and I will show you who can do it and when.")
 
 
+def documents_reply(documents: list[dict]) -> str:
+    """What to say above the documents themselves.
+
+    Short on purpose. The links are underneath and they carry the titles, so
+    repeating every name here would say the same thing twice on a small screen.
+    Whether a document can be *answered from* is worth a word though: a resident
+    who downloads a site map and then asks a question about it should not be
+    surprised by the refusal.
+    """
+    if not documents:
+        return "I could not find a document by that name."
+
+    if len(documents) == 1:
+        doc = documents[0]
+        line = f"Here is the {doc['title']}."
+        if not doc["answerable"]:
+            line += " It is a scan, so I can give you the file but I cannot answer questions from it."
+        return line
+
+    return f"I found {len(documents)} documents that match. Here they are."
+
+
 def checkout_reply(cart: dict) -> str:
     if not cart["items"]:
         return "Tell me what needs doing first and I will find someone who does it."

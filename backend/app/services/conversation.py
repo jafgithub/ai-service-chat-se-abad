@@ -10,7 +10,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.services import rag, ai, intent as intent_svc, cart_service, response
+from app.services import rag, ai, doc_library, docs_index, intent as intent_svc, cart_service, response
 
 logger = logging.getLogger("chat")
 
@@ -23,13 +23,14 @@ _GREETING = re.compile(
     re.IGNORECASE,
 )
 
-# Points at the floating assistant rather than answering rules questions here.
-# The booking chat books jobs; the community documents live behind the button in
-# the corner, where every question is already known to be about the rules.
+# One box, three jobs, said in the order people ask for them. The rules used to
+# live only behind the floating button and the greeting sent people there; the
+# client asked for everything to be reachable from the conversation, so it is
+# named here instead of pointed at.
 GREETING_REPLY = (
     "Hello. Tell me what needs doing and I will find someone who does it. "
-    "For questions about your community rules, use the assistant at the "
-    "bottom right of the screen."
+    "I can also get you a parking pass, or find a document from your "
+    "community's rules."
 )
 
 
@@ -50,15 +51,49 @@ def process(message: str, session, db: Session, category_filter: str | None = No
         return _finish(db, session, GREETING_REPLY, [], None,
                        speech=GREETING_REPLY, intent_type="greeting")
 
+    # ── a parking pass ───────────────────────────────────────────────────────
+    #
+    # The chat recognises the request and the frontend opens the form, the same
+    # way asking to check out opens the checkout. Eleven details asked one at a
+    # time is a worse way to fill in a form than a form, so the conversation
+    # stops here and hands over.
+    if intent.type == "parking":
+        reply = ("Let's get you a parking pass. Fill this in and I will issue "
+                 "it and email you the code.")
+        return _finish(db, session, reply, [], {"type": "parking"},
+                       speech="Let's get you a parking pass.", intent_type=intent.type)
+
+    # ── a document by name ───────────────────────────────────────────────────
+    #
+    # Matched on the *title*, which is the only thing that can work: the client's
+    # own example, "get me the application for occupancy", names a scan with no
+    # readable text in it. Nothing inside that document can ever match a query,
+    # so searching what is inside it finds nothing and always did.
+    if intent.type == "document":
+        found = doc_library.search_titles(intent.query)
+        if found:
+            documents = [{
+                "id": d["id"],
+                "title": d["title"],
+                # The label, not the key: a resident reads "Serenity Point",
+                # and "serenity" on a card is the database showing through.
+                "community": docs_index.label_for(d["community"]),
+                "answerable": d.get("kind") == doc_library.ANSWERABLE,
+                "download_url": f"/api/v1/documents/{d['id']}/file",
+            } for d in found[:4]]
+            reply = response.documents_reply(documents)
+            return _finish(db, session, reply, [], {"type": "documents"},
+                           speech=reply, intent_type=intent.type, documents=documents)
+        # Nothing by that name. Fall through to the catalogue rather than
+        # refusing: "send me a plumber" reads as a document request to the
+        # matcher and is not one.
+
     # ── search ───────────────────────────────────────────────────────────────
     #
-    # Only the catalogue. The community documents used to be consulted here as
-    # well, and it worked, but it put two unrelated jobs in one box: a resident
-    # asking about the quiet hours and a customer with a blocked drain got the
-    # same screen, and the screen had to guess which of them was talking. The
-    # documents now live entirely behind the floating assistant, where every
-    # question is already known to be about the rules.
-    if intent.type == "search":
+    # The catalogue. Community rules questions still belong to the floating
+    # assistant, which knows which community is being asked about; this is the
+    # box for "my sink is blocked".
+    if intent.type == "search" or intent.type == "document":
         services = rag.search_products(query=intent.query, db=db, top_k=None, category_filter=category_filter)
         session.last_shown_json = response.build_shown(services)
         if services:
@@ -144,13 +179,15 @@ MAX_SERVICES_RETURNED = 100
 
 
 def _finish(db: Session, session, reply: str, services: list[dict], action: dict | None,
-            speech: str | None = None, intent_type: str | None = None) -> dict:
+            speech: str | None = None, intent_type: str | None = None,
+            documents: list[dict] | None = None) -> dict:
     return {
         "reply": reply,
         "speech": speech or reply,   # spoken text falls back to the full reply
         "services": services[:MAX_SERVICES_RETURNED],
         "total_services": len(services),
         "cart": cart_service.serialize_cart(db, session),
+        "documents": documents or [],
         "action": action,
         "intent": intent_type,
     }

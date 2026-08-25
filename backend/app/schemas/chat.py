@@ -30,6 +30,21 @@ class ServiceResult(BaseModel):
     similarity: float
 
 
+class DocumentResult(BaseModel):
+    """A document the assistant found by name, ready to download.
+
+    Separate from `services` because it is not one: nothing here is bookable,
+    priced, or scored against the catalogue. The frontend draws it as a link.
+    """
+    id: str
+    title: str
+    community: str
+    #: False for a scan. Said on the card, because a resident who downloads a
+    #: site map and then asks a question about it should not be surprised.
+    answerable: bool = True
+    download_url: str
+
+
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
@@ -40,6 +55,8 @@ class ChatResponse(BaseModel):
     # rather than claiming the catalog holds 100 cheeses.
     total_services: int = 0
     cart: CartOut
+    #: Documents matched by name, when that is what was asked for.
+    documents: list[DocumentResult] = []
     action: Optional[dict[str, Any]] = None
     # What the shopper's message was understood as: "search", "add_to_cart",
     # "view_cart", "checkout" and so on. The frontend uses it to decide whether

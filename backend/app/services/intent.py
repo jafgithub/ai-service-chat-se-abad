@@ -49,6 +49,40 @@ _CONVERSATIONAL = re.compile(
     r"^\s*" + _CONV_CHUNK + r"(\s*[,.!;]+\s*" + _CONV_CHUNK + r")*\s*[.!,]*\s*$",
     re.IGNORECASE,
 )
+# ── the two things the assistant does besides find a tradesperson ────────────
+#
+# Both were screens of their own first, and the client asked for them in the
+# conversation instead: "users ask for create parking permit in the chat, it
+# opens up a form". So the chat recognises the request and hands the frontend an
+# action; the form itself is still a form, because eleven questions asked one at
+# a time is a worse way to fill in a form than a form.
+
+# Asking for a pass to be issued. Deliberately narrow: "can I park a boat at my
+# house" is a question about the rules and must reach the documents instead, and
+# the word "parking" on its own decides nothing.
+_PARKING = re.compile(
+    r"\b(parking|visitor|guest)\s+(pass|permit|passes|permits)\b|"
+    r"\bpass\s+for\s+(my|a|the)\s+(visitor|guest|car|vehicle)\b|"
+    r"\bpark\s+(my|a|the)\s+(car|vehicle|visitor'?s?\s+car)\b",
+    re.IGNORECASE,
+)
+# ...but only when something is being asked for, rather than asked about.
+_WANTS = re.compile(
+    r"\b(need|want|get|give|create|make|issue|request|register|new|another|"
+    r"apply\s+for|book|arrange|set\s+up|generate|how\s+do\s+i\s+get)\b",
+    re.IGNORECASE,
+)
+
+# Asking for a document by name. "form", "copy" and "document" are the words
+# that mean a file is wanted rather than an answer, which is what separates
+# "get me the parking pass form" from "I need a parking pass".
+_DOCUMENT = re.compile(
+    r"\b(document|documents|form|forms|copy|pdf|paperwork|file)\b|"
+    r"\b(download|send|email|share)\s+(me\s+)?(the|a|an|that)\b|"
+    r"\b(get|give|show|find)\s+me\s+(the|a|an)\b",
+    re.IGNORECASE,
+)
+
 _VIEW_CART = re.compile(r"\b(view|show|see|what'?s?\s+in|check)\b.*\bcart\b|\bmy\s+cart\b|\bcart\s+total\b", re.IGNORECASE)
 _CHECKOUT = re.compile(
     r"\b(check\s*out|checkout|confirm\s+(my\s+)?(booking|appointment)|"
@@ -207,6 +241,19 @@ def parse(message: str, session, db: "Session") -> Intent:
 
     if _CONVERSATIONAL.match(text):
         return Intent(type="conversational")
+
+    # Before checkout and before the catalogue. A resident asking for a parking
+    # pass is not searching for a tradesperson, and the search would answer them
+    # with one.
+    if _PARKING.search(text) and _WANTS.search(text) and not _DOCUMENT.search(text):
+        return Intent(type="parking")
+
+    # A named document beats everything except a pass, because the ask is
+    # specific: somebody who says "the application for occupancy" wants that
+    # file, not an answer composed out of it.
+    if _DOCUMENT.search(text):
+        return Intent(type="document", query=text)
+
     if _CHECKOUT.search(text):
         return Intent(type="checkout")
 

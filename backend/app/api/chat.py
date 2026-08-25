@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.schemas.chat import ChatRequest, ChatResponse, ServiceResult
+from app.schemas.chat import ChatRequest, ChatResponse, DocumentResult, ServiceResult
 from app.services import cart_service, conversation
 
 logger = logging.getLogger("chat")
@@ -47,6 +47,7 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
         services=[ServiceResult(**p) for p in result["services"]],
         total_services=result.get("total_services", 0),
         cart=result["cart"],
+        documents=[DocumentResult(**d) for d in result.get("documents", [])],
         action=result["action"],
         intent=result.get("intent"),
     )

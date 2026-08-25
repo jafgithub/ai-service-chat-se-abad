@@ -33,8 +33,24 @@ export interface ServiceResult {
  *  customer chose a service ("book item 2"), which is the cue to go and find
  *  providers for it. */
 export interface ChatAction {
-  type: "added" | "removed" | "quantity" | "checkout";
+  /** `parking` opens the pass form; `documents` means the files are in
+   *  `documents` on the response and there is nothing else to do. */
+  type: "added" | "removed" | "quantity" | "checkout" | "parking" | "documents";
   items?: { item_id: number; name: string; quantity?: number }[];
+}
+
+/** A document the assistant found by name, ready to download.
+ *
+ *  Not a `ServiceResult`: nothing here is bookable, priced or scored against
+ *  the catalogue, and drawing one as a service card would be offering to send
+ *  somebody a tradesperson called "Site map". */
+export interface DocumentResult {
+  id: string;
+  title: string;
+  community: string;
+  /** False for a scan: the file downloads, the assistant cannot quote it. */
+  answerable: boolean;
+  download_url: string;
 }
 
 export interface ChatResponse {
@@ -43,6 +59,7 @@ export interface ChatResponse {
   speech?: string;
   services: ServiceResult[];
   total_services?: number;
+  documents: DocumentResult[];
   action: ChatAction | null;
   intent?: string | null;
 }
@@ -56,6 +73,7 @@ export interface VoiceResponse {
   audio: string;
   services: ServiceResult[];
   total_services?: number;
+  documents?: DocumentResult[];
   action: ChatAction | null;
   intent?: string | null;
 }
