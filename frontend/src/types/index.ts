@@ -33,6 +33,11 @@ export interface ChatMessage {
   asked?: string;
   /** Whose documents answered, so the block can say so and offer to change it. */
   community?: string;
+  /** What kind of answer this is. A numbered line means something different in
+   *  each: "1. Blocked drain cleared: from $89.00" is bookable, "1. Provide
+   *  specifications" is step one of a procedure, and drawing them the same way
+   *  is what made a resident ask what "book item 1" meant. */
+  variant?: "services" | "documents" | "plain";
 }
 
 export interface Step {

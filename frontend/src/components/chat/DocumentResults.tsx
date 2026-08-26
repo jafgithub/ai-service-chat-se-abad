@@ -25,17 +25,26 @@ export function DocumentResults({ documents }: DocumentResultsProps) {
     <ul className="space-y-3">
       {documents.map((doc) => (
         <li key={doc.id}>
+          {/* The whole card used to be one anchor with neither `download` nor
+              `target`, so a click navigated the application away and replaced
+              it with a PDF. It is now a row: read on the left, save on the
+              right, and a button cannot be nested inside an anchor. */}
+          <div className="flex items-start gap-3 rounded-card border border-line bg-surface p-4 transition-shadow hover:shadow-card-hover">
           <a
-            href={`${apiBase}${doc.download_url}`}
-            className="flex items-start gap-3 rounded-card border border-line bg-surface p-4 transition-shadow hover:shadow-card-hover"
+            href={`${apiBase}${doc.view_url || doc.download_url}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-w-0 flex-1 items-start gap-3"
           >
             <span
               className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-control bg-brand-50 text-brand-600"
               aria-hidden
             >
+              {/* A page, not an arrow. This half opens the document to read;
+                  the arrow lives on the Download button, which saves it. */}
               <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v12m0 0-4-4m4 4 4-4" />
-                <path strokeLinecap="round" d="M5 19h14" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14 3v5h5M9 13h6M9 17h4" />
               </svg>
             </span>
 
@@ -49,6 +58,22 @@ export function DocumentResults({ documents }: DocumentResultsProps) {
               )}
             </span>
           </a>
+
+          <a
+            href={`${apiBase}${doc.download_url}`}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Download ${doc.title}`}
+            className="flex flex-shrink-0 items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-muted transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v11m0 0-3.5-3.5M12 15l3.5-3.5" />
+              <path strokeLinecap="round" d="M5 19h14" />
+            </svg>
+            Download
+          </a>
+          </div>
         </li>
       ))}
     </ul>

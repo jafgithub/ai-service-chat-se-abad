@@ -14,7 +14,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { getSessionId } from "@/lib/session";
 import { rememberCommunity, storedCommunity, useCommunities } from "@/lib/community";
 import { chatApi, requestsApi, voiceApi, ApiError } from "@/lib/api";
-import type { Booked, CommunityOption, DocumentResult, ServiceResult } from "@/lib/api";
+import type { Booked, ChatAction, CommunityOption, DocumentResult, ServiceResult } from "@/lib/api";
 import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { cn } from "@/lib/utils";
@@ -191,7 +191,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     role: "user" | "assistant",
     content: string,
     extra?: Partial<Pick<ChatMessageType,
-      "documents" | "clarify" | "pick" | "asked" | "community" | "missedIn">>,
+      "documents" | "clarify" | "pick" | "asked" | "community" | "missedIn" | "variant">>,
   ) => {
     setMessages((prev) => [...prev, {
       id: crypto.randomUUID(), role, content, timestamp: new Date(), ...extra,
@@ -381,6 +381,83 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     }]);
   }, []);
 
+  /** One reply, applied to the screen.
+   *
+   *  Shared by the typed path and the spoken one. They were two copies of the
+   *  same logic and had already drifted: the voice path never attached the
+   *  documents to a message, so a spoken question was answered with its
+   *  sources invisible.
+   *
+   *  The panel is drawn from `shelf`, which the server sends with any reply
+   *  about a community. That is what makes it stay put for a whole
+   *  conversation: it used to be cleared on every answer that cited a source,
+   *  which is why the client said downloading had stopped working. He was
+   *  looking at the panel, and the panel was empty. */
+  const applyReply = useCallback((
+    res: {
+      reply: string;
+      intent?: string | null;
+      documents: DocumentResult[];
+      shelf?: DocumentResult[];
+      services: ServiceResult[];
+      total_services?: number;
+      action: ChatAction | null;
+    },
+    said: string,
+  ) => {
+    const docsFamily = res.intent === "document"
+      || res.intent === "documents"
+      || res.intent === "documents_miss"
+      || res.intent === "pick_community";
+
+    addMessage("assistant", res.reply, {
+      documents: res.documents.length > 0 ? res.documents : undefined,
+      clarify: res.action?.type === "clarify" ? (res.action.question ?? said) : undefined,
+      pick: res.action?.type === "pick_community" ? communityOptionsRef.current : undefined,
+      missedIn: res.action?.type === "documents_miss"
+        ? (res.action.community || undefined) : undefined,
+      // On every answer, not only the ones with documents: "Change" needs the
+      // question, and so does the picker when it appears.
+      asked: res.action?.question ?? said,
+      community: homeLabel(),
+      variant: docsFamily ? "documents" : res.services.length > 0 ? "services" : "plain",
+    });
+
+    const shelf = res.shelf ?? [];
+    if (shelf.length > 0) {
+      setDocuments(shelf);
+      setServices([]);
+      setTotalMatches(0);
+      setDocAnswered(res.intent !== "document");
+      setResultsFor(said);
+    } else if (docsFamily) {
+      // A community reply with no shelf: leave the panel exactly as it is
+      // rather than emptying it behind the answer.
+      setDocAnswered(true);
+      setServices([]);
+      setTotalMatches(0);
+      setResultsFor(said);
+    } else if (res.services.length > 0) {
+      setDocAnswered(false);
+      setProblem(said);
+      setDocuments([]);
+      setServices(res.services);
+      setTotalMatches(res.total_services ?? res.services.length);
+      setVisibleCount(PAGE_SIZE);
+      setResultsFor(said);
+    } else if (res.action === null) {
+      // A search that found nothing must clear the last one, or the assistant
+      // says "I couldn't find anything" beside a panel still listing the
+      // previous question's results.
+      setDocAnswered(false);
+      setDocuments([]);
+      setServices([]);
+      setTotalMatches(0);
+      setVisibleCount(PAGE_SIZE);
+      setResultsFor(said);
+    }
+  }, [addMessage, homeLabel]);
+
   /** What the assistant did, applied to the screen.
    *
    *  "added" is the interesting one. The intent engine still calls choosing a
@@ -442,25 +519,10 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         return;
       }
       addMessage("user", heard);
-      addMessage("assistant", res.reply);
-      if (res.documents && res.documents.length > 0) {
-        setDocuments(res.documents);
-        setServices([]);
-        setTotalMatches(0);
-        setResultsFor(heard);
-      } else if (res.services.length > 0) {
-        setProblem(heard);
-        setDocuments([]);
-        setServices(res.services);
-        setTotalMatches(res.total_services ?? res.services.length);
-        setVisibleCount(PAGE_SIZE);
-        setResultsFor(heard);
-      } else if (res.action === null) {
-        setServices([]);
-        setTotalMatches(0);
-        setVisibleCount(PAGE_SIZE);
-        setResultsFor(heard);
-      }
+      // The same handler as the typed path, which is the whole point: these
+      // were two copies and the spoken one had quietly stopped attaching the
+      // documents to its answers.
+      applyReply({ ...res, documents: res.documents ?? [] }, heard);
       applyAction(res.action, res.services.length > 0 ? res.services : services);
       // Speak the short version: long lists are shown, not read out.
       await speak(res.audio ?? "", res.speech || res.reply);
@@ -470,7 +532,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     }
 
     if (voiceActiveRef.current) voiceTurnRef.current();      // keep the conversation going
-  }, [recordUtterance, speak, sessionId, scope, geo.position, addMessage, applyAction, services]);
+  }, [recordUtterance, speak, sessionId, scope, geo.position, addMessage, applyAction,
+      applyReply, services]);
 
   // Keep the ref pointed at the freshest turn fn so the loop always recurses correctly.
   useEffect(() => { voiceTurnRef.current = voiceTurn; }, [voiceTurn]);
@@ -560,62 +623,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         community: storedCommunity() || undefined,
         route,
       });
-      addMessage("assistant", response.reply, {
-        documents: response.documents.length > 0 ? response.documents : undefined,
-        clarify: response.action?.type === "clarify"
-          ? (response.action.question ?? text.trim())
-          : undefined,
-        pick: response.action?.type === "pick_community"
-          ? communityOptionsRef.current
-          : undefined,
-        missedIn: response.action?.type === "documents_miss"
-          ? (response.action.community || undefined)
-          : undefined,
-        // Kept on every answer, not only the ones with documents: "Change"
-        // needs the question, and so does the picker when it appears.
-        asked: response.action?.question ?? text.trim(),
-        community: homeLabel(),
-      });
-      // A search that found nothing has to clear the last one, or the assistant
-      // says "I couldn't find anything" beside a panel still listing results for
-      // the previous question. Only a *search* clears them: choosing a service
-      // also returns an empty list, and that must leave what is on screen alone.
-      // Documents replace whatever the pane was showing, because they are the
-      // answer to what was just asked. An empty list leaves the last set alone:
-      // asking for a pass must not wipe the search behind it.
-      if (response.documents.length > 0) {
-        // Only a list asked for by name fills the pane. Documents cited under
-        // an answer are already in the bubble, and putting the same two rows in
-        // both places at once reads as a bug rather than as emphasis.
-        const namedOne = response.intent === "document";
-        setDocuments(namedOne ? response.documents : []);
-        setDocAnswered(!namedOne);
-        setServices([]);
-        setTotalMatches(0);
-        setResultsFor(text.trim());
-      } else if (response.intent === "documents" || response.intent === "documents_miss") {
-        // Answered from the documents, or told plainly that they do not cover
-        // it. Either way the catalogue was never asked, so it must not report.
-        setDocAnswered(true);
-        setDocuments([]);
-        setServices([]);
-        setTotalMatches(0);
-        setResultsFor(text.trim());
-      } else if (response.services.length > 0) {
-        setDocAnswered(false);
-        setProblem(text.trim());
-        setDocuments([]);
-        setServices(response.services);
-        setTotalMatches(response.total_services ?? response.services.length);
-        setVisibleCount(PAGE_SIZE);
-        setResultsFor(text.trim());
-      } else if (response.action === null) {
-        setDocAnswered(false);
-        setServices([]);
-        setTotalMatches(0);
-        setVisibleCount(PAGE_SIZE);
-        setResultsFor(text.trim());
-      }
+      applyReply(response, text.trim());
       applyAction(response.action, response.services.length > 0 ? response.services : services);
     } catch (err) {
       const msg = err instanceof ApiError
@@ -625,7 +633,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, services, homeLabel]);
+  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, applyReply,
+      services]);
 
   const onBooked = useCallback((made: Booked) => {
     addMessage(

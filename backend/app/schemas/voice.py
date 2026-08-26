@@ -20,6 +20,7 @@ class VoiceResponse(BaseModel):
     total_services: int = 0
     cart: CartOut
     documents: list[DocumentResult] = []
+    shelf: list[DocumentResult] = []
     action: Optional[dict[str, Any]] = None
     # Same purpose as on the chat response: only a genuine product search should
     # ever reach out to a paid third-party search.

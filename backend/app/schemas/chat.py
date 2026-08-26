@@ -69,8 +69,13 @@ class ChatResponse(BaseModel):
     # rather than claiming the catalog holds 100 cheeses.
     total_services: int = 0
     cart: CartOut
-    #: Documents matched by name, when that is what was asked for.
+    #: Documents matched by name, or cited under an answer.
     documents: list[DocumentResult] = []
+    #: Everything the resident's association holds, while the conversation is
+    #: about that association. Sent with the reply rather than fetched
+    #: separately so the panel is a pure function of the last answer, and so
+    #: the voice path gets it without a second round trip it cannot make.
+    shelf: list[DocumentResult] = []
     action: Optional[dict[str, Any]] = None
     # What the shopper's message was understood as: "search", "add_to_cart",
     # "view_cart", "checkout" and so on. The frontend uses it to decide whether

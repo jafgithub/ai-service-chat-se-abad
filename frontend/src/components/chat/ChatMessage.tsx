@@ -51,7 +51,13 @@ function withEmphasis(text: string): React.ReactNode {
   );
 }
 
-function FormattedText({ text }: { text: string }) {
+function FormattedText({
+  text,
+  variant = "plain",
+}: {
+  text: string;
+  variant?: "services" | "documents" | "plain";
+}) {
   const lines = text.split(/\n+/).filter((l) => l.trim() !== "");
 
   return (
@@ -59,9 +65,14 @@ function FormattedText({ text }: { text: string }) {
       {lines.map((line, i) => {
         const trimmed = line.trim();
 
-        // A numbered product line: "1. Whole Milk: $1.80"
+        // A numbered line means two different things and used to be drawn one
+        // way. In a service answer it is "1. Blocked drain cleared: from
+        // $89.00", a row you can book by its number. In a document answer it is
+        // "1. Provide specifications of the modification", step one of a
+        // procedure that cannot be booked at all. Drawing the second as the
+        // first is what led the client to ask what "book item 1" was for.
         const numbered = trimmed.match(/^(\d+)\.\s+(.+)$/);
-        if (numbered) {
+        if (numbered && variant === "services") {
           return (
             <div
               key={i}
@@ -72,6 +83,20 @@ function FormattedText({ text }: { text: string }) {
               </span>
               <span className="text-sm leading-snug text-ink">
                 {formatProductLine(numbered[2])}
+              </span>
+            </div>
+          );
+        }
+        if (numbered) {
+          // A step. No pill, no card, no price emphasis: nothing that suggests
+          // it can be picked by its number.
+          return (
+            <div key={i} className="flex items-start gap-2.5 pl-0.5">
+              <span className="mt-0.5 flex-shrink-0 text-[13px] font-semibold tabular-nums text-ink-faint">
+                {numbered[1]}.
+              </span>
+              <span className="text-sm leading-relaxed text-ink">
+                {withEmphasis(numbered[2])}
               </span>
             </div>
           );
@@ -164,7 +189,7 @@ export function ChatMessage({
             <span className="text-sm leading-relaxed">{message.content}</span>
           ) : (
             <>
-              <FormattedText text={message.content} />
+              <FormattedText text={message.content} variant={message.variant} />
 
               {message.documents && message.documents.length > 0 && (
                 <DocumentList

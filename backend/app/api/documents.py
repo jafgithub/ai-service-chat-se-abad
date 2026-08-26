@@ -49,6 +49,8 @@ class DocumentOut(BaseModel):
     #: which are downloadable and nothing more.
     answerable: bool
     download_url: str
+    #: The same file served inline, for reading rather than saving.
+    view_url: str = ""
 
 
 def _out(doc: dict) -> DocumentOut:
@@ -62,6 +64,7 @@ def _out(doc: dict) -> DocumentOut:
         added_at=doc.get("added_at", ""),
         answerable=doc["kind"] == doc_library.ANSWERABLE,
         download_url=f"/api/v1/documents/{doc['id']}/file",
+        view_url=f"/api/v1/documents/{doc['id']}/file?view=1",
     )
 
 

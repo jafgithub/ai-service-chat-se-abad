@@ -80,6 +80,10 @@ export interface ChatResponse {
   services: ServiceResult[];
   total_services?: number;
   documents: DocumentResult[];
+  /** Everything the resident's association holds, sent with any reply that is
+   *  about that association. The panel is drawn from this rather than fetched
+   *  separately, so it can never disagree with the answer beside it. */
+  shelf: DocumentResult[];
   action: ChatAction | null;
   intent?: string | null;
 }
@@ -94,6 +98,7 @@ export interface VoiceResponse {
   services: ServiceResult[];
   total_services?: number;
   documents?: DocumentResult[];
+  shelf?: DocumentResult[];
   action: ChatAction | null;
   intent?: string | null;
 }

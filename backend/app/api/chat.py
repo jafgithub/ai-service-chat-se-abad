@@ -53,6 +53,7 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
         total_services=result.get("total_services", 0),
         cart=result["cart"],
         documents=[DocumentResult(**d) for d in result.get("documents", [])],
+        shelf=[DocumentResult(**d) for d in result.get("shelf", [])],
         action=result["action"],
         intent=result.get("intent"),
     )

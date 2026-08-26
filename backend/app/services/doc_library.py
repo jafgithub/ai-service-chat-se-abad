@@ -97,6 +97,33 @@ _NOISE = frozenset({
 })
 
 
+#: American spellings mapped onto the ones the documents use.
+#:
+#: The client asked "can you download the color archive for me" seconds after
+#: being told the community holds the "Approved colour archive", and got a
+#: clarifying question back, because `color` and `colour` share no characters
+#: as far as a set intersection is concerned. Residents in Florida will type
+#: the American spelling; the associations write the British one.
+#:
+#: A map rather than a stemmer, for the same reason `_singular` is not one: the
+#: titles are a closed set we write ourselves, and the handful of words that
+#: actually differ is knowable.
+_SPELLING = {
+    "color": "colour", "colors": "colours",
+    "catalog": "catalogue", "catalogs": "catalogues",
+    "license": "licence", "licenses": "licences",
+    "neighborhood": "neighbourhood", "neighborhoods": "neighbourhoods",
+    "organization": "organisation", "organizations": "organisations",
+    "authorization": "authorisation", "authorizations": "authorisations",
+    "enrollment": "enrolment", "enrollments": "enrolments",
+    "fulfillment": "fulfilment",
+    "harbor": "harbour", "harbors": "harbours",
+    "center": "centre", "centers": "centres",
+    "meter": "metre", "meters": "metres",
+    "check": "cheque", "checks": "cheques",
+}
+
+
 def _singular(word: str) -> str:
     """Enough of a stem that "colours" finds "colour". Not a stemmer: titles are
     a closed set written by us, so the plural s is the whole problem."""
@@ -108,8 +135,14 @@ def _singular(word: str) -> str:
 
 
 def _terms(text: str) -> list[str]:
-    return [_singular(w) for w in re.findall(r"[a-z0-9]+", (text or "").lower())
-            if w not in _NOISE]
+    """The words that identify a document, normalised so two spellings meet.
+
+    Spelling is settled before the noise test and before de-pluralising, so
+    "colors" becomes "colours" becomes "colour" and lands on the same term as
+    the title's own word.
+    """
+    words = (_SPELLING.get(w, w) for w in re.findall(r"[a-z0-9]+", (text or "").lower()))
+    return [_singular(w) for w in words if w not in _NOISE]
 
 
 def search_titles(query: str, community: str = "") -> list[dict]:
@@ -139,6 +172,11 @@ def search_titles(query: str, community: str = "") -> list[dict]:
             continue
         # Every word of the title named counts for more than a long title with
         # one word in common, and a document whose whole name was said wins.
+        #
+        # Scoring the query instead was tried and reverted: "design" is one word
+        # of a three word title, so by-query it scores 1.0 and matches, which is
+        # exactly the coincidence the floor below exists to reject. The title is
+        # the right denominator; what was wrong was the spelling, above.
         scored.append((len(hit) / len(title), len(hit), doc))
 
     scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
@@ -158,6 +196,68 @@ def find(community: str, title: str) -> Optional[dict]:
         if doc["community"] == community and doc["title"] == title:
             return doc
     return None
+
+
+#: "download that", "send it to me", "the second one". Anything that points at
+#: something already on screen rather than naming it.
+_POINTS_BACK = re.compile(
+    r"\b(that|those|it|this|these|the\s+(first|second|third|last|other)"
+    r"(\s+one)?|same|above)\b",
+    re.IGNORECASE,
+)
+
+_POSITIONS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5}
+
+
+def resolve_remembered(message: str, remembered: list[dict]) -> list[dict]:
+    """A document the resident is pointing at rather than naming.
+
+    `intent.py` already does this for services: after a numbered list, "item 2"
+    resolves against `last_shown_json`. This is the same idea for documents,
+    and it exists because of one exchange. The assistant said "what I hold for
+    Kendall Square is the Approved colour archive", the resident replied "can
+    you download the color archive for me", and there was nothing holding the
+    archive, so the reply was a question rather than the file.
+
+    Three ways of pointing, in order of how specific they are:
+
+    1. by name, against the remembered few rather than the whole library
+    2. by position, "the second one"
+    3. by pronoun, "download that", which means the only one when there is
+       only one and the most recent otherwise
+
+    Returns a list so the caller treats it exactly like `search_titles`.
+    """
+    if not remembered:
+        return []
+
+    # 1) Named, but only among what was just offered. Scoped this tightly on
+    #    purpose: "the form" said after two forms were listed means one of
+    #    those two, not every form in six associations.
+    wanted = set(_terms(message))
+    if wanted:
+        named = [doc for doc in remembered
+                 if wanted & set(_terms(doc.get("title", "")))]
+        if len(named) == 1:
+            return named
+
+    if not _POINTS_BACK.search(message or ""):
+        return []
+
+    # 2) By position in the list they were shown.
+    for word, position in _POSITIONS.items():
+        if re.search(rf"\b{word}\b", message, re.IGNORECASE):
+            if word == "last":
+                continue
+            if position <= len(remembered):
+                return [remembered[position - 1]]
+    if re.search(r"\blast\b", message, re.IGNORECASE):
+        return [remembered[-1]]
+
+    # 3) A bare pronoun. Unambiguous only when there was one thing to point at;
+    #    with several, "that" means the one named first, which is the one the
+    #    answer leant on hardest.
+    return [remembered[0]]
 
 
 def get(doc_id: str, include_withdrawn: bool = False) -> Optional[dict]:

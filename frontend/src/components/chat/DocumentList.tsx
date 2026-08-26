@@ -97,17 +97,23 @@ export function DocumentList({ documents, heading, home, onChange }: DocumentLis
               )}
             </a>
 
+            {/* Labelled, because the client said he could not download and the
+                control was a grey arrow at the end of a row. `target` is what
+                actually protects the app: `download` is ignored cross origin,
+                and without either a click replaces the page with a PDF. */}
             <a
               href={`${apiBase}${doc.download_url}`}
               download
-              title={`Download ${doc.title}`}
+              target="_blank"
+              rel="noopener noreferrer"
               aria-label={`Download ${doc.title}`}
-              className="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-control text-ink-faint transition-colors hover:bg-brand-50 hover:text-brand-600"
+              className="mr-2 flex flex-shrink-0 items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-muted transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.9} viewBox="0 0 24 24" aria-hidden>
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v11m0 0-3.5-3.5M12 15l3.5-3.5" />
                 <path strokeLinecap="round" d="M5 19h14" />
               </svg>
+              Download
             </a>
           </li>
         ))}

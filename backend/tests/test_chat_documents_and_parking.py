@@ -176,3 +176,44 @@ def test_the_shelf_reply_says_how_much_there_is():
 
     assert one == "Kendall Square has one document loaded. Here it is."
     assert "7 documents" in many
+
+
+# ── spelling ─────────────────────────────────────────────────────────────────
+#
+# From the logs on 26 August. The client typed the American spelling seconds
+# after the assistant had shown him the British one, and the intersection of
+# {color, archive} with {approved, colour, archive} is one word out of three,
+# which is under the floor. Residents in Florida type "color"; the associations
+# write "colour".
+
+def test_the_american_spelling_finds_the_british_title(monkeypatch):
+    monkeypatch.setattr(doc_library, "all_documents", lambda include_withdrawn=False: [
+        {"id": "k", "community": "kendall square", "title": "Approved colour archive",
+         "kind": doc_library.ANSWERABLE},
+    ])
+
+    found = doc_library.search_titles("can you download the color archive for me ?")
+
+    assert [d["id"] for d in found] == ["k"]
+
+
+def test_it_works_the_other_way_too(monkeypatch):
+    """An association that writes "Color" and a resident who types "colour"."""
+    monkeypatch.setattr(doc_library, "all_documents", lambda include_withdrawn=False: [
+        {"id": "k", "community": "kendall square", "title": "Approved Color Archive",
+         "kind": doc_library.ANSWERABLE},
+    ])
+
+    assert doc_library.search_titles("the colour archive")[0]["id"] == "k"
+
+
+def test_the_threshold_is_untouched(monkeypatch):
+    """Spelling was the bug, not the floor. Lowering the floor is the tempting
+    fix and the one that breaks everything else, so this states plainly that a
+    single word against a three word title is still a coincidence."""
+    monkeypatch.setattr(doc_library, "all_documents", lambda include_withdrawn=False: [
+        {"id": "a", "community": "three lakes", "title": "Design review form and instructions",
+         "kind": doc_library.ANSWERABLE},
+    ])
+
+    assert doc_library.search_titles("design") == []

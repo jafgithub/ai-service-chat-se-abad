@@ -86,6 +86,10 @@ def _wants_documents(message: str) -> bool:
 # and shared with the floating assistant.
 PICK_COMMUNITY_REPLY = "Which community are you asking about?"
 
+# Said when a community conversation gives way to a tradesperson, so the change
+# of subject is never silent. No dash: these go straight to residents.
+SWITCHING_TO_SERVICES = "Switching to services for this one."
+
 UNSURE_REPLY = (
     "I could not find that. Are you asking about your community's rules, "
     "or do you need someone to come out?"
@@ -111,6 +115,51 @@ GREETING_REPLY = (
 )
 
 
+# ── remembering what the conversation is about ───────────────────────────────
+#
+# Read through helpers, never as bare attributes. The tests fake the session as
+# a plain object carrying `last_shown_json` and `last_referenced_item_id` and
+# nothing else, and a bare `session.mode` would raise there rather than in
+# anything a resident touches.
+
+DOCUMENTS = "documents"
+SERVICES = "services"
+
+
+def _remembered_community(session, sent: str) -> str:
+    """Which association this conversation is about.
+
+    What the interface sent wins, because a resident who has just changed it in
+    the picker means it. The session is the fallback, and it is what makes
+    `/voice` work at all: that endpoint cannot send a community.
+    """
+    return sent or getattr(session, "community", "") or ""
+
+
+def _remembered_documents(session) -> list[dict]:
+    return getattr(session, "last_documents_json", None) or []
+
+
+def _mode(session) -> str:
+    return getattr(session, "conversation_mode", "") or ""
+
+
+def _remember(session, *, community: str = "", documents: list[dict] | None = None,
+              mode: str = "") -> None:
+    """Keep what the next message will need. Assigned wholesale, never mutated
+    in place: the column is a plain JSON type with no change tracking, so an
+    in-place append would never reach the database."""
+    if community:
+        session.community = community
+    if documents is not None:
+        session.last_documents_json = [
+            {"id": d["id"], "title": d["title"], "community": d.get("community", "")}
+            for d in documents
+        ]
+    if mode:
+        session.conversation_mode = mode
+
+
 def process(message: str, session, db: Session, category_filter: str | None = None,
             community: str = "", route: str = "") -> dict:
     """One message in, one screen out.
@@ -121,7 +170,29 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     skips the guess entirely for that one message.
     """
     intent = intent_svc.parse(message, session, db)
-    logger.info(f"[CHAT] intent={intent.type} refs={[(r.item_id, r.quantity) for r in intent.refs]}")
+
+    # What this conversation is already about, before this message is judged.
+    # The community the interface sent wins over the remembered one, because a
+    # resident who has just changed it in the picker means it.
+    community = _remembered_community(session, community)
+    sticky = _mode(session) == DOCUMENTS
+    remembered = _remembered_documents(session)
+
+    # Leaving the documents for a tradesperson. `_BOOKING_SHAPE` is reused as
+    # *the* test for a clear service request rather than a second predicate
+    # being invented beside it: it already short-circuits `_wants_documents`,
+    # and it already gets "can I book someone to cut the grass" right.
+    leaving = sticky and (route == "services" or bool(_BOOKING_SHAPE.search(message)))
+    if leaving:
+        sticky = False
+        _remember(session, mode=SERVICES)
+    # Announced, but not when they tapped the button: telling somebody what
+    # they just chose reads as the assistant not having listened.
+    announce = SWITCHING_TO_SERVICES if (leaving and route != "services") else ""
+
+    logger.info("[CHAT] intent=%s mode=%s community=%r refs=%s", intent.type,
+                _mode(session) or "-", community,
+                [(r.item_id, r.quantity) for r in intent.refs])
 
     services: list[dict] = []
     action: dict | None = None
@@ -155,7 +226,24 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     # readable text in it. Nothing inside that document can ever match a query,
     # so searching what is inside it finds nothing and always did.
     if intent.type == "document":
-        found = doc_library.search_titles(intent.query)
+        # What was just on screen comes first. The client asked "can you
+        # download the color archive for me" one message after being told
+        # "what I hold for Kendall Square is the Approved colour archive", and
+        # the archive was the obvious answer only because it had just been
+        # said. Nothing was keeping it, so he got a question back.
+        found = doc_library.resolve_remembered(message, remembered)
+        # Re-read the library record. What is remembered is a name and an id,
+        # deliberately, so a document withdrawn mid conversation cannot be
+        # served from memory; everything else about it, `kind` above all, has
+        # to come from the library or a perfectly readable document gets
+        # described to the resident as a scan.
+        found = [doc for doc in (doc_library.get(d["id"]) for d in found) if doc]
+        # Then by name, inside their own association. Scoped and left scoped:
+        # falling back to every community would hand a Kendall Square resident
+        # Three Lakes' paperwork, which is the same failure as answering them
+        # from it.
+        if not found:
+            found = doc_library.search_titles(intent.query, community=community)
         whole_shelf = ""
         if not found:
             # "show me the Kendall Square documents" names a community and no
@@ -177,11 +265,20 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             } for d in (found if whole_shelf else found[:4])]
             reply = (response.shelf_reply(docs_index.label_for(whole_shelf), documents)
                      if whole_shelf else response.documents_reply(documents))
+            _enter_documents(session, community or _key_for(documents[0]["community"]),
+                             documents)
             return _finish(db, session, reply, [], {"type": "documents"},
                            speech=reply, intent_type=intent.type, documents=documents)
-        # Nothing by that name. Fall through to the catalogue rather than
-        # refusing: "send me a plumber" reads as a document request to the
-        # matcher and is not one.
+
+        # Nothing by that name. Falling through to the catalogue is what told a
+        # resident asking for a PDF to "book item 2", so it now happens only
+        # when the message was never really about a document: "send me a
+        # plumber" reads as one to the matcher and is not one.
+        if sticky or community:
+            return _finish(db, session, _document_miss(message, community), [],
+                           {"type": "documents_miss", "community": community,
+                            "question": message},
+                           intent_type="documents_miss", announce=announce)
 
     # ── a question about the community ───────────────────────────────────────
     #
@@ -198,7 +295,12 @@ def process(message: str, session, db: Session, category_filter: str | None = No
         # document we hold.
         names_community = (bool(docs_index.named_communities(message))
                            and not _BOOKING_SHAPE.search(message))
-        asked = route == "documents" or _wants_documents(message) or names_community
+        # `sticky` is what keeps "what about weekends" and "and the pet rules?"
+        # with the documents. `_wants_documents` stays a pure function of the
+        # message: fifteen parametrised tests assert it directly, and threading
+        # a session into it would break every one.
+        asked = (route == "documents" or _wants_documents(message)
+                 or names_community or sticky)
 
         if asked:
             # Which association? Asked here rather than on the way in, because
@@ -213,7 +315,8 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                         db, session, PICK_COMMUNITY_REPLY, [],
                         {"type": "pick_community", "question": message,
                          "options": [{"key": c.key, "label": c.label} for c in choices]},
-                        speech=PICK_COMMUNITY_REPLY, intent_type="pick_community")
+                        speech=PICK_COMMUNITY_REPLY, intent_type="pick_community",
+                        announce=announce)
 
             sources: list = []
             grounded = _document_answer(message, sources, community or "")
@@ -221,9 +324,11 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                 found = _documents_behind(sources)
                 logger.info("[CHAT] answered from the community documents, %d source(s)",
                             len(found))
+                _enter_documents(session, community, found)
                 return _finish(db, session, grounded, [], None,
                                speech="Here is what the community documents say.",
-                               intent_type="documents", documents=found)
+                               intent_type="documents", documents=found,
+                               announce=announce)
 
             # The documents came back empty. Whether that is the answer or
             # merely a miss depends on how certain we are the question was
@@ -247,6 +352,7 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             # is not an answer to them.
             owns_the_question = (
                 route == "documents"
+                or sticky
                 or bool(_DOC_SHAPE.search(message))
                 or (names_community and _wants_documents(message))
             )
@@ -256,10 +362,15 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                 # "not here" and nothing else is what turned one question into
                 # five identical retries in the logs on 26 August.
                 where = community or (named_communities_key(message) or "")
+                # Remember the shelf, not just the community. The reply names
+                # what the association does hold, so those titles are now on
+                # screen and "download the colour archive" has to resolve
+                # against them. This is the exact turn the client got stuck on.
+                _enter_documents(session, where, doc_library.for_community(where))
                 return _finish(db, session, _document_miss(message, community or ""),
                                [], {"type": "documents_miss", "community": where,
                                     "question": message},
-                               intent_type="documents_miss")
+                               intent_type="documents_miss", announce=announce)
 
     # ── search ───────────────────────────────────────────────────────────────
     if intent.type == "search" or intent.type == "document":
@@ -285,6 +396,9 @@ def process(message: str, session, db: Session, category_filter: str | None = No
             reply = ai.search_intro(message, services) or response.search_reply(services)
         if services:
             speech = "Here is the list."
+            # A genuine catalogue answer ends the community conversation, so
+            # "the first one" means a service again.
+            _remember(session, mode=SERVICES)
 
     # ── add to cart ──────────────────────────────────────────────────────────
     elif intent.type == "add_to_cart":
@@ -344,7 +458,22 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     else:  # conversational
         reply = ai.small_talk(message) or "Thanks! Is there anything else I can help you with?"
 
-    return _finish(db, session, reply, services, action, speech, intent_type=intent.type)
+    return _finish(db, session, reply, services, action, speech,
+                   intent_type=intent.type, announce=announce)
+
+
+def _enter_documents(session, community: str, documents: list[dict] | None = None) -> None:
+    """This conversation is about the community now.
+
+    `last_shown_json` is cleared deliberately. It is the numbered *service*
+    list, and `intent.parse` resolves a bare "the first one" against it before
+    anything else gets a look. Left in place, a resident who asked for a
+    plumber, switched to the rules, and then said "download the first one"
+    would have been sold a boiler service.
+    """
+    _remember(session, community=community, documents=documents, mode=DOCUMENTS)
+    session.last_shown_json = []
+    session.last_referenced_item_id = None
 
 
 def named_communities_key(message: str) -> str:
@@ -430,9 +559,37 @@ def _key_for(label: str) -> str:
 MAX_SERVICES_RETURNED = 100
 
 
+def _shelf_for(session) -> list[dict]:
+    """Everything the association holds, while the conversation is about it.
+
+    Composed here rather than fetched by the interface, so the panel cannot
+    disagree with the answer beside it, and so `/voice` gets it too: that
+    endpoint has no way to ask a second question.
+    """
+    if _mode(session) != DOCUMENTS:
+        return []
+    key = getattr(session, "community", "") or ""
+    if not key:
+        return []
+    return [{
+        "id": d["id"],
+        "title": d["title"],
+        "community": docs_index.label_for(d["community"]),
+        "answerable": d.get("kind") == doc_library.ANSWERABLE,
+        "section": "",
+        "download_url": f"/api/v1/documents/{d['id']}/file",
+        "view_url": f"/api/v1/documents/{d['id']}/file?view=1",
+    } for d in doc_library.for_community(key)]
+
+
 def _finish(db: Session, session, reply: str, services: list[dict], action: dict | None,
             speech: str | None = None, intent_type: str | None = None,
-            documents: list[dict] | None = None) -> dict:
+            documents: list[dict] | None = None, announce: str = "") -> dict:
+    """`announce` is prefixed here rather than at each call site, so every
+    branch says the change of subject the same way and none of them forget."""
+    if announce:
+        reply = f"{announce}\n\n{reply}"
+        speech = f"{announce} {speech}" if speech else reply
     return {
         "reply": reply,
         "speech": speech or reply,   # spoken text falls back to the full reply
@@ -440,6 +597,7 @@ def _finish(db: Session, session, reply: str, services: list[dict], action: dict
         "total_services": len(services),
         "cart": cart_service.serialize_cart(db, session),
         "documents": documents or [],
+        "shelf": _shelf_for(session),
         "action": action,
         "intent": intent_type,
     }
