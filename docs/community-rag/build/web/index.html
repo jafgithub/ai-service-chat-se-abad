@@ -151,6 +151,8 @@ tbody tr:last-child td { border-bottom: none; }
 <ul><li><strong>One community is never answered from another&#x27;s documents.</strong> Not when the</li></ul>
 <p>names are similar, not when the other document is the better match, not when we hold nothing for the community that was asked about.</p>
 <p>The second rule is why this document exists in the shape it does. On 20 August a resident question about Three Lakes was answered out of the Serenity Point rules, because &quot;Lake&quot; sits close to &quot;lakes&quot; in the embedding space and nothing downstream knew the difference mattered. Rules about somebody&#x27;s home, delivered confidently, from a document that does not govern them.</p>
+<figure><img src="img/d04_architecture.png" width="1500" height="941" alt="One process, three engines, two places state lives" loading="lazy"></figure>
+<p>Everything below is a detail of that picture. Four surfaces, one API, and three engines that decide, answer and issue. The only work done off this machine is phrasing an answer, hearing a spoken question and sending an email: the embedding model, the index, the documents and the passes are all here.</p>
 <h1 id="s2-the-two-ways-in">2. The two ways in</h1>
 <p><strong>One door, not two.</strong> Every question about the community documents arrives through the floating assistant, bottom right of every page. It posts to <code>POST /api/v1/docs/ask</code> and has no service catalogue in front of it, so every question it receives is already known to be about the rules. There is nothing to guess.</p>
 <figure><img src="img/d01_doors.png" width="1500" height="589" alt="The two front doors and the one core" loading="lazy"></figure>

@@ -25,6 +25,13 @@ rules, because "Lake" sits close to "lakes" in the embedding space and nothing
 downstream knew the difference mattered. Rules about somebody's home, delivered
 confidently, from a document that does not govern them.
 
+![One process, three engines, two places state lives](d04_architecture.png)
+
+Everything below is a detail of that picture. Four surfaces, one API, and three
+engines that decide, answer and issue. The only work done off this machine is
+phrasing an answer, hearing a spoken question and sending an email: the
+embedding model, the index, the documents and the passes are all here.
+
 # 2. The two ways in
 
 **One door, not two.** Every question about the community documents arrives

@@ -189,7 +189,104 @@ def d03():
           "answered from Serenity.")
 
 
+def d04():
+    """The whole thing, once, so nobody has to assemble it from eighteen sections."""
+    s = [f'<svg viewBox="0 0 1360 700">{ARROW}']
+
+    def band(y, label):
+        # `style`, not the attribute: the `.lb` class sets text-anchor:middle and
+        # a presentation attribute loses to it, which centred every one of these
+        # on x=30 and pushed half the words off the left edge.
+        return (f'<text class="lb" x="30" y="{y}" '
+                f'style="text-anchor:start;letter-spacing:1.2px">{label}</text>')
+
+    # ── what a person touches ────────────────────────────────────────────────
+    s.append(band(30, "WHAT SOMEBODY TOUCHES"))
+    for i, (title, sub) in enumerate([
+        ("Main chat", "rules, services, parking"),
+        ("Floating assistant", "rules only"),
+        ("Admin screen", "upload, remove, passes"),
+        ("Gate page", "scan a pass at the barrier"),
+    ]):
+        s.append(box(30 + i * 340, 46, 300, 66, "you", title, sub))
+    for i in range(4):
+        s.append(arrow(180 + i * 340, 112, 180 + i * 340, 148))
+
+    # ── one process ──────────────────────────────────────────────────────────
+    s.append(box(30, 148, 1300, 74, "sys", "One FastAPI process",
+                 "/chat and /voice \u00b7 /docs/ask \u00b7 /documents \u00b7 /parking"))
+    for i in range(3):
+        s.append(arrow(235 + i * 445, 222, 235 + i * 445, 270))
+
+    # ── the three engines ────────────────────────────────────────────────────
+    s.append(band(252, "WHAT DECIDES AND ANSWERS"))
+    for x, title, sub, rows in [
+        (30, "Conversation", "what this message is", [
+            "intent, by shape not by score",
+            "documents mode, and when it ends",
+            "what was named last turn",
+        ]),
+        (475, "Documents", "the answer, or a refusal", [
+            "scope to one community first",
+            "retrieve, then ground or refuse",
+            "titles, for asking by name",
+        ]),
+        (920, "Parking", "a pass, and its end", [
+            "token, QR, expiry",
+            "spent when the vehicle leaves",
+        ]),
+    ]:
+        s.append(f'<rect x="{x}" y="270" width="410" height="150" rx="12" class="ok"/>')
+        s.append(f'<text class="t" x="{x+205}" y="300">{title}</text>')
+        s.append(f'<text class="s" x="{x+205}" y="322">{sub}</text>')
+        for i, row in enumerate(rows):
+            s.append(f'<text class="li" x="{x+26}" y="{354+i*24}" '
+                     f'style="font-size:13.5px">{row}</text>')
+    for i in range(3):
+        s.append(arrow(235 + i * 445, 420, 235 + i * 445, 472))
+
+    # ── where the state lives ────────────────────────────────────────────────
+    s.append(band(454, "WHERE THE STATE LIVES"))
+    for x, title, sub, rows in [
+        (30, "MySQL", "the moving parts", [
+            "chat_sessions, and what each one remembers",
+            "services, jobs, appointments, parking_passes",
+        ]),
+        (700, "Files beside the app", "app/data, and the PDFs themselves", [
+            "serenity_docs.json, communities.json, documents.json",
+            "knowledge/ and uploads/, the files a resident downloads",
+        ]),
+    ]:
+        s.append(f'<rect x="{x}" y="472" width="630" height="118" rx="12" class="out"/>')
+        s.append(f'<text class="t" x="{x+315}" y="502">{title}</text>')
+        s.append(f'<text class="s" x="{x+315}" y="524">{sub}</text>')
+        for i, row in enumerate(rows):
+            s.append(f'<text class="li" x="{x+26}" y="{552+i*22}" '
+                     f'style="font-size:13.5px">{row}</text>')
+
+    # ── outside ──────────────────────────────────────────────────────────────
+    s.append(band(624, "OUTSIDE THIS MACHINE"))
+    for i, (title, sub) in enumerate([
+        ("Gemini", "phrases the answer, hears the voice"),
+        ("Brevo", "sends the pass and the confirmations"),
+        ("all-MiniLM-L6-v2", "in this process, 384 dimensions"),
+    ]):
+        s.append(box(30 + i * 445, 636, 410, 62, "out", title, sub))
+
+    s.append("</svg>")
+    write("d04_architecture", "Architecture", "The whole of it, on one page",
+          "One process, three engines, two places state lives. Everything a "
+          "resident touches goes through the same API, and the only work done "
+          "off this machine is phrasing, speech and email.",
+          "".join(s),
+          "<b>The embedding model runs inside this process, not as a service.</b> "
+          "That is why retrieval is fast, why a restart costs a few seconds of "
+          "warm up, and why the memory limit on the unit is 1100M rather than "
+          "something smaller.")
+
+
 if __name__ == "__main__":
     d01()
     d02()
     d03()
+    d04()
