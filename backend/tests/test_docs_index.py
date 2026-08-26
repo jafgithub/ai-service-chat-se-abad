@@ -193,12 +193,40 @@ def test_the_fee_line_survived_chunking():
     assert "25.00" in corpus
 
 
-def test_letterhead_is_not_indexed_as_content():
-    """Both management companies' addresses repeat on every page, which made
-    the office address the most retrievable text in the amenities sheet."""
+def test_the_letterhead_is_kept_once_and_never_as_content():
+    """The rule changed on 27 August, and the reasoning is worth keeping.
+
+    Both management companies' addresses repeat on every page, which made the
+    office address the most retrievable text in the amenities sheet. So it was
+    stripped. Then the client asked the assistant for the management address
+    and was told it did not have it, which was true and useless: the address is
+    on page one of the pack he was reading.
+
+    So the rule is no longer "throw the letterhead away". It is "keep exactly
+    one copy of it, labelled as the contact, and nowhere else". A chunk that is
+    ordinary document content must still be free of it, or every rules question
+    starts competing with an office address again.
+    """
+    contacts = [c for c in docs_index._chunks if c["section"] == "Managing agent"]
+    assert contacts, "the management contact should be indexed"
+
     for c in docs_index._chunks:
+        if c["section"] == "Managing agent":
+            continue
         assert "grsmanagement.com" not in c["text"].lower(), c["section"]
         assert "lcroyal@" not in c["text"].lower(), c["section"]
+
+
+def test_the_management_contact_cannot_displace_a_rules_answer():
+    """The number that mattered when the wording was chosen. The contact scores
+    0.05 against a rules question, so adding it takes nothing away."""
+    for question in ["what are the quiet hours", "am I allowed a dog",
+                     "when is trash collected", "can I park a boat"]:
+        top = docs_index.search(question, k=1, chosen="serenity")
+        assert top, question
+        # Which section wins is retrieval's business and changes as documents
+        # are added. That it is not the office address is the point.
+        assert top[0]["section"] != "Managing agent", question
 
 
 # ── one community must not be answered out of another's documents ────────────

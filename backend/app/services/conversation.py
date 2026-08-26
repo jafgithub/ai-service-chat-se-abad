@@ -56,6 +56,12 @@ _DOC_SHAPE = re.compile(
     r"policy|policies|hoa|association|ordinances?|handbook|"
     r"quiet hours?|curfew|noise|"
     r"architectural|arb|approval|approved|violation|fine[sd]?|"
+    # Who runs the association, and how to reach them. "management address"
+    # opens with no question word and none of the words above, so it was read
+    # as a service search and answered with a community hall to hire. Checked
+    # against the catalogue first: not one of the 32 services mentions any of
+    # these, so nothing is taken away from the tradespeople.
+    r"management|managing agent|property manager|association office|"
     r"lease|leasing|tenant|pets?|trash|recycling|amenit(y|ies))\b",
     re.IGNORECASE,
 )
