@@ -168,3 +168,38 @@ def test_naming_a_community_answers_without_asking(monkeypatch):
     named = docs_index.named_communities("what are the Three Lakes mailbox rules")
 
     assert [c.key for c in named] == ["three lakes"]
+
+
+# ── a community that holds nothing on the subject ────────────────────────────
+#
+# From the logs on 26 August. A Kendall Square resident asked for the quiet
+# hours five times in forty six seconds, in three phrasings, because their
+# association holds one colour archive and nothing else. The documents found
+# nothing, the question fell through to the catalogue, the catalogue found one
+# weak match, and they were offered a mobile mechanic at $70. Nothing on screen
+# said Kendall Square had no rules loaded, so they kept rephrasing.
+
+def test_the_documents_own_a_miss_in_their_own_vocabulary():
+    """"quiet hours" is the documents' word. A community that does not cover it
+    has answered the question: we do not hold that. Falling through to a
+    tradesperson is not a worse answer, it is not an answer."""
+    from app.services.conversation import _DOC_SHAPE
+
+    assert _DOC_SHAPE.search("what are the quiet hours")
+    assert _DOC_SHAPE.search("what are the parking rules")
+    assert _DOC_SHAPE.search("am I allowed pets")
+
+
+@pytest.mark.parametrize("said", [
+    "what does a boiler service cost",
+    "how much is a house clean",
+    "what time can someone come for a car service",
+])
+def test_a_question_shaped_message_about_a_service_still_falls_through(said):
+    """These open with a question word and nothing else. Owning them would turn
+    "what does a boiler service cost" into "I could not find that in the
+    community documents", which is true and useless."""
+    from app.services.conversation import _DOC_SHAPE, _POLICY_SHAPE
+
+    assert _POLICY_SHAPE.search(said), "still routed to the documents first"
+    assert not _DOC_SHAPE.search(said), "but the documents must not own the miss"

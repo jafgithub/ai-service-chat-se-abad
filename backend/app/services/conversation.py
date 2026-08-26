@@ -215,12 +215,32 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                                speech="Here is what the community documents say.",
                                intent_type="documents", documents=found)
 
-            # Named a place and asked about its rules, and the documents came
-            # back empty. Falling through to the catalogue is what the client
-            # photographed: "Lauderdale Lake community rules" answered with
-            # "Community hall booking, from $35.00". A tradesperson is not a
-            # worse answer to that question, it is not an answer to it.
-            if route == "documents" or (names_community and _wants_documents(message)):
+            # The documents came back empty. Whether that is the answer or
+            # merely a miss depends on how certain we are the question was
+            # theirs, and the two shapes are not equally certain.
+            #
+            # `_DOC_SHAPE` is the documents' own vocabulary: quiet hours, pets,
+            # leasing, the ARB. A message using it is about the rules whatever
+            # the catalogue thinks, so the documents own the answer including
+            # the answer "we do not hold that". `_POLICY_SHAPE` is only the
+            # shape of a question, and "what does a boiler service cost" is one
+            # of those without being about the rules at all, so it still falls
+            # through to the catalogue.
+            #
+            # Getting this wrong is what the client photographed twice. On 20
+            # August "Lauderdale Lake community rules" was answered with
+            # "Community hall booking, from $35.00". On 26 August a Kendall
+            # Square resident asked five times for the quiet hours and was
+            # offered a mobile mechanic at $70, because their association holds
+            # one colour archive and nothing else, and nothing on screen said
+            # so. A tradesperson is not a worse answer to those questions, it
+            # is not an answer to them.
+            owns_the_question = (
+                route == "documents"
+                or bool(_DOC_SHAPE.search(message))
+                or (names_community and _wants_documents(message))
+            )
+            if owns_the_question:
                 return _finish(db, session, _document_miss(message, community or ""),
                                [], None, intent_type="documents_miss")
 
