@@ -156,6 +156,15 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     # so searching what is inside it finds nothing and always did.
     if intent.type == "document":
         found = doc_library.search_titles(intent.query)
+        whole_shelf = ""
+        if not found:
+            # "show me the Kendall Square documents" names a community and no
+            # document, and it means all of them. Matching on title cannot work
+            # here: no title contains the community's name, so the ask that
+            # sounds most natural was the one that found nothing.
+            whole_shelf = named_communities_key(message)
+            if whole_shelf:
+                found = doc_library.for_community(whole_shelf)
         if found:
             documents = [{
                 "id": d["id"],
@@ -165,8 +174,9 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                 "community": docs_index.label_for(d["community"]),
                 "answerable": d.get("kind") == doc_library.ANSWERABLE,
                 "download_url": f"/api/v1/documents/{d['id']}/file",
-            } for d in found[:4]]
-            reply = response.documents_reply(documents)
+            } for d in (found if whole_shelf else found[:4])]
+            reply = (response.shelf_reply(docs_index.label_for(whole_shelf), documents)
+                     if whole_shelf else response.documents_reply(documents))
             return _finish(db, session, reply, [], {"type": "documents"},
                            speech=reply, intent_type=intent.type, documents=documents)
         # Nothing by that name. Fall through to the catalogue rather than
@@ -241,8 +251,15 @@ def process(message: str, session, db: Session, category_filter: str | None = No
                 or (names_community and _wants_documents(message))
             )
             if owns_the_question:
+                # The reply names what the community does hold. The action gives
+                # the resident somewhere to go with that, because being told
+                # "not here" and nothing else is what turned one question into
+                # five identical retries in the logs on 26 August.
+                where = community or (named_communities_key(message) or "")
                 return _finish(db, session, _document_miss(message, community or ""),
-                               [], None, intent_type="documents_miss")
+                               [], {"type": "documents_miss", "community": where,
+                                    "question": message},
+                               intent_type="documents_miss")
 
     # ── search ───────────────────────────────────────────────────────────────
     if intent.type == "search" or intent.type == "document":
@@ -328,6 +345,12 @@ def process(message: str, session, db: Session, category_filter: str | None = No
         reply = ai.small_talk(message) or "Thanks! Is there anything else I can help you with?"
 
     return _finish(db, session, reply, services, action, speech, intent_type=intent.type)
+
+
+def named_communities_key(message: str) -> str:
+    """The community a message names, when it names exactly one."""
+    named = docs_index.named_communities(message)
+    return named[0].key if len(named) == 1 else ""
 
 
 def _document_answer(message: str, sources: list, chosen: str = "") -> "str | None":

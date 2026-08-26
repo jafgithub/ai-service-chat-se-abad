@@ -1,4 +1,4 @@
-import type { DocumentResult } from "@/lib/api";
+import type { CommunityOption, DocumentResult } from "@/lib/api";
 
 export interface ServiceCategory {
   id: string;
@@ -24,7 +24,10 @@ export interface ChatMessage {
   clarify?: string;
   /** The communities to choose between, the first time somebody asks about the
    *  rules and we do not know where they live. */
-  pick?: { key: string; label: string }[];
+  pick?: CommunityOption[];
+  /** A rules question this community had nothing on. Carries the community so
+   *  the reply can offer somewhere to go rather than ending on "not here". */
+  missedIn?: string;
   /** The question this answer was to, so "Change" can ask it again against a
    *  different community rather than making them retype it. */
   asked?: string;

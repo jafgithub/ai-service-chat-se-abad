@@ -128,6 +128,21 @@ def documents_reply(documents: list[dict]) -> str:
     return f"I found {len(documents)} documents that match. Here they are."
 
 
+def shelf_reply(community: str, documents: list[dict]) -> str:
+    """Everything one community holds, in answer to "what have you got".
+
+    Counted rather than listed, because the list is directly underneath. The
+    count is the part that is not obvious from looking: an association holding
+    one colour sheet is a different proposition from one holding six, and a
+    resident deserves to know which they are dealing with.
+    """
+    if not documents:
+        return f"I do not hold anything for {community} yet."
+    if len(documents) == 1:
+        return f"{community} has one document loaded. Here it is."
+    return f"Here is everything I hold for {community}, {len(documents)} documents."
+
+
 def checkout_reply(cart: dict) -> str:
     if not cart["items"]:
         return "Tell me what needs doing first and I will find someone who does it."

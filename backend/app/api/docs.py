@@ -470,6 +470,10 @@ def communities() -> dict:
                 "key": c.key,
                 "label": c.label,
                 "documents": len(docs_index.documents_for(c.key)),
+                # What is actually in there, so a resident choosing between six
+                # associations can see that one of them holds a colour sheet
+                # and nothing else before they spend a question finding out.
+                "titles": docs_index.documents_for(c.key)[:4],
             }
             for c in docs_index.answerable()
         ],

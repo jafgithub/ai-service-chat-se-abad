@@ -14,7 +14,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { getSessionId } from "@/lib/session";
 import { rememberCommunity, storedCommunity, useCommunities } from "@/lib/community";
 import { chatApi, requestsApi, voiceApi, ApiError } from "@/lib/api";
-import type { Booked, DocumentResult, ServiceResult } from "@/lib/api";
+import type { Booked, CommunityOption, DocumentResult, ServiceResult } from "@/lib/api";
 import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { cn } from "@/lib/utils";
@@ -147,10 +147,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   /* Read at click time rather than closed over: the list arrives from the
      server after the first render, and "Change" may be pressed at any point
      after that. */
-  const communityOptionsRef = useRef<{ key: string; label: string }[]>([]);
-  useEffect(() => {
-    communityOptionsRef.current = communityOptions.map((c) => ({ key: c.key, label: c.label }));
-  }, [communityOptions]);
+  const communityOptionsRef = useRef<CommunityOption[]>([]);
+  useEffect(() => { communityOptionsRef.current = communityOptions; }, [communityOptions]);
   /* Same reason, the other way round: `pickCommunity` is defined above
      `sendMessage` because the render needs it, and calling it through a ref
      keeps the two from having to be declared in dependency order. */
@@ -193,7 +191,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     role: "user" | "assistant",
     content: string,
     extra?: Partial<Pick<ChatMessageType,
-      "documents" | "clarify" | "pick" | "asked" | "community">>,
+      "documents" | "clarify" | "pick" | "asked" | "community" | "missedIn">>,
   ) => {
     setMessages((prev) => [...prev, {
       id: crypto.randomUUID(), role, content, timestamp: new Date(), ...extra,
@@ -362,6 +360,13 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const pickCommunity = useCallback((key: string, question: string) => {
     rememberCommunity(key);
     if (question.trim()) void sendMessageRef.current(question);
+  }, []);
+
+  /** "See what it holds": the community's whole shelf, as a document list. */
+  const showLibrary = useCallback((community: string) => {
+    const label = communityOptionsRef.current.find((c) => c.key === community)?.label
+      ?? community;
+    void sendMessageRef.current(`show me the ${label} documents`);
   }, []);
 
   /** "Change" under an answer: offer the choice again for that same question. */
@@ -561,7 +566,10 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
           ? (response.action.question ?? text.trim())
           : undefined,
         pick: response.action?.type === "pick_community"
-          ? response.action.options
+          ? communityOptionsRef.current
+          : undefined,
+        missedIn: response.action?.type === "documents_miss"
+          ? (response.action.community || undefined)
           : undefined,
         // Kept on every answer, not only the ones with documents: "Change"
         // needs the question, and so does the picker when it appears.
@@ -824,6 +832,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                 onClarify={(question, route) => sendMessage(question, route)}
                 onPickCommunity={pickCommunity}
                 onChangeCommunity={changeCommunity}
+                onShowLibrary={showLibrary}
               />
             ))}
             {isLoading && <TypingIndicator />}

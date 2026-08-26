@@ -255,6 +255,9 @@ export interface CommunityOption {
   label: string;
   /** How many documents are loaded for it. */
   documents: number;
+  /** The first few titles, so a chooser can say what is actually in there
+   *  rather than only how much. Some associations hold one colour sheet. */
+  titles?: string[];
 }
 
 export interface CommunityList {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChatMessage as ChatMessageType } from "@/types";
+import { CommunityChooser } from "./CommunityChooser";
 import { DocumentList } from "./DocumentList";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,8 @@ interface ChatMessageProps {
   onPickCommunity?: (key: string, question: string) => void;
   /** "Change" under an answer: offer the choice again for that question. */
   onChangeCommunity?: (question: string) => void;
+  /** The community had nothing on it: show what it does hold. */
+  onShowLibrary?: (community: string) => void;
 }
 
 /**
@@ -119,7 +122,7 @@ function formatProductLine(text: string): React.ReactNode {
 }
 
 export function ChatMessage({
-  message, large = false, onClarify, onPickCommunity, onChangeCommunity,
+  message, large = false, onClarify, onPickCommunity, onChangeCommunity, onShowLibrary,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
 
@@ -175,17 +178,34 @@ export function ChatMessage({
               )}
 
               {message.pick && message.pick.length > 0 && onPickCommunity && (
+                <CommunityChooser
+                  options={message.pick}
+                  onChoose={(key) => onPickCommunity(key, message.asked ?? "")}
+                />
+              )}
+
+              {/* Told "not here" and left there is what turned one question
+                  into five identical retries. Both of these are a next step. */}
+              {message.missedIn && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {message.pick.map((option) => (
+                  {onShowLibrary && (
                     <button
-                      key={option.key}
                       type="button"
-                      onClick={() => onPickCommunity(option.key, message.asked ?? "")}
+                      onClick={() => onShowLibrary(message.missedIn!)}
                       className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
                     >
-                      {option.label}
+                      See what it holds
                     </button>
-                  ))}
+                  )}
+                  {onChangeCommunity && message.asked && (
+                    <button
+                      type="button"
+                      onClick={() => onChangeCommunity(message.asked!)}
+                      className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                    >
+                      Try another community
+                    </button>
+                  )}
                 </div>
               )}
 

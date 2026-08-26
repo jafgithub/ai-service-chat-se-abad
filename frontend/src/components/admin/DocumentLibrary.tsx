@@ -140,6 +140,11 @@ export function DocumentLibrary({ token }: { token: string }) {
     return acc;
   }, {});
 
+  /* One document is not a rule book. Two is a community with a couple of forms
+     and no rules. Past that it is a judgement call nobody needs a warning
+     about. */
+  const thin = communities.filter((c) => (c.documents ?? 0) <= 1);
+
   return (
     <section className="rounded-card border border-line bg-surface">
       <header className="border-b border-line px-5 py-4">
@@ -149,6 +154,41 @@ export function DocumentLibrary({ token }: { token: string }) {
           kept for residents to download, but cannot be answered from.
         </p>
       </header>
+
+      {thin.length > 0 && (
+        /* Shown here rather than in a report, because this is the screen that
+           fixes it. A resident of one of these can be asked almost nothing:
+           on 26 August somebody asked Kendall Square for the quiet hours five
+           times in forty six seconds before giving up. */
+        <div className="border-b border-line bg-warn-soft px-5 py-3">
+          <p className="text-sm font-medium text-warn">
+            {thin.length === 1
+              ? "One community has almost nothing loaded"
+              : `${thin.length} communities have almost nothing loaded`}
+          </p>
+          <ul className="mt-1.5 space-y-0.5">
+            {thin.map((c) => (
+              <li key={c.key} className="text-[13px] text-warn">
+                <span className="font-medium">{c.label}</span>
+                {": "}
+                {c.documents === 0
+                  ? "nothing at all"
+                  : c.titles?.length
+                    /* The community's own name is stripped off the front:
+                       "Lauderdale Lakes: Lauderdale Lakes code handbook" says
+                       it twice, and lowercasing a proper noun to avoid that
+                       just looks like a typo. */
+                    ? `${c.titles[0].replace(new RegExp(`^${c.label}\\s*`, "i"), "")} only`
+                    : `${c.documents} document${c.documents === 1 ? "" : "s"}`}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-[13px] text-warn">
+            Residents there can be asked almost nothing. Add their rules and
+            regulations below.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={upload} className="grid gap-3 border-b border-line px-5 py-4 sm:grid-cols-2">
         <label className="text-sm">

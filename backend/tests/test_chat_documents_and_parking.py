@@ -148,3 +148,31 @@ def test_a_readable_document_does_not_labour_the_point():
         {"title": "Mailbox guidelines", "answerable": True},
     ])
     assert said == "Here is the Mailbox guidelines."
+
+
+# ── asking a community for everything it holds ───────────────────────────────
+
+def test_asking_for_a_community_s_documents_is_a_document_request():
+    """"See what it holds" sends this, and so does anybody who types it."""
+    assert parse("show me the Kendall Square documents") == "document"
+
+
+def test_a_community_name_matches_no_title_by_design(monkeypatch):
+    """The reason the shelf needs its own path. No document is called "Kendall
+    Square", so title matching finds nothing for the most natural way to ask."""
+    monkeypatch.setattr(doc_library, "all_documents", lambda include_withdrawn=False: [
+        {"id": "k", "community": "kendall square", "title": "Approved colour archive",
+         "kind": doc_library.ANSWERABLE},
+    ])
+
+    assert doc_library.search_titles("show me the Kendall Square documents") == []
+
+
+def test_the_shelf_reply_says_how_much_there_is():
+    """The count is the part that is not obvious from the list underneath. One
+    colour sheet is a different proposition from six documents."""
+    one = response.shelf_reply("Kendall Square", [{"title": "Approved colour archive"}])
+    many = response.shelf_reply("Serenity Point", [{}] * 7)
+
+    assert one == "Kendall Square has one document loaded. Here it is."
+    assert "7 documents" in many

@@ -41,7 +41,7 @@ export interface ChatAction {
   /** `parking` opens the pass form; `documents` means the files are in
    *  `documents` on the response and there is nothing else to do. */
   type: "added" | "removed" | "quantity" | "checkout" | "parking" | "documents"
-      | "clarify" | "pick_community";
+      | "clarify" | "pick_community" | "documents_miss";
   items?: { item_id: number; name: string; quantity?: number }[];
   /** `clarify` and `pick_community`: the question to ask again once they have
    *  said which way they meant it, or where they live. */
@@ -49,6 +49,8 @@ export interface ChatAction {
   /** `pick_community` only: the communities worth offering, which is the ones
    *  that actually hold documents. */
   options?: { key: string; label: string }[];
+  /** `documents_miss` only: whose documents were searched and came up empty. */
+  community?: string;
 }
 
 /** A document the assistant found by name, ready to download.
