@@ -137,3 +137,34 @@ def test_a_single_unfinished_line_is_still_the_whole_answer():
     a failure. A partial answer beats no answer."""
     only = "Quiet hours are from 11:00 PM to"
     assert docs._drop_unfinished(only) == only
+
+
+# ── asking which community, once, and only when it matters ───────────────────
+
+class Session:
+    last_shown_json = []
+    last_referenced_item_id = None
+
+
+def test_a_plumber_is_never_asked_which_hoa_they_belong_to(monkeypatch):
+    """Most people who open this want a tradesperson. Asking them which
+    association they live in first is a toll on the common case, and the
+    question cannot be answered by somebody who is not a resident at all."""
+    assert conversation._wants_documents("my sink is blocked") is False
+
+
+def test_the_question_is_only_asked_when_the_answer_is_needed():
+    """By the time this branch runs, the message is known to be about the rules
+    and the answer genuinely cannot be given without knowing where they live."""
+    assert conversation._wants_documents("what are the quiet hours") is True
+    assert conversation.PICK_COMMUNITY_REPLY.endswith("?")
+
+
+def test_naming_a_community_answers_without_asking(monkeypatch):
+    """"what are the Three Lakes mailbox rules" says where. Asking anyway would
+    be asking a question the resident has already answered."""
+    from app.services import docs_index
+
+    named = docs_index.named_communities("what are the Three Lakes mailbox rules")
+
+    assert [c.key for c in named] == ["three lakes"]

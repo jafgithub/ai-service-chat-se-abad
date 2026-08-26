@@ -25,16 +25,52 @@ interface DocumentListProps {
   /** "FROM YOUR DOCUMENTS" over an answer's sources, nothing over a list that
    *  was asked for by name and needs no explaining. */
   heading?: string;
+  /** The community the resident normally asks as. Named in the strip, with a
+   *  way to change it, because this is where it becomes relevant: nobody
+   *  wondered which association they belonged to while describing a leak. */
+  home?: string;
+  onChange?: () => void;
 }
 
-export function DocumentList({ documents, heading }: DocumentListProps) {
+export function DocumentList({ documents, heading, home, onChange }: DocumentListProps) {
   if (documents.length === 0) return null;
+
+  // Answering out of a community that is not theirs is legitimate, and saying
+  // nothing about it is not: a resident who asks a neighbouring association's
+  // rule out of curiosity must not take the answer home as their own.
+  const elsewhere = home
+    ? [...new Set(documents.map((d) => d.community).filter((c) => c && c !== home))]
+    : [];
 
   return (
     <div className="mt-3 overflow-hidden rounded-control border border-line">
       {heading && (
-        <p className="border-b border-line bg-surface-sunken px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-faint">
-          {heading}
+        <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 border-b border-line bg-surface-sunken px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-faint">
+          <span>{heading}</span>
+          {home && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="text-ink-muted">{home}</span>
+              {onChange && (
+                <>
+                  <span aria-hidden>·</span>
+                  <button
+                    type="button"
+                    onClick={onChange}
+                    className="uppercase tracking-wider text-brand-600 underline underline-offset-2 hover:text-brand-700"
+                  >
+                    Change
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {elsewhere.length > 0 && (
+        <p className="border-b border-line bg-warn-soft px-3 py-1.5 text-[11.5px] text-warn">
+          Answered from {elsewhere.join(" and ")}, not your usual community.
         </p>
       )}
 

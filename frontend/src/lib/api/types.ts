@@ -40,11 +40,15 @@ export interface ServiceResult {
 export interface ChatAction {
   /** `parking` opens the pass form; `documents` means the files are in
    *  `documents` on the response and there is nothing else to do. */
-  type: "added" | "removed" | "quantity" | "checkout" | "parking" | "documents" | "clarify";
+  type: "added" | "removed" | "quantity" | "checkout" | "parking" | "documents"
+      | "clarify" | "pick_community";
   items?: { item_id: number; name: string; quantity?: number }[];
-  /** `clarify` only: the question to ask again once they have said which way
-   *  they meant it. */
+  /** `clarify` and `pick_community`: the question to ask again once they have
+   *  said which way they meant it, or where they live. */
   question?: string;
+  /** `pick_community` only: the communities worth offering, which is the ones
+   *  that actually hold documents. */
+  options?: { key: string; label: string }[];
 }
 
 /** A document the assistant found by name, ready to download.

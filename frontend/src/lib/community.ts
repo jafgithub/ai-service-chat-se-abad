@@ -28,6 +28,15 @@ export function storedCommunity(): string {
   }
 }
 
+export function rememberCommunity(key: string): void {
+  try {
+    localStorage.setItem(KEY, key);
+  } catch {
+    // Private windows and blocked site data both throw. The choice then lasts
+    // as long as the page does, which is better than refusing to record it.
+  }
+}
+
 export function useCommunities() {
   const [options, setOptions] = useState<CommunityOption[]>([]);
   const [home, setHome] = useState("");

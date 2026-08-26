@@ -12,7 +12,7 @@ import { AccountMenu } from "@/components/layout/AccountMenu";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { getSessionId } from "@/lib/session";
-import { storedCommunity } from "@/lib/community";
+import { rememberCommunity, storedCommunity, useCommunities } from "@/lib/community";
 import { chatApi, requestsApi, voiceApi, ApiError } from "@/lib/api";
 import type { Booked, DocumentResult, ServiceResult } from "@/lib/api";
 import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
@@ -140,6 +140,31 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const [problem, setProblem] = useState("");
 
   const auth = useAuth();
+  /* Only for the label. The key itself is read straight out of storage on every
+     send, so a choice made in the floating assistant applies here without this
+     component having to hear about it. */
+  const { options: communityOptions } = useCommunities();
+  /* Read at click time rather than closed over: the list arrives from the
+     server after the first render, and "Change" may be pressed at any point
+     after that. */
+  const communityOptionsRef = useRef<{ key: string; label: string }[]>([]);
+  useEffect(() => {
+    communityOptionsRef.current = communityOptions.map((c) => ({ key: c.key, label: c.label }));
+  }, [communityOptions]);
+  /* Same reason, the other way round: `pickCommunity` is defined above
+     `sendMessage` because the render needs it, and calling it through a ref
+     keeps the two from having to be declared in dependency order. */
+  const sendMessageRef = useRef<(text: string) => void>(() => {});
+
+  /* The community's label, read at the moment a reply arrives rather than held
+     in state. Choosing one writes to storage, and a copy in React state is a
+     tick behind: the first answer after a change was being stamped with the
+     community they had just moved away from, and then flagged as "not your
+     usual community" when it was now exactly that. */
+  const homeLabel = useCallback(() => {
+    const key = storedCommunity();
+    return communityOptionsRef.current.find((c) => c.key === key)?.label;
+  }, []);
 
   // Voice loop plumbing
   const voiceActiveRef = useRef(false);   // continuous mode on/off (read inside async callbacks)
@@ -167,7 +192,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const addMessage = useCallback((
     role: "user" | "assistant",
     content: string,
-    extra?: { documents?: DocumentResult[]; clarify?: string },
+    extra?: Partial<Pick<ChatMessageType,
+      "documents" | "clarify" | "pick" | "asked" | "community">>,
   ) => {
     setMessages((prev) => [...prev, {
       id: crypto.randomUUID(), role, content, timestamp: new Date(), ...extra,
@@ -325,6 +351,30 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     setIsListening(true);
     recorder.start();
   }), []);
+
+  /** They picked a community, on first ask or from "Change".
+   *
+   *  Remembered before the question is asked again, because the next request
+   *  reads the choice straight out of storage. The question is re-sent rather
+   *  than answered from what we already have: the retrieval is scoped to the
+   *  community, so the earlier answer was to a different question than the one
+   *  they now mean. */
+  const pickCommunity = useCallback((key: string, question: string) => {
+    rememberCommunity(key);
+    if (question.trim()) void sendMessageRef.current(question);
+  }, []);
+
+  /** "Change" under an answer: offer the choice again for that same question. */
+  const changeCommunity = useCallback((question: string) => {
+    setMessages((prev) => [...prev, {
+      id: crypto.randomUUID(),
+      role: "assistant" as const,
+      content: "Which community should I answer from?",
+      timestamp: new Date(),
+      pick: communityOptionsRef.current,
+      asked: question,
+    }]);
+  }, []);
 
   /** What the assistant did, applied to the screen.
    *
@@ -510,6 +560,13 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         clarify: response.action?.type === "clarify"
           ? (response.action.question ?? text.trim())
           : undefined,
+        pick: response.action?.type === "pick_community"
+          ? response.action.options
+          : undefined,
+        // Kept on every answer, not only the ones with documents: "Change"
+        // needs the question, and so does the picker when it appears.
+        asked: response.action?.question ?? text.trim(),
+        community: homeLabel(),
       });
       // A search that found nothing has to clear the last one, or the assistant
       // says "I couldn't find anything" beside a panel still listing results for
@@ -560,7 +617,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, services]);
+  }, [isLoading, scope, geo.position, sessionId, addMessage, applyAction, services, homeLabel]);
 
   const onBooked = useCallback((made: Booked) => {
     addMessage(
@@ -596,6 +653,9 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
 
   /* Defined once, rendered twice: pinned under the conversation on a wide
      screen, and as a shared footer on a phone. */
+  // Now that `sendMessage` exists, let the community buttons reach it.
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
+
   const composer = (
     <div className="flex-shrink-0 border-t border-line bg-surface px-4 py-3">
       <form
@@ -762,6 +822,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                 message={msg}
                 large
                 onClarify={(question, route) => sendMessage(question, route)}
+                onPickCommunity={pickCommunity}
+                onChangeCommunity={changeCommunity}
               />
             ))}
             {isLoading && <TypingIndicator />}

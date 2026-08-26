@@ -81,6 +81,11 @@ def _wants_documents(message: str) -> bool:
 # Asked, found nothing, and the two possible readings are far enough apart that
 # guessing is worse than asking. The frontend puts a button under each reading,
 # so answering costs one tap rather than a retyped question.
+# Asked once, the first time somebody asks about the rules without us knowing
+# where they live. Never asked again: the answer is remembered in the browser
+# and shared with the floating assistant.
+PICK_COMMUNITY_REPLY = "Which community are you asking about?"
+
 UNSURE_REPLY = (
     "I could not find that. Are you asking about your community's rules, "
     "or do you need someone to come out?"
@@ -186,6 +191,20 @@ def process(message: str, session, db: Session, category_filter: str | None = No
         asked = route == "documents" or _wants_documents(message) or names_community
 
         if asked:
+            # Which association? Asked here rather than on the way in, because
+            # most people who open this want a plumber and being asked which
+            # HOA they belong to first is a toll on the common case. By this
+            # line the question is known to be about the rules, so the answer
+            # genuinely cannot be given without knowing.
+            if not community and not names_community:
+                choices = docs_index.answerable()
+                if len(choices) > 1:
+                    return _finish(
+                        db, session, PICK_COMMUNITY_REPLY, [],
+                        {"type": "pick_community", "question": message,
+                         "options": [{"key": c.key, "label": c.label} for c in choices]},
+                        speech=PICK_COMMUNITY_REPLY, intent_type="pick_community")
+
             sources: list = []
             grounded = _document_answer(message, sources, community or "")
             if grounded:

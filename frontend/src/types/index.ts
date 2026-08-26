@@ -22,6 +22,14 @@ export interface ChatMessage {
    *  community or a service. Holds the original question, so a button can ask
    *  it again down the side it names. */
   clarify?: string;
+  /** The communities to choose between, the first time somebody asks about the
+   *  rules and we do not know where they live. */
+  pick?: { key: string; label: string }[];
+  /** The question this answer was to, so "Change" can ask it again against a
+   *  different community rather than making them retype it. */
+  asked?: string;
+  /** Whose documents answered, so the block can say so and offer to change it. */
+  community?: string;
 }
 
 export interface Step {

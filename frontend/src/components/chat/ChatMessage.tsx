@@ -9,6 +9,11 @@ interface ChatMessageProps {
   large?: boolean;
   /** Tapping one of the "community or a service?" buttons. */
   onClarify?: (question: string, route: "documents" | "services") => void;
+  /** Choosing a community, either on first ask or from "Change". Both remember
+   *  it and ask the original question again against it. */
+  onPickCommunity?: (key: string, question: string) => void;
+  /** "Change" under an answer: offer the choice again for that question. */
+  onChangeCommunity?: (question: string) => void;
 }
 
 /**
@@ -113,7 +118,9 @@ function formatProductLine(text: string): React.ReactNode {
   );
 }
 
-export function ChatMessage({ message, large = false, onClarify }: ChatMessageProps) {
+export function ChatMessage({
+  message, large = false, onClarify, onPickCommunity, onChangeCommunity,
+}: ChatMessageProps) {
   const isUser = message.role === "user";
 
   return (
@@ -157,7 +164,29 @@ export function ChatMessage({ message, large = false, onClarify }: ChatMessagePr
               <FormattedText text={message.content} />
 
               {message.documents && message.documents.length > 0 && (
-                <DocumentList documents={message.documents} heading="From your documents" />
+                <DocumentList
+                  documents={message.documents}
+                  heading="From your documents"
+                  home={message.community}
+                  onChange={message.asked && onChangeCommunity
+                    ? () => onChangeCommunity(message.asked!)
+                    : undefined}
+                />
+              )}
+
+              {message.pick && message.pick.length > 0 && onPickCommunity && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {message.pick.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => onPickCommunity(option.key, message.asked ?? "")}
+                      className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               )}
 
               {message.clarify && onClarify && (
