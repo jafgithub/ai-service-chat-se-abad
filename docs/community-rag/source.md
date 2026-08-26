@@ -62,6 +62,20 @@ questions itself, and the guessing problem that closed it the first time is
 answered differently: the conversation remembers what it is about, so it does
 not have to decide afresh on every message. Section 15.
 
+![Which of the two jobs a message is](d05_decision.png)
+
+Five gates, checked in that order, and nothing reaches the catalogue until every
+one above it has said no. The fourth is the one that keeps breaking, in both
+directions. Answering no too readily is how "Lauderdale Lake community rules"
+came to be answered with a community hall to hire. Answering yes too readily is
+how "plumber", asked after a question about the rules, came to be answered with
+"I could not find that in the community documents".
+
+While a conversation is already about the community, the fourth gate also says
+yes to a follow-up, which is what makes "what about weekends" work without
+repeating the subject. It does not say yes to a bare trade name, because a new
+subject is better served by the catalogue than by the rules.
+
 # 3. Which community, and how it is chosen
 
 A resident is asked once, on their first question, which association they are

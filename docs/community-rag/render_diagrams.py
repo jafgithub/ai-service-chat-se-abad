@@ -285,8 +285,65 @@ def d04():
           "something smaller.")
 
 
+def d05():
+    """What decides whether a message gets the rules or a tradesperson."""
+    s = [f'<svg viewBox="0 0 1360 600">{ARROW}']
+
+    s.append(box(30, 30, 320, 58, "you", "A message arrives"))
+    s.append(arrow(190, 88, 190, 122))
+
+    gates = [
+        (122, 58, "Just a greeting?", None, "Say hello back", "ok"),
+        (208, 58, "Asking for a pass?", '"visitor parking", "I need a permit"',
+         "Open the parking form", "ok"),
+        (312, 58, "Naming a document?", '"the colour archive", "download that"',
+         "Hand over the file", "ok"),
+        # Kept short enough to sit inside a 500 wide box at 13px. The long
+        # version overflowed both edges, which the code cannot tell you and the
+        # render can.
+        (416, 82, "About the community?",
+         "its vocabulary, a question, a name, or a follow-up",
+         "Answer from that community, or say plainly it is not there", "ok"),
+    ]
+
+    prev_bottom = None
+    for y, h, title, sub, outcome, cls in gates:
+        s.append(f'<rect x="30" y="{y}" width="500" height="{h}" rx="10" class="sys"/>')
+        if sub:
+            s.append(f'<text class="t" x="280" y="{y+h/2-6}">{title}</text>')
+            s.append(f'<text class="s" x="280" y="{y+h/2+16}">{sub}</text>')
+        else:
+            s.append(f'<text class="t" x="280" y="{y+h/2+5}">{title}</text>')
+        # yes, to the right
+        s.append(arrow(530, y + h / 2, 700, y + h / 2, "yes", 615, y + h / 2 - 8))
+        s.append(f'<rect x="700" y="{y}" width="630" height="{h}" rx="10" class="{cls}"/>')
+        s.append(f'<text class="t" x="1015" y="{y+h/2+5}">{outcome}</text>')
+        if prev_bottom is not None:
+            s.append(arrow(280, prev_bottom, 280, y, "no", 300, (prev_bottom + y) / 2 + 4))
+        prev_bottom = y + h
+
+    # the fall through
+    s.append(arrow(280, prev_bottom, 280, 528, "no", 300, 545 - 8))
+    s.append(f'<rect x="30" y="528" width="1300" height="58" rx="10" class="warn"/>')
+    s.append('<text class="t" x="680" y="553">Search the catalogue: services, '
+             'their prices, and who can do them</text>')
+    s.append('<text class="s" x="680" y="573">the panel fills with providers, '
+             'exactly as it does from a category on the opening screen</text>')
+
+    s.append("</svg>")
+    write("d05_decision", "Routing", "Which of the two jobs a message is",
+          "Checked in this order, top to bottom. Nothing reaches the catalogue "
+          "until everything above it has said no.",
+          "".join(s),
+          "<b>The fourth gate is the one that keeps breaking.</b> While a "
+          "conversation is already about the community it answers yes to "
+          "follow-ups as well, which is what makes \u201cwhat about weekends\u201d work. It "
+          "answered yes to everything once, and \u201cplumber\u201d could not get out.")
+
+
 if __name__ == "__main__":
     d01()
     d02()
     d03()
     d04()
+    d05()
