@@ -178,11 +178,22 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     sticky = _mode(session) == DOCUMENTS
     remembered = _remembered_documents(session)
 
-    # Leaving the documents for a tradesperson. `_BOOKING_SHAPE` is reused as
-    # *the* test for a clear service request rather than a second predicate
-    # being invented beside it: it already short-circuits `_wants_documents`,
-    # and it already gets "can I book someone to cut the grass" right.
-    leaving = sticky and (route == "services" or bool(_BOOKING_SHAPE.search(message)))
+    # Naming a community is a signal in its own right, and it is needed twice,
+    # so it is settled before anything decides anything.
+    names_community = (bool(docs_index.named_communities(message))
+                       and not _BOOKING_SHAPE.search(message))
+
+    # Leaving the documents for a tradesperson.
+    #
+    # Staying used to be the default and "plumber" could not get out. A bare
+    # trade name matches no booking verb, so after one rules question it was
+    # answered with "I could not find that in the community documents". Sticky
+    # has to mean "keep the thread", not "keep everything".
+    leaving = sticky and (
+        route == "services"
+        or bool(_BOOKING_SHAPE.search(message))
+        or not _still_about_documents(message, remembered, names_community)
+    )
     if leaving:
         sticky = False
         _remember(session, mode=SERVICES)
@@ -288,13 +299,10 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     # what kind of message this is, and retrieval's own floor decides whether
     # the documents really cover it.
     if intent.type in ("search", "document") and route != "services":
-        # Naming a community is a signal of its own, separate from the
-        # vocabulary test. The client once typed "DUTIES AND POWERS of
-        # lauderdale lake", a heading copied out of the handbook: no question
-        # word, none of the words in _DOC_SHAPE, and unmistakably about a
-        # document we hold.
-        names_community = (bool(docs_index.named_communities(message))
-                           and not _BOOKING_SHAPE.search(message))
+        # `names_community` is computed at the top of `process`. It is a signal
+        # of its own, separate from the vocabulary test: the client once typed
+        # "DUTIES AND POWERS of lauderdale lake", a heading copied out of the
+        # handbook, with no question word and none of the words in _DOC_SHAPE.
         # `sticky` is what keeps "what about weekends" and "and the pet rules?"
         # with the documents. `_wants_documents` stays a pure function of the
         # message: fifteen parametrised tests assert it directly, and threading
@@ -460,6 +468,41 @@ def process(message: str, session, db: Session, category_filter: str | None = No
 
     return _finish(db, session, reply, services, action, speech,
                    intent_type=intent.type, announce=announce)
+
+
+# A message that carries the thread on rather than starting something new.
+# "and the pet rules?", "what about weekends", "ok what about that one".
+_FOLLOW_UP = re.compile(
+    r"^\s*(and|also|plus|ok(ay)?|then|so)\b|"
+    r"\b(what|how)\s+about\b|"
+    r"\b(that|those|this|these|it|the\s+same|the\s+other)\b",
+    re.IGNORECASE,
+)
+
+
+def _still_about_documents(message: str, remembered: list[dict],
+                           names_community: bool) -> bool:
+    """Is this message carrying the community conversation on, or starting
+    something else?
+
+    Sticky mode used to answer "yes" to everything, which is how "plumber"
+    came to be answered with "I could not find that in the community
+    documents". A bare trade name matches no booking verb, so nothing let it
+    out. Staying now has to be earned by the message looking like it belongs:
+    the rules' own vocabulary or a question, a word that points back at what
+    was just said, a community by name, or the name of a document already on
+    screen.
+
+    Anything else is a new subject, and the catalogue is a better guess at it
+    than the documents are.
+    """
+    if _wants_documents(message) or names_community:
+        return True
+    if _FOLLOW_UP.search(message or ""):
+        return True
+    # "the colour one" after the colour archive was named. Reuses the resolver
+    # rather than a second list of ways to refer to a document.
+    return bool(doc_library.resolve_remembered(message, remembered))
 
 
 def _enter_documents(session, community: str, documents: list[dict] | None = None) -> None:

@@ -121,3 +121,44 @@ def test_a_question_is_not_a_reference():
     """"what are the quiet hours" names no document and points at none. It must
     reach the retrieval, not be answered with whatever was last on screen."""
     assert doc_library.resolve_remembered("what are the quiet hours", SHELF) == []
+
+
+# ── sticky must keep the thread, not keep everything ─────────────────────────
+#
+# Reported live. After one rules question, "plumber" was answered with "I could
+# not find that in the community documents". A bare trade name matches no
+# booking verb, so nothing let it out of documents mode, and a resident asking
+# for a tradesperson was told their association has no rules about one.
+
+SHELF_S = [{"id": "s-rules", "title": "Rules and Regulations", "community": "Serenity Point"}]
+
+
+@pytest.mark.parametrize("said", [
+    "plumber",
+    "plumber service",
+    "electrician",
+    "vet",
+    "locksmith",
+])
+def test_a_bare_trade_name_leaves_the_documents(said):
+    assert conversation._still_about_documents(said, SHELF_S, False) is False
+
+
+@pytest.mark.parametrize("said", [
+    # The documents' own vocabulary, or a question. Both belong to the rules.
+    "what about weekends",
+    "and the pet rules?",
+    "how about parking",
+    "can I keep a dog",
+    # Pointing back at what was just said.
+    "what about that",
+    "and the same for guests",
+    # A document already on screen, named loosely.
+    "the rules and regulations",
+])
+def test_a_follow_up_stays_with_the_documents(said):
+    assert conversation._still_about_documents(said, SHELF_S, True if "lauderdale" in said else False) is True
+
+
+def test_naming_a_community_always_stays():
+    assert conversation._still_about_documents("lauderdale lakes bins", [], True) is True
