@@ -142,7 +142,7 @@ tbody tr:last-child td { border-bottom: none; }
   <p class="sub">The document assistant end to end: how a question is routed, how a community is recognised, why one community can never be answered from another's documents, and what to do when a new association sends its paperwork.</p>
   <p class="by">Abad Naseer &nbsp;&middot;&nbsp; 20 August 2026 &nbsp;&middot;&nbsp; every behaviour checked against the live server</p>
 </div>
-<nav class="toc" aria-label="Contents"><p class="toch">Contents</p><a class="t1" href="#s1-what-this-covers">1. What this covers</a><a class="t1" href="#s2-the-two-ways-in">2. The two ways in</a><a class="t1" href="#s3-which-community-and-how-it-is-chosen">3. Which community, and how it is chosen</a><a class="t1" href="#s4-retrieval-and-what-grounds-it">4. Retrieval, and what grounds it</a><a class="t1" href="#s5-community-detection-and-scoping">5. Community detection and scoping</a><a class="t2" href="#s5-1-recognising-the-name">5.1 Recognising the name</a><a class="t2" href="#s5-2-scoping-before-ranking">5.2 Scoping before ranking</a><a class="t2" href="#s5-3-a-community-we-hold-nothing-for">5.3 A community we hold nothing for</a><a class="t1" href="#s6-what-is-indexed-today">6. What is indexed today</a><a class="t2" href="#s6-1-the-colour-sheets-and-why-they-have-their-own-chunker">6.1 The colour sheets, and why they have their own chunker</a><a class="t2" href="#s6-2-what-is-held-but-not-indexed">6.2 What is held but not indexed</a><a class="t1" href="#s7-three-lakes-and-the-ocr-dependency">7. Three Lakes, and the OCR dependency</a><a class="t1" href="#s8-contradictions">8. Contradictions</a><a class="t1" href="#s9-adding-a-new-community">9. Adding a new community</a><a class="t1" href="#s10-files-and-what-changed-on-20-august">10. Files, and what changed on 20 August</a><a class="t1" href="#s11-testing-and-verification">11. Testing and verification</a><a class="t1" href="#s12-known-limits">12. Known limits</a></nav>
+<nav class="toc" aria-label="Contents"><p class="toch">Contents</p><a class="t1" href="#s1-what-this-covers">1. What this covers</a><a class="t1" href="#s2-the-two-ways-in">2. The two ways in</a><a class="t1" href="#s3-which-community-and-how-it-is-chosen">3. Which community, and how it is chosen</a><a class="t1" href="#s4-retrieval-and-what-grounds-it">4. Retrieval, and what grounds it</a><a class="t1" href="#s5-community-detection-and-scoping">5. Community detection and scoping</a><a class="t2" href="#s5-1-recognising-the-name">5.1 Recognising the name</a><a class="t2" href="#s5-2-scoping-before-ranking">5.2 Scoping before ranking</a><a class="t2" href="#s5-3-a-community-we-hold-nothing-for">5.3 A community we hold nothing for</a><a class="t1" href="#s6-what-is-indexed-today">6. What is indexed today</a><a class="t2" href="#s6-1-the-colour-sheets-and-why-they-have-their-own-chunker">6.1 The colour sheets, and why they have their own chunker</a><a class="t2" href="#s6-2-what-is-held-but-not-indexed">6.2 What is held but not indexed</a><a class="t1" href="#s7-three-lakes-and-the-ocr-dependency">7. Three Lakes, and the OCR dependency</a><a class="t1" href="#s8-contradictions">8. Contradictions</a><a class="t1" href="#s9-adding-a-new-community">9. Adding a new community</a><a class="t1" href="#s10-files-and-what-changed-on-20-august">10. Files, and what changed on 20 August</a><a class="t1" href="#s11-testing-and-verification">11. Testing and verification</a><a class="t1" href="#s12-known-limits">12. Known limits</a><a class="t1" href="#s13-uploading-a-document-without-sending-it-to-anybody">13. Uploading a document, without sending it to anybody</a><a class="t1" href="#s14-taking-the-document-away">14. Taking the document away</a><a class="t1" href="#s15-which-community-chosen-once-and-remembered">15. Which community, chosen once and remembered</a><a class="t1" href="#s16-keeping-itself-current">16. Keeping itself current</a><a class="t1" href="#s17-parking-passes">17. Parking passes</a><a class="t1" href="#s18-what-changed-22-to-26-august">18. What changed, 22 to 26 August</a></nav>
 <h1 id="s1-what-this-covers">1. What this covers</h1>
 <p>The Service Assistant answers two different kinds of question through one chat box. &quot;My sink is leaking&quot; is a request for a tradesperson and goes to the service catalogue. &quot;What are the quiet hours&quot; is a question about the rules and is answered from the association&#x27;s own documents. This is a reference for the second one: how a question reaches the documents, which community&#x27;s documents it may be answered from, and what to do when a new association sends its paperwork.</p>
 <p>Two rules run through everything below, and both are enforced by code rather than by asking a model nicely.</p>
@@ -157,6 +157,7 @@ tbody tr:last-child td { border-bottom: none; }
 <p>The booking chat books jobs and nothing else: search the catalogue, add to the basket, pick a time, pay. It does not consult the documents.</p>
 <p><strong>It did, for a day.</strong> The same answers were available inside the booking chat, and the machinery worked: shape and vocabulary decided whether a message was about the rules, a community name scoped it, and the answer arrived with its sources. What it could not fix was the shape of the thing. One box answering both &quot;what are the quiet hours&quot; and &quot;my sink is blocked&quot; has to guess which is being asked on every message, and every guess it got wrong was visible to a resident. Two boxes, each certain what it is for, need no guess at all.</p>
 <p>That is why the routing rules that used to be documented here are gone. They were a good answer to a question that should not have been asked.</p>
+<p><strong>And then it did again, on 26 August, at the client&#x27;s request.</strong> &quot;I thought all are going to be chat ai based interactive.&quot; The main chat now answers community questions itself, and the guessing problem that closed it the first time is answered differently: the conversation remembers what it is about, so it does not have to decide afresh on every message. Section 15.</p>
 <h1 id="s3-which-community-and-how-it-is-chosen">3. Which community, and how it is chosen</h1>
 <p>A resident is asked once, on their first question, which association they are in. Two taps at most, and it is remembered from then on, shown in the panel header where it can be changed.</p>
 <p>Asked once rather than on every question, because the common case is a resident of one community asking about their own home, and a dropdown in front of every question taxes exactly that case. Naming a community in the question still wins over the setting: somebody who types &quot;Lauderdale Lakes tall grass&quot; is asking on purpose, and the credit under the answer says which community answered.</p>
@@ -247,6 +248,7 @@ tbody tr:last-child td { border-bottom: none; }
 <p>Retrieval has to hand the model both sides or it cannot report the disagreement, which is why the chunker keeps both documents rather than deduplicating them, and why a test asserts that both quiet hours rules are retrieved together for the same question.</p>
 <p>These need a decision from the association about which document is authoritative. Until one is given, showing both is the only honest answer.</p>
 <h1 id="s9-adding-a-new-community">9. Adding a new community</h1>
+<p><strong>The short way is now the admin screen</strong>, section 13: choosing a file registers the community, indexes the document and has it answering within the minute. What follows is the offline route, which is still how a large or awkward document gets in, and which explains what the screen does on your behalf.</p>
 <p>Two things, and the second is the one that is easy to forget.</p>
 <p><strong>1. Index the documents.</strong> Put the PDF under <code>backend/knowledge/&lt;community&gt;/</code>, add a line to <code>MANIFEST</code> in <code>scripts/build_doc_index.py</code> giving its path, title, short name and community tag, and rerun the builder on a laptop:</p>
 <pre><code>cd backend
@@ -312,15 +314,73 @@ python3 scripts/build_doc_index.py</code></pre>
 <figure><img src="img/s01_threelakes.png" width="1500" height="761" alt="The refusal in the booking chat" loading="lazy"></figure>
 <figure><img src="img/s02_booking.png" width="1500" height="761" alt="Service booking, unaffected" loading="lazy"></figure>
 <h1 id="s12-known-limits">12. Known limits</h1>
-<ul><li><strong>Three Lakes needs OCR</strong>, and a careful read of the result before it is</li></ul>
-<p>trusted. Section 7.</p>
-<ul><li><strong>The registry is hand maintained.</strong> Section 9. Indexing a document without</li></ul>
-<p>declaring its community name brings back the silent wrong answer.</p>
+<p>Three of these were fixed between 22 and 26 August and are struck through rather than deleted, because the reasoning that put them here is still worth reading.</p>
+<ul><li>~~<strong>Three Lakes needs OCR.</strong>~~ Three of its documents are indexed and</li></ul>
+<p>answering. The two scans are held as downloads instead, section 14.</p>
+<ul><li>~~<strong>The registry is hand maintained.</strong>~~ It lives in</li></ul>
+<p><code>app/data/communities.json</code> and an upload registers its own community, section 13. The trap it warned about is real for anything that writes the index directly: a chunk whose community is not in the registry is unreachable, and the question falls back to Serenity.</p>
+<ul><li>~~<strong>A restart is required</strong> after a new index is deployed.~~ A check every ten</li></ul>
+<p>minutes reloads whatever moved, section 16.</p>
 <ul><li><strong>Lauderdale Lakes has no quiet hours</strong> in its handbook, so that question</li></ul>
 <p>refuses honestly. It reads like a fault and is not one.</p>
 <ul><li><strong>The contradictions need a decision</strong> from the association about which</li></ul>
 <p>document is authoritative. Section 8.</p>
-<ul><li><strong>A restart is required</strong> after a new index is deployed. It is loaded once, on</li></ul>
-<p>first use.</p>
+<ul><li><strong>Four associations of six hold almost nothing.</strong> Lauderdale Lakes has its</li></ul>
+<p>code handbook; Kendall Square, Valencia and Enclave At Old Cutler have a colour sheet each. A resident of those four can be asked almost nothing, and no amount of code fixes it. The admin screen names them, section 13.</p>
+<ul><li><strong>One code opens every door.</strong> The same admin token that checks a parking pass</li></ul>
+<p>opens orders, payments and document removal, and the gate page keeps it on the device that scanned. Before guards use it at a barrier they need a credential that only checks passes.</p>
+<h1 id="s13-uploading-a-document-without-sending-it-to-anybody">13. Uploading a document, without sending it to anybody</h1>
+<p>The client asked for this on 22 August: &quot;allow Admin to upload the documents&quot;. Before it, every document reached the assistant by being emailed to us and loaded by hand, which put a day between an association approving a rule and a resident being able to ask about it.</p>
+<p><strong>Where:</strong> serviceagent.fordev.fun/admin, under Community documents.</p>
+<figure><img src="img/s03_admin_upload.png" width="1240" height="510" alt="Adding a document, and the associations that hold almost nothing" loading="lazy"></figure>
+<p>Choosing a file does all of it in one request: the text comes out, the document is cut into sections on its own headings, the sections are embedded, and the index is updated in memory and on disk. The screen reports how many sections it read. A resident can ask about it a few seconds later. Removing a document is the same in reverse and takes effect just as quickly.</p>
+<p><strong>A new association is a file and a name.</strong> Choosing &quot;Add a new community&quot; in the same form registers it, which is what makes the registry data rather than code. There is no separate screen and no Display Name field: the name typed here is what residents see in the picker.</p>
+<p><strong>A scan is accepted, not refused.</strong> When no text can be extracted the document is stored as download only. The assistant will not answer from a picture of a page, and says so, but the file is on the community&#x27;s shelf for residents to open. Four documents are held that way today.</p>
+<p><strong>The warning at the top is not decoration.</strong> Four of the six associations hold almost nothing, and a resident of those four can be asked almost nothing. It is shown on the screen that fixes it.</p>
+<h1 id="s14-taking-the-document-away">14. Taking the document away</h1>
+<p>Every answer names the documents it came out of, and each one is a row with two things to do with it: the title opens the PDF in a tab to read, the button saves it.</p>
+<figure><img src="img/s06_steps_and_shelf.png" width="1500" height="600" alt="Steps from the document, the form attached, and the association&#x27;s shelf" loading="lazy"></figure>
+<p>Two details in that screenshot are deliberate.</p>
+<p><strong>The steps are steps, not a list of things to book.</strong> When a question is about a procedure the assistant writes it as a numbered list out of the document, and the form for that procedure is attached underneath. Numbered lines used to be drawn as bookable service rows whatever they said, which is what made a resident ask what &quot;book item 1&quot; was supposed to mean.</p>
+<p><strong>The panel holds the whole shelf.</strong> Every document the association has, for the length of the conversation, each with its own Download. It used to empty itself whenever an answer cited a source, which is why the client reported that downloading had stopped working. It had not; there was simply no button on screen.</p>
+<p><strong>Asking for a document by name works, and so does pointing at one.</strong> &quot;Send me the design review form&quot; finds it by title. &quot;Can you download that&quot; resolves against whatever was last named. Title matching is the only thing that can find a scan at all, because there is no text inside it to match against.</p>
+<h1 id="s15-which-community-chosen-once-and-remembered">15. Which community, chosen once and remembered</h1>
+<p>Nothing is asked until it matters. Somebody describing a blocked drain is never asked which homeowners association they belong to. The first time a question is about the rules and we do not know where they live, the assistant asks.</p>
+<figure><img src="img/s04_community_picker.png" width="470" height="450" alt="Choosing an association, and what each one holds" loading="lazy"></figure>
+<p>A search box rather than a row of buttons, because six fit on a screen and fifty do not. Each row says what that association actually holds, so a resident learns that Kendall Square has one colour sheet before they spend their question on it rather than after.</p>
+<p>One tap remembers the choice and re-asks the original question against it, so the answer arrives on the same turn. The choice is shared with the floating assistant, and it is kept on the session as well as in the browser: the voice endpoint has no way to send one, so a spoken question used to be answered from Serenity&#x27;s rules whoever was asking.</p>
+<p><strong>Naming another association answers from it without changing the default.</strong> A resident checking a neighbour&#x27;s rule out of curiosity is told plainly that the answer came from somewhere other than their own community, and their own community is still theirs on the next question.</p>
+<p><strong>The conversation stays where it is.</strong> Once it is about the rules, follow-ups stay with the rules, vague ones included. Only a clear request for a tradesperson switches, and the switch says so: &quot;Switching to services for this one.&quot; Before this, every message was classified from scratch, so &quot;what about weekends&quot; could land anywhere.</p>
+<figure><img src="img/s05_miss_with_shelf.png" width="1500" height="290" alt="The miss, what the association does hold, and somewhere to go next" loading="lazy"></figure>
+<p>A question the documents cannot answer is answered honestly, naming what the association does hold, with the two ways out that stop it being a dead end. It never falls through to the service catalogue: a tradesperson is not a worse answer to &quot;what are the quiet hours&quot;, it is not an answer to it.</p>
+<h1 id="s16-keeping-itself-current">16. Keeping itself current</h1>
+<p>A check runs every ten minutes and rebuilds only what moved. It compares one count and one timestamp over the services table, and the modification times of the index and the registry. A pass that finds nothing costs almost nothing, so it can run all day.</p>
+<p>Documents uploaded through the admin screen do not wait for it; they are live within the same request. The refresher is for every other way the data changes: a service added straight to the database, an index rebuilt from source, a file copied onto the server.</p>
+<p><code>REFRESH_MINUTES=0</code> switches it off.</p>
+<h1 id="s17-parking-passes">17. Parking passes</h1>
+<p>A separate flow, asked for on 22 August, and reachable from the conversation since 26 August. Saying &quot;visitor parking&quot; or &quot;I need a parking pass&quot; opens the form without leaving the chat.</p>
+<figure><img src="img/s07_parking_in_chat.png" width="530" height="470" alt="Asking for a pass, in the conversation" loading="lazy"></figure>
+<p><strong>A pass belongs to a person.</strong> Signing in is required, and that is the feature rather than a hurdle: the office has to be able to say whose vehicle is on the property, so an anonymous pass is not a pass.</p>
+<p>The code appears on screen and arrives by email at the same time, so a resident who closes the tab on the way out of the door can still open a barrier twenty minutes later, and so it can be forwarded to whoever is driving.</p>
+<p><strong>What the code carries is a token and nothing else.</strong> Scanning it opens a page that shows nothing at all without the office code, so a photograph of a windscreen gives away nothing. With the code, whoever is at the gate sees the vehicle, the resident, the community, who is being visited and the expiry.</p>
+<p><strong>The pass is spent on the way out.</strong> Ending it at the barrier is what stops it being forwarded on for the rest of the week. Scanning a spent code says &quot;Already used&quot; and shows when the vehicle left.</p>
+<p>Questions *about* parking are not requests for a pass. &quot;What are the parking rules&quot; and &quot;can I park a boat at my house&quot; go to the documents. Two signals keep them apart: the documents&#x27; own vocabulary always means the rules, and a question word means the rules only when nothing is being asked for, so &quot;how do I get a parking pass&quot; still opens the form.</p>
+<h1 id="s18-what-changed-22-to-26-august">18. What changed, 22 to 26 August</h1>
+<div class="tw"><table>
+<tbody>
+<tr><td></td><td></td></tr>
+<tr><td>Registry moved from code into <code>app/data/communities.json</code></td><td>22 Aug</td></tr>
+<tr><td>Upload, extract, chunk, embed and go live in one request</td><td>22 Aug</td></tr>
+<tr><td>Scans kept as downloads instead of being refused</td><td>22 Aug</td></tr>
+<tr><td>Downloads under every answer, and a shelf per community</td><td>23 Aug</td></tr>
+<tr><td>Parking passes, emailed, with the gate page at <code>/parking/check</code></td><td>23 Aug</td></tr>
+<tr><td>The ten minute refresher</td><td>24 Aug</td></tr>
+<tr><td>Parking and documents reachable from the conversation</td><td>26 Aug</td></tr>
+<tr><td>The community picker, searchable, saying what each holds</td><td>26 Aug</td></tr>
+<tr><td>The conversation remembers its community and its documents</td><td>26 Aug</td></tr>
+</tbody></table></div>
+<p>Two faults found by the client&#x27;s own testing and fixed the same day are worth recording, because both were invisible in the logs.</p>
+<p><strong>A community that holds nothing offered a mechanic.</strong> A Kendall Square resident asked for the quiet hours five times in forty six seconds and was answered each time with &quot;Mobile mechanic call out, from $70.00&quot;. The documents found nothing, the question fell through to the catalogue, and one weak catalogue match was enough to hide the fact that the association has no rules loaded at all.</p>
+<p><strong>&quot;color&quot; never matched &quot;colour&quot;.</strong> He asked to download the colour archive one message after being told the association holds it, and was asked whether he meant the rules or a tradesperson. Set intersection does not care that the two words mean the same thing. Both spellings now normalise onto one form.</p>
 </body>
 </html>

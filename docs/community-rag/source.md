@@ -49,6 +49,12 @@ resident. Two boxes, each certain what it is for, need no guess at all.
 That is why the routing rules that used to be documented here are gone. They
 were a good answer to a question that should not have been asked.
 
+**And then it did again, on 26 August, at the client's request.** "I thought all
+are going to be chat ai based interactive." The main chat now answers community
+questions itself, and the guessing problem that closed it the first time is
+answered differently: the conversation remembers what it is about, so it does
+not have to decide afresh on every message. Section 15.
+
 # 3. Which community, and how it is chosen
 
 A resident is asked once, on their first question, which association they are
@@ -263,6 +269,11 @@ authoritative. Until one is given, showing both is the only honest answer.
 
 # 9. Adding a new community
 
+**The short way is now the admin screen**, section 13: choosing a file registers
+the community, indexes the document and has it answering within the minute. What
+follows is the offline route, which is still how a large or awkward document
+gets in, and which explains what the screen does on your behalf.
+
 Two things, and the second is the one that is easy to forget.
 
 **1. Index the documents.** Put the PDF under `backend/knowledge/<community>/`,
@@ -395,13 +406,196 @@ real browser:
 
 # 12. Known limits
 
-- **Three Lakes needs OCR**, and a careful read of the result before it is
-  trusted. Section 7.
-- **The registry is hand maintained.** Section 9. Indexing a document without
-  declaring its community name brings back the silent wrong answer.
+Three of these were fixed between 22 and 26 August and are struck through
+rather than deleted, because the reasoning that put them here is still worth
+reading.
+
+- ~~**Three Lakes needs OCR.**~~ Three of its documents are indexed and
+  answering. The two scans are held as downloads instead, section 14.
+- ~~**The registry is hand maintained.**~~ It lives in
+  `app/data/communities.json` and an upload registers its own community,
+  section 13. The trap it warned about is real for anything that writes the
+  index directly: a chunk whose community is not in the registry is
+  unreachable, and the question falls back to Serenity.
+- ~~**A restart is required** after a new index is deployed.~~ A check every ten
+  minutes reloads whatever moved, section 16.
 - **Lauderdale Lakes has no quiet hours** in its handbook, so that question
   refuses honestly. It reads like a fault and is not one.
 - **The contradictions need a decision** from the association about which
   document is authoritative. Section 8.
-- **A restart is required** after a new index is deployed. It is loaded once, on
-  first use.
+- **Four associations of six hold almost nothing.** Lauderdale Lakes has its
+  code handbook; Kendall Square, Valencia and Enclave At Old Cutler have a
+  colour sheet each. A resident of those four can be asked almost nothing, and
+  no amount of code fixes it. The admin screen names them, section 13.
+- **One code opens every door.** The same admin token that checks a parking pass
+  opens orders, payments and document removal, and the gate page keeps it on
+  the device that scanned. Before guards use it at a barrier they need a
+  credential that only checks passes.
+
+# 13. Uploading a document, without sending it to anybody
+
+The client asked for this on 22 August: "allow Admin to upload the documents".
+Before it, every document reached the assistant by being emailed to us and
+loaded by hand, which put a day between an association approving a rule and a
+resident being able to ask about it.
+
+**Where:** serviceagent.fordev.fun/admin, under Community documents.
+
+![Adding a document, and the associations that hold almost nothing](s03_admin_upload.png)
+
+Choosing a file does all of it in one request: the text comes out, the document
+is cut into sections on its own headings, the sections are embedded, and the
+index is updated in memory and on disk. The screen reports how many sections it
+read. A resident can ask about it a few seconds later. Removing a document is
+the same in reverse and takes effect just as quickly.
+
+**A new association is a file and a name.** Choosing "Add a new community" in
+the same form registers it, which is what makes the registry data rather than
+code. There is no separate screen and no Display Name field: the name typed
+here is what residents see in the picker.
+
+**A scan is accepted, not refused.** When no text can be extracted the document
+is stored as download only. The assistant will not answer from a picture of a
+page, and says so, but the file is on the community's shelf for residents to
+open. Four documents are held that way today.
+
+**The warning at the top is not decoration.** Four of the six associations hold
+almost nothing, and a resident of those four can be asked almost nothing. It is
+shown on the screen that fixes it.
+
+# 14. Taking the document away
+
+Every answer names the documents it came out of, and each one is a row with two
+things to do with it: the title opens the PDF in a tab to read, the button saves
+it.
+
+![Steps from the document, the form attached, and the association's shelf](s06_steps_and_shelf.png)
+
+Two details in that screenshot are deliberate.
+
+**The steps are steps, not a list of things to book.** When a question is about
+a procedure the assistant writes it as a numbered list out of the document, and
+the form for that procedure is attached underneath. Numbered lines used to be
+drawn as bookable service rows whatever they said, which is what made a resident
+ask what "book item 1" was supposed to mean.
+
+**The panel holds the whole shelf.** Every document the association has, for the
+length of the conversation, each with its own Download. It used to empty itself
+whenever an answer cited a source, which is why the client reported that
+downloading had stopped working. It had not; there was simply no button on
+screen.
+
+**Asking for a document by name works, and so does pointing at one.** "Send me
+the design review form" finds it by title. "Can you download that" resolves
+against whatever was last named. Title matching is the only thing that can find
+a scan at all, because there is no text inside it to match against.
+
+# 15. Which community, chosen once and remembered
+
+Nothing is asked until it matters. Somebody describing a blocked drain is never
+asked which homeowners association they belong to. The first time a question is
+about the rules and we do not know where they live, the assistant asks.
+
+![Choosing an association, and what each one holds](s04_community_picker.png)
+
+A search box rather than a row of buttons, because six fit on a screen and fifty
+do not. Each row says what that association actually holds, so a resident learns
+that Kendall Square has one colour sheet before they spend their question on it
+rather than after.
+
+One tap remembers the choice and re-asks the original question against it, so
+the answer arrives on the same turn. The choice is shared with the floating
+assistant, and it is kept on the session as well as in the browser: the voice
+endpoint has no way to send one, so a spoken question used to be answered from
+Serenity's rules whoever was asking.
+
+**Naming another association answers from it without changing the default.** A
+resident checking a neighbour's rule out of curiosity is told plainly that the
+answer came from somewhere other than their own community, and their own
+community is still theirs on the next question.
+
+**The conversation stays where it is.** Once it is about the rules, follow-ups
+stay with the rules, vague ones included. Only a clear request for a
+tradesperson switches, and the switch says so: "Switching to services for this
+one." Before this, every message was classified from scratch, so "what about
+weekends" could land anywhere.
+
+![The miss, what the association does hold, and somewhere to go next](s05_miss_with_shelf.png)
+
+A question the documents cannot answer is answered honestly, naming what the
+association does hold, with the two ways out that stop it being a dead end. It
+never falls through to the service catalogue: a tradesperson is not a worse
+answer to "what are the quiet hours", it is not an answer to it.
+
+# 16. Keeping itself current
+
+A check runs every ten minutes and rebuilds only what moved. It compares one
+count and one timestamp over the services table, and the modification times of
+the index and the registry. A pass that finds nothing costs almost nothing, so
+it can run all day.
+
+Documents uploaded through the admin screen do not wait for it; they are live
+within the same request. The refresher is for every other way the data changes:
+a service added straight to the database, an index rebuilt from source, a file
+copied onto the server.
+
+`REFRESH_MINUTES=0` switches it off.
+
+# 17. Parking passes
+
+A separate flow, asked for on 22 August, and reachable from the conversation
+since 26 August. Saying "visitor parking" or "I need a parking pass" opens the
+form without leaving the chat.
+
+![Asking for a pass, in the conversation](s07_parking_in_chat.png)
+
+**A pass belongs to a person.** Signing in is required, and that is the feature
+rather than a hurdle: the office has to be able to say whose vehicle is on the
+property, so an anonymous pass is not a pass.
+
+The code appears on screen and arrives by email at the same time, so a resident
+who closes the tab on the way out of the door can still open a barrier twenty
+minutes later, and so it can be forwarded to whoever is driving.
+
+**What the code carries is a token and nothing else.** Scanning it opens a page
+that shows nothing at all without the office code, so a photograph of a
+windscreen gives away nothing. With the code, whoever is at the gate sees the
+vehicle, the resident, the community, who is being visited and the expiry.
+
+**The pass is spent on the way out.** Ending it at the barrier is what stops it
+being forwarded on for the rest of the week. Scanning a spent code says
+"Already used" and shows when the vehicle left.
+
+Questions *about* parking are not requests for a pass. "What are the parking
+rules" and "can I park a boat at my house" go to the documents. Two signals keep
+them apart: the documents' own vocabulary always means the rules, and a question
+word means the rules only when nothing is being asked for, so "how do I get a
+parking pass" still opens the form.
+
+# 18. What changed, 22 to 26 August
+
+| | |
+|---|---|
+| Registry moved from code into `app/data/communities.json` | 22 Aug |
+| Upload, extract, chunk, embed and go live in one request | 22 Aug |
+| Scans kept as downloads instead of being refused | 22 Aug |
+| Downloads under every answer, and a shelf per community | 23 Aug |
+| Parking passes, emailed, with the gate page at `/parking/check` | 23 Aug |
+| The ten minute refresher | 24 Aug |
+| Parking and documents reachable from the conversation | 26 Aug |
+| The community picker, searchable, saying what each holds | 26 Aug |
+| The conversation remembers its community and its documents | 26 Aug |
+
+Two faults found by the client's own testing and fixed the same day are worth
+recording, because both were invisible in the logs.
+
+**A community that holds nothing offered a mechanic.** A Kendall Square resident
+asked for the quiet hours five times in forty six seconds and was answered each
+time with "Mobile mechanic call out, from $70.00". The documents found nothing,
+the question fell through to the catalogue, and one weak catalogue match was
+enough to hide the fact that the association has no rules loaded at all.
+
+**"color" never matched "colour".** He asked to download the colour archive one
+message after being told the association holds it, and was asked whether he
+meant the rules or a tradesperson. Set intersection does not care that the two
+words mean the same thing. Both spellings now normalise onto one form.
