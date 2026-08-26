@@ -62,16 +62,46 @@ _CONVERSATIONAL = re.compile(
 # the word "parking" on its own decides nothing.
 _PARKING = re.compile(
     r"\b(parking|visitor|guest)\s+(pass|permit|passes|permits)\b|"
+    # "visitor parking", "guest parking". A noun phrase with no verb in it is
+    # how people actually ask, and requiring one sent five ordinary phrasings
+    # to the catalogue to be answered with a mobile mechanic.
+    r"\b(visitor|guest)s?\s+parking\b|"
+    r"\bparking\s+for\s+(my|a|the)?\s*(visitor|guest|friend|car|vehicle)\b|"
     r"\bpass\s+for\s+(my|a|the)\s+(visitor|guest|car|vehicle)\b|"
     r"\bpark\s+(my|a|the)\s+(car|vehicle|visitor'?s?\s+car)\b",
     re.IGNORECASE,
 )
-# ...but only when something is being asked for, rather than asked about.
+
+# ...unless it is a question *about* parking rather than a request for a pass.
+#
+# The distinction that has to hold: "visitor parking" opens the form, and "what
+# are the parking rules" and "can I park a boat at my house" do not. Two
+# signals separate them. The documents' own vocabulary means the rules, always.
+# A question word means the rules only when nothing is being asked for, so that
+# "how do I get a parking pass" and "can I get a visitor pass" still open the
+# form.
+_ASKS_ABOUT = re.compile(
+    r"\b(rules?|regulations?|policy|policies|allowed|permitted|restrictions?|"
+    r"by-?laws?|guidelines?|fine[sd]?|violation)\b",
+    re.IGNORECASE,
+)
+_QUESTION_OPENER = re.compile(
+    r"^\s*(what|when|where|which|who|why|how\s+(much|many|long)|"
+    r"am\s+i|are\s+we|is\s+there|are\s+there)\b",
+    re.IGNORECASE,
+)
 _WANTS = re.compile(
     r"\b(need|want|get|give|create|make|issue|request|register|new|another|"
     r"apply\s+for|book|arrange|set\s+up|generate|how\s+do\s+i\s+get)\b",
     re.IGNORECASE,
 )
+
+
+def _asking_about_parking(text: str) -> bool:
+    """A question about the rules, not a request for a pass."""
+    if _ASKS_ABOUT.search(text):
+        return True
+    return bool(_QUESTION_OPENER.match(text)) and not _WANTS.search(text)
 
 # Asking for a document by name. "form", "copy" and "document" are the words
 # that mean a file is wanted rather than an answer, which is what separates
@@ -245,7 +275,9 @@ def parse(message: str, session, db: "Session") -> Intent:
     # Before checkout and before the catalogue. A resident asking for a parking
     # pass is not searching for a tradesperson, and the search would answer them
     # with one.
-    if _PARKING.search(text) and _WANTS.search(text) and not _DOCUMENT.search(text):
+    if (_PARKING.search(text)
+            and not _asking_about_parking(text)
+            and not _DOCUMENT.search(text)):
         return Intent(type="parking")
 
     # A named document beats everything except a pass, because the ask is

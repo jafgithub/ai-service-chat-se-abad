@@ -37,6 +37,14 @@ def parse(text):
     "I want a guest parking pass for tomorrow",
     "register a parking pass for my visitor",
     "how do I get a parking permit",
+    # Reported live: every one of these went to the catalogue instead, because
+    # the matcher demanded a verb. A noun phrase with no verb in it is how
+    # people actually ask for a pass.
+    "visitor parking",
+    "guest parking",
+    "visitor parking pass",
+    "parking for my visitor",
+    "I need parking for a visitor",
 ])
 def test_asking_for_a_pass_opens_the_form(said):
     assert parse(said) == "parking"
