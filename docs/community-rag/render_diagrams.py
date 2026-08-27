@@ -341,9 +341,89 @@ def d05():
           "answered yes to everything once, and \u201cplumber\u201d could not get out.")
 
 
+def d06():
+    """The whole story: how a document gets in, how a question is answered, and
+    how a pass is issued and spent."""
+    s = [f'<svg viewBox="0 0 1360 690">{ARROW}']
+
+    def journey(x, badge, title, sub, steps, cls):
+        out = [f'<rect x="{x}" y="44" width="410" height="58" rx="10" class="{cls}"/>',
+               f'<text class="t" x="{x+205}" y="70">{title}</text>',
+               f'<text class="s" x="{x+205}" y="90">{sub}</text>']
+        y = 126
+        for i, (line, note) in enumerate(steps, 1):
+            out.append(f'<rect x="{x}" y="{y}" width="410" height="62" rx="10" class="out"/>')
+            out.append(f'<circle cx="{x+28}" cy="{y+31}" r="13" fill="#2258d4"/>')
+            out.append(f'<text class="n" x="{x+28}" y="{y+36}" style="font-size:13px">{i}</text>')
+            out.append(f'<text class="li" x="{x+52}" y="{y+26}" '
+                       f'style="font-size:14px;font-weight:600">{line}</text>')
+            out.append(f'<text class="li" x="{x+52}" y="{y+46}" '
+                       f'style="font-size:12.5px;fill:#5b6b86">{note}</text>')
+            if i < len(steps):
+                out.append(arrow(x + 205, y + 62, x + 205, y + 74))
+            y += 74
+        return "".join(out), y
+
+    a, _ = journey(30, "", "A document arrives", "from the admin screen, in one request", [
+        ("Somebody picks a PDF", "any association, any document"),
+        ("The text comes out", "no text means download only, and it says so"),
+        ("Cut on its own headings", "one rule or one section at a time"),
+        ("Embedded, 384 dimensions", "on this machine, not sent anywhere"),
+        ("Answering, seconds later", "and removable just as fast"),
+    ], "ok")
+
+    b, _ = journey(475, "", "A resident asks", "the part everything else exists for", [
+        ("Rules, or a tradesperson?", "decided by shape, not by score"),
+        ("Which community?", "asked once, then remembered"),
+        ("Scope first, then rank", "another association is not in the room"),
+        ("Grounded, or refused", "nothing found means no model is called"),
+        ("Answer, and the document", "cited, and there to download"),
+    ], "ok")
+
+    c, _ = journey(920, "", "A visitor needs parking", "asked for in the same conversation", [
+        ("A resident asks", '"visitor parking" opens the form'),
+        ("Signed in, and filled in", "a pass belongs to a person"),
+        ("Issued: on screen and emailed", "forwardable to whoever is driving"),
+        ("Scanned at the barrier", "the code alone shows a stranger nothing"),
+        ("Spent when the car leaves", "so it cannot be passed on"),
+    ], "ok")
+
+    s.extend([a, b, c])
+
+    # what all three stand on
+    s.append('<text class="lb" x="30" y="518" '
+             'style="text-anchor:start;letter-spacing:1.2px">WHAT ALL THREE STAND ON</text>')
+    for i, (title, sub) in enumerate([
+        ("The index", "209 sections, one matrix multiply"),
+        ("The library", "which file each answer can hand over"),
+        ("MySQL", "sessions, bookings, passes"),
+        ("The embedding model", "in this process, nothing sent out"),
+    ]):
+        x = 30 + i * 333
+        s.append(f'<rect x="{x}" y="530" width="313" height="62" rx="10" class="sys"/>')
+        s.append(f'<text class="t" x="{x+156}" y="556" style="font-size:14px">{title}</text>')
+        s.append(f'<text class="s" x="{x+156}" y="576" style="font-size:12.5px">{sub}</text>')
+
+    s.append('<rect x="30" y="614" width="1300" height="56" rx="10" class="warn"/>')
+    s.append('<text class="t" x="680" y="638">One rule holds all of it together</text>')
+    s.append('<text class="s" x="680" y="658">an answer is either supported by a '
+             'passage we retrieved, or it is a refusal</text>')
+
+    s.append("</svg>")
+    write("d06_story", "The whole story", "A document in, a question answered, a car through the gate",
+          "Three journeys, one machine. Everything below the line is shared by "
+          "all three, and the rule at the foot is what the product is.",
+          "".join(s),
+          "<b>Read the fourth step of the middle column twice.</b> When nothing "
+          "clears the retrieval floor, the refusal is returned without a "
+          "language model being called at all. That is not a policy the model "
+          "is asked to follow. It is a road it never travels.")
+
+
 if __name__ == "__main__":
     d01()
     d02()
     d03()
     d04()
     d05()
+    d06()

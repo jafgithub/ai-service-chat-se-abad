@@ -25,6 +25,15 @@ rules, because "Lake" sits close to "lakes" in the embedding space and nothing
 downstream knew the difference mattered. Rules about somebody's home, delivered
 confidently, from a document that does not govern them.
 
+![A document in, a question answered, a car through the gate](d06_story.png)
+
+Three journeys through one machine. A document arriving, a resident asking, a
+visitor needing to park. Everything below the line is shared by all three, and
+the rule at the foot is the product: an answer is either supported by a passage
+we retrieved, or it is a refusal.
+
+The component view of the same thing:
+
 ![One process, three engines, two places state lives](d04_architecture.png)
 
 Everything below is a detail of that picture. Four surfaces, one API, and three
