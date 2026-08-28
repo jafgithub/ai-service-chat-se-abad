@@ -31,6 +31,17 @@
 -- instance, that new address has to be added there too: the existing grant is
 -- pinned to a single IP.
 --
+-- PORTABILITY
+--
+-- Written to run on both. Ours is MySQL 8, the client's GoDaddy host is
+-- MariaDB 10.11, and two things in a stock mysqldump stop dead there:
+--
+--   utf8mb4_0900_ai_ci   MySQL 8 only        -> utf8mb4_unicode_ci
+--   DEFAULT (now())      MySQL 8 expression  -> DEFAULT current_timestamp()
+--
+-- The first fails with "Unknown collation" on the very first table, which is
+-- how this was found.
+
 -- NOTHING HERE TOUCHES THE GROCERY DATABASE. These 19 tables are the Service
 -- Assistant's own, and aidata2prd_dev holds none of them.
 
@@ -59,7 +70,7 @@ CREATE TABLE `accounts` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`),
   KEY `ix_account_role` (`role`)
-) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -74,8 +85,8 @@ CREATE TABLE `appointments` (
   `calendly_uri` varchar(255) DEFAULT NULL,
   `calendly_invitee_uri` varchar(255) DEFAULT NULL,
   `cancel_reason` text,
-  `created_at` datetime DEFAULT (now()),
-  `updated_at` datetime DEFAULT (now()),
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp(),
   `provider_id` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `job_id` (`job_id`),
@@ -83,7 +94,7 @@ CREATE TABLE `appointments` (
   KEY `ix_appointment_day` (`starts_at`),
   KEY `ix_appointment_provider` (`provider_id`,`starts_at`),
   CONSTRAINT `appointments_ibfk_1` FOREIGN KEY (`job_id`) REFERENCES `jobs` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -93,12 +104,12 @@ CREATE TABLE `cart_items` (
   `item_id` bigint NOT NULL,
   `quantity` int NOT NULL,
   `unit_price` decimal(24,2) NOT NULL,
-  `created_at` datetime DEFAULT (now()),
-  `updated_at` datetime DEFAULT (now()),
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `ix_cart_items_session_id` (`session_id`),
   CONSTRAINT `cart_items_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `chat_sessions` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -107,7 +118,7 @@ CREATE TABLE `categories` (
   `name` varchar(120) NOT NULL,
   `status` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -117,13 +128,13 @@ CREATE TABLE `chat_sessions` (
   `longitude` decimal(10,7) DEFAULT NULL,
   `last_shown_json` json DEFAULT NULL,
   `last_referenced_item_id` bigint DEFAULT NULL,
-  `created_at` datetime DEFAULT (now()),
-  `updated_at` datetime DEFAULT (now()),
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp(),
   `community` varchar(64) DEFAULT NULL,
   `last_documents_json` json DEFAULT NULL,
   `conversation_mode` varchar(16) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -136,9 +147,9 @@ CREATE TABLE `customers` (
   `longitude` decimal(10,7) DEFAULT NULL,
   `address` text,
   `type` varchar(50) DEFAULT NULL,
-  `created_at` datetime DEFAULT (now()),
+  `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -150,11 +161,11 @@ CREATE TABLE `job_lines` (
   `item_details` text,
   `quantity` int NOT NULL,
   `tax_amount` decimal(24,2) NOT NULL,
-  `created_at` datetime DEFAULT (now()),
-  `updated_at` datetime DEFAULT (now()),
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp(),
   `total_add_on_price` decimal(24,2) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -170,7 +181,7 @@ CREATE TABLE `jobs` (
   `access_notes` text,
   `idempotency_key` varchar(64) DEFAULT NULL,
   `payment_method` varchar(20) DEFAULT NULL,
-  `created_at` datetime DEFAULT (now()),
+  `created_at` datetime DEFAULT current_timestamp(),
   `provider_id` int DEFAULT NULL,
   `provider_service_id` int DEFAULT NULL,
   `currency` varchar(8) DEFAULT 'USD',
@@ -180,7 +191,7 @@ CREATE TABLE `jobs` (
   UNIQUE KEY `idempotency_key` (`idempotency_key`),
   KEY `customer_id` (`customer_id`),
   CONSTRAINT `jobs_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -209,7 +220,7 @@ CREATE TABLE `parking_passes` (
   KEY `ix_parking_passes_account_id` (`account_id`),
   CONSTRAINT `parking_passes_ibfk_1` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`),
   CONSTRAINT `parking_passes_ibfk_2` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -223,13 +234,13 @@ CREATE TABLE `payments` (
   `amount` decimal(10,2) NOT NULL,
   `currency` varchar(10) NOT NULL,
   `error_message` text,
-  `created_at` datetime DEFAULT (now()),
-  `updated_at` datetime DEFAULT (now()),
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_payments_event` (`provider_event_id`),
   KEY `ix_payments_ref` (`provider`,`provider_ref`),
   KEY `ix_payments_order` (`order_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -243,7 +254,7 @@ CREATE TABLE `provider_availability` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_provider_weekday` (`provider_id`,`weekday`,`opens_at`),
   CONSTRAINT `fk_pa_provider` FOREIGN KEY (`provider_id`) REFERENCES `providers` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -260,7 +271,7 @@ CREATE TABLE `provider_services` (
   UNIQUE KEY `uq_provider_service` (`provider_id`,`service_id`),
   KEY `ix_provider_service_service` (`service_id`,`active`),
   CONSTRAINT `fk_ps_provider` FOREIGN KEY (`provider_id`) REFERENCES `providers` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -274,7 +285,7 @@ CREATE TABLE `provider_time_off` (
   PRIMARY KEY (`id`),
   KEY `ix_time_off_provider` (`provider_id`,`starts_at`,`ends_at`),
   CONSTRAINT `fk_time_off_provider` FOREIGN KEY (`provider_id`) REFERENCES `providers` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -299,7 +310,7 @@ CREATE TABLE `providers` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`),
   KEY `ix_provider_status` (`status`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -310,7 +321,7 @@ CREATE TABLE `service_phrases` (
   `vector` json NOT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_phrase_service` (`service_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=190 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=190 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -332,7 +343,7 @@ CREATE TABLE `service_requests` (
   PRIMARY KEY (`id`),
   KEY `ix_request_customer` (`customer_id`,`created_at`),
   KEY `ix_request_status` (`status`)
-) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -367,7 +378,7 @@ CREATE TABLE `services` (
   `module_id` bigint DEFAULT NULL,
   `is_approved` tinyint(1) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -383,7 +394,7 @@ CREATE TABLE `sessions` (
   KEY `ix_session_account` (`account_id`),
   KEY `ix_session_expiry` (`expires_at`),
   CONSTRAINT `fk_session_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -393,7 +404,7 @@ CREATE TABLE `stores` (
   `status` tinyint(1) NOT NULL DEFAULT '1',
   `email` varchar(190) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
