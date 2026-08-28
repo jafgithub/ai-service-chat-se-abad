@@ -1,0 +1,18 @@
+[Unit]
+Description=Service Assistant outbox sync (local MySQL -> client's remote database)
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/plumber/backend
+ExecStart=/home/ubuntu/plumber/backend/.venv/bin/python sync_to_remote.py --interval 60
+Restart=always
+RestartSec=10
+# Small and steady. The work is one query and a network hop, and capping it
+# means a runaway backfill cannot crowd out the API on a 2GB box.
+MemoryMax=300M
+
+[Install]
+WantedBy=multi-user.target
