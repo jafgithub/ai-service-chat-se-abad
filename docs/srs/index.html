@@ -1,0 +1,1494 @@
+<title>Service Assistant Specification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+/* ── tokens ───────────────────────────────────────────────────────────────
+   The palette is the one the other five documents in this set already use:
+   rust badge, deep navy ink, and the blue / green / amber semantic trio from
+   render_diagrams.py. Continuity with the house style, not a sixth identity.
+
+   In the console those colours carry meaning rather than decoration. Green is
+   our own hardware, blue is the cloud engine that catches it, grey is an
+   honest refusal, rust is something being turned away at the gate.           */
+:root {
+  --paper:      #f6f7f9;
+  --card:       #ffffff;
+  --sunken:     #eef1f5;
+  --rule:       #dde3ea;
+  --rule-soft:  #e8edf2;
+
+  --ink:        #14213a;
+  --muted:      #5b6b86;
+  --faint:      #8494ab;
+
+  --brand:      #c2451b;
+  --brand-soft: #fdf1ec;
+
+  --ours:       #2f6b4c;
+  --ours-soft:  #eaf6ef;
+  --cloud:      #2258d4;
+  --cloud-soft: #eef3fd;
+  --refuse:     #5b6b86;
+  --refuse-soft:#eef1f5;
+  --warn:       #b1791a;
+  --warn-soft:  #fffaf0;
+
+  --shadow: 0 1px 2px rgba(20,33,58,.05), 0 10px 28px rgba(20,33,58,.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #0e1420;
+    --card:       #151d2c;
+    --sunken:     #1b2534;
+    --rule:       #263143;
+    --rule-soft:  #1f2a39;
+
+    --ink:        #e7edf5;
+    --muted:      #9fb0c6;
+    --faint:      #71829a;
+
+    --brand:      #ef7a4d;
+    --brand-soft: #331a12;
+
+    --ours:       #57b98a;
+    --ours-soft:  #12301f;
+    --cloud:      #6f9df0;
+    --cloud-soft: #131f38;
+    --refuse:     #8fa0b8;
+    --refuse-soft:#1b2534;
+    --warn:       #d8a441;
+    --warn-soft:  #2e2410;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:      #0e1420;
+  --card:       #151d2c;
+  --sunken:     #1b2534;
+  --rule:       #263143;
+  --rule-soft:  #1f2a39;
+
+  --ink:        #e7edf5;
+  --muted:      #9fb0c6;
+  --faint:      #71829a;
+
+  --brand:      #ef7a4d;
+  --brand-soft: #331a12;
+
+  --ours:       #57b98a;
+  --ours-soft:  #12301f;
+  --cloud:      #6f9df0;
+  --cloud-soft: #131f38;
+  --refuse:     #8fa0b8;
+  --refuse-soft:#1b2534;
+  --warn:       #d8a441;
+  --warn-soft:  #2e2410;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16.5px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono, .id, .num {
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+.shell {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 60px) clamp(16px, 4vw, 34px) 96px;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 20px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.back::before { content: "\2190"; margin-right: 7px; }
+.back:hover { color: var(--brand); }
+
+/* ── masthead, in the manner of a document of record ──────────────────── */
+.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 22px; margin-bottom: 34px; }
+
+.badge {
+  display: inline-block;
+  background: var(--brand);
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 4px 11px;
+  border-radius: 4px;
+}
+
+h1 {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: clamp(32px, 5vw, 50px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -.015em;
+  margin: 16px 0 0;
+  text-wrap: balance;
+}
+
+.standfirst {
+  margin: 14px 0 0;
+  max-width: 60ch;
+  font-size: clamp(16.5px, 1.6vw, 18.5px);
+  color: var(--muted);
+}
+
+.docmeta {
+  margin: 22px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px 24px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+}
+.docmeta dt { color: var(--faint); text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; }
+.docmeta dd { margin: 3px 0 0; color: var(--ink); font-weight: 500; }
+
+/* ── layout: sticky contents beside the text at wide widths ───────────── */
+.layout { display: block; }
+@media (min-width: 1040px) {
+  .layout { display: grid; grid-template-columns: 218px minmax(0, 1fr); gap: 52px; align-items: start; }
+  .toc { position: sticky; top: 28px; }
+}
+
+.toc { margin-bottom: 40px; }
+.toc h2 {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.toc ol ol { margin: 3px 0 6px 16px; }
+.toc a {
+  display: flex;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 13.5px;
+  padding: 3px 0;
+  border-radius: 3px;
+}
+.toc a:hover { color: var(--brand); }
+.toc a .n { color: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; flex: 0 0 auto; padding-top: 1px; }
+
+/* ── prose ────────────────────────────────────────────────────────────── */
+.body > section { margin-bottom: 52px; scroll-margin-top: 24px; }
+
+h2.sec {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: clamp(24px, 2.6vw, 31px);
+  font-weight: 500;
+  letter-spacing: -.01em;
+  margin: 0 0 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  text-wrap: balance;
+}
+h2.sec .n { color: var(--brand); font-family: "IBM Plex Mono", monospace; font-size: .62em; margin-right: 12px; }
+
+h3.sub {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 30px 0 8px;
+  letter-spacing: -.005em;
+}
+h3.sub .n { color: var(--brand); font-family: "IBM Plex Mono", monospace; font-size: .82em; margin-right: 9px; font-weight: 500; }
+
+p { margin: 0 0 14px; max-width: 66ch; }
+p:last-child { margin-bottom: 0; }
+.body strong { font-weight: 700; }
+
+.lede { font-size: 17.5px; color: var(--muted); max-width: 62ch; }
+
+/* requirement lists */
+.reqs { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.reqs li {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  align-items: baseline;
+}
+.reqs li:nth-child(odd) { background: var(--sunken); }
+.reqs .id {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  letter-spacing: .02em;
+}
+.reqs .txt { max-width: 60ch; }
+
+.callout {
+  border-left: 3px solid var(--brand);
+  background: var(--brand-soft);
+  padding: 13px 0 13px 17px;
+  margin: 18px 0;
+  border-radius: 0 6px 6px 0;
+}
+.callout p { margin: 0; max-width: 62ch; }
+
+.shows {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 4px 13px;
+  text-decoration: none;
+}
+.shows:hover { border-color: var(--brand); color: var(--brand); }
+.shows::before { content: "▸"; color: var(--brand); }
+
+.scroller { overflow-x: auto; margin: 20px 0; }
+table.spec { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14.5px; }
+table.spec th, table.spec td { text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+table.spec th { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+table.spec td:first-child { font-weight: 600; white-space: nowrap; }
+table.spec .num { font-variant-numeric: tabular-nums; }
+
+.figure { margin: 22px 0 0; }
+.figure .scroller { border: 1px solid var(--rule); border-radius: 10px; background: var(--card); padding: 14px 12px 8px; }
+.figcap { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--faint); margin-top: 9px; }
+
+/* ── the static flow diagram ──────────────────────────────────────────── */
+.flow { display: block; width: 100%; height: auto; min-width: 880px; }
+.fbox { fill: var(--sunken); stroke: var(--rule); stroke-width: 1.5; }
+.fbox.gate { fill: var(--brand-soft); stroke: var(--brand); }
+.fbox.you  { fill: var(--warn-soft); stroke: var(--warn); }
+.fbox.ours { fill: var(--ours-soft); stroke: var(--ours); }
+.fbox.cloud{ fill: var(--cloud-soft); stroke: var(--cloud); }
+.ft { fill: var(--ink); font: 600 13px "Public Sans", sans-serif; text-anchor: middle; }
+.fs { fill: var(--muted); font: 400 11px "IBM Plex Mono", monospace; text-anchor: middle; }
+.fl { stroke: var(--faint); stroke-width: 1.6; fill: none; }
+.flab { fill: var(--faint); font: 500 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+
+/* ── the console ──────────────────────────────────────────────────────── */
+.console { border: 1px solid var(--rule); border-radius: 12px; background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+.console > header {
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--rule);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px;
+}
+.console > header h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.console .modelled {
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--faint);
+  margin-left: auto;
+}
+
+.stage { padding: 10px 12px 2px; overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; min-width: 900px; }
+
+.nbox { fill: var(--sunken); stroke: var(--rule); stroke-width: 1.6; transition: fill .16s, stroke .16s; }
+.nbox.hot   { fill: var(--cloud-soft); stroke: var(--cloud); }
+.nbox.ours  { fill: var(--ours-soft);  stroke: var(--ours); }
+.nbox.cloud { fill: var(--cloud-soft); stroke: var(--cloud); }
+.nbox.stop  { fill: var(--brand-soft); stroke: var(--brand); stroke-dasharray: 6 4; }
+.nbox.dead  { fill: var(--brand-soft); stroke: var(--brand); stroke-dasharray: 6 4; }
+.nt { fill: var(--ink); font: 600 13px "Public Sans", sans-serif; text-anchor: middle; }
+.ns { fill: var(--muted); font: 400 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+.edge { stroke: var(--rule); stroke-width: 2; fill: none; transition: stroke .16s; }
+.elab { fill: var(--faint); font: 500 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+.p-ours { fill: var(--ours); } .p-cloud { fill: var(--cloud); }
+.p-refuse { fill: var(--refuse); } .p-block { fill: var(--brand); }
+
+.scenarios { display: flex; flex-wrap: wrap; gap: 8px; padding: 15px 18px; border-top: 1px solid var(--rule); }
+.scenarios button {
+  min-height: 40px; padding: 7px 15px; border-radius: 7px;
+  border: 1px solid var(--rule); background: var(--sunken); color: var(--ink);
+  font: 600 13px "Public Sans", sans-serif; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.scenarios button:hover { border-color: var(--faint); }
+.scenarios button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.scenarios button.quiet { margin-left: auto; background: transparent; }
+
+.dials { display: flex; flex-wrap: wrap; gap: 20px 28px; padding: 0 18px 16px; }
+.dial { flex: 1 1 190px; display: flex; flex-direction: column; gap: 5px; }
+.dial label {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.dial label b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dial input[type="range"] { width: 100%; accent-color: var(--brand); height: 20px; cursor: pointer; }
+
+.tiles {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 1px; background: var(--rule-soft); border-top: 1px solid var(--rule);
+}
+.tile { background: var(--card); padding: 13px 15px; }
+.tile .k {
+  font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint);
+}
+.tile .v {
+  margin-top: 3px; font-family: "IBM Plex Mono", monospace; font-size: 22px;
+  font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+.tile .v .u { font-size: 11.5px; color: var(--faint); margin-left: 2px; }
+.v.ours { color: var(--ours); } .v.cloud { color: var(--cloud); }
+.v.refuse { color: var(--refuse); } .v.block { color: var(--brand); }
+.v.good { color: var(--ours); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px; font-weight: 500;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.closed  { background: var(--ours-soft);  color: var(--ours); }
+.pill.open    { background: var(--brand-soft); color: var(--brand); }
+.pill.probing { background: var(--warn-soft);  color: var(--warn); }
+
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: var(--rule-soft); border-top: 1px solid var(--rule); }
+.chart { background: var(--card); padding: 13px 15px 8px; }
+.chart .k { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.chart svg { display: block; width: 100%; height: 58px; }
+
+.log {
+  margin: 0; padding: 11px 18px 16px; max-height: 210px; overflow-y: auto;
+  font-family: "IBM Plex Mono", monospace; font-size: 12.5px; line-height: 1.7; list-style: none;
+  border-top: 1px solid var(--rule);
+}
+.log li { display: flex; gap: 12px; color: var(--muted); }
+.log li .t { color: var(--faint); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.log li.ours .m   { color: var(--ours); }
+.log li.cloud .m  { color: var(--cloud); }
+.log li.block .m  { color: var(--brand); }
+.log li.warn .m   { color: var(--warn); }
+
+:where(a, button, input):focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 13.5px; }
+.foot p { max-width: 68ch; }
+</style>
+
+<div class="shell">
+
+  <a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
+
+  <div class="masthead">
+    <span class="badge">Specification</span>
+    <h1>The Service Assistant</h1>
+    <p class="standfirst">
+      What the system does, who uses it, and how it is required to behave when
+      things go wrong. Section 8 is a working model of it you can run.
+    </p>
+    <dl class="docmeta">
+      <div><dt>Document</dt><dd>SRS-SA-1</dd></div>
+      <div><dt>Version</dt><dd>1.1</dd></div>
+      <div><dt>Date</dt><dd>29 August 2026</dd></div>
+      <div><dt>Status</dt><dd>For review</dd></div>
+      <div><dt>Author</dt><dd>Abad Naseer</dd></div>
+    </dl>
+  </div>
+
+  <div class="layout">
+
+    <nav class="toc" aria-label="Contents">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#s1"><span class="n">1</span> Purpose and scope</a></li>
+        <li><a href="#s2"><span class="n">2</span> The system in one picture</a></li>
+        <li><a href="#s3"><span class="n">3</span> Who uses it</a></li>
+        <li><a href="#s4"><span class="n">4</span> What it does</a></li>
+        <li><a href="#s5"><span class="n">5</span> How it must behave</a>
+          <ol>
+            <li><a href="#s51"><span class="n">5.1</span> Scalability</a></li>
+            <li><a href="#s52"><span class="n">5.2</span> Fallback</a></li>
+            <li><a href="#s53"><span class="n">5.3</span> Availability</a></li>
+            <li><a href="#s54"><span class="n">5.4</span> Security</a></li>
+            <li><a href="#s55"><span class="n">5.5</span> Observability</a></li>
+          </ol>
+        </li>
+        <li><a href="#s6"><span class="n">6</span> Assumptions and limits</a></li>
+        <li><a href="#s7"><span class="n">7</span> Out of scope</a></li>
+        <li><a href="#s8"><span class="n">8</span> Fig. 1, the live model</a></li>
+      </ol>
+    </nav>
+
+    <div class="body">
+
+      <section id="s1">
+        <h2 class="sec"><span class="n">1</span>Purpose and scope</h2>
+        <p class="lede">
+          The Service Assistant is the front door to a housing association.
+          Residents ask it about the rules, book a tradesperson, pay for the
+          work, and get a parking pass for a visitor. Providers run their own
+          listings on it. The office runs the association on it. All of it
+          happens in one conversation, and none of it requires telephoning
+          anybody.
+        </p>
+        <p>
+          This document specifies what it is required to do and how it is
+          required to behave. It is written to be read by somebody who will not
+          read the code, so it names no internal parts. Where a figure is
+          measured it says so, and where a figure is a target it says that
+          instead.
+        </p>
+        <p>
+          The five qualities in section 5 are the ones this system is judged on:
+          <strong>scalability, fallback, availability, security and
+          observability</strong>. Each one names the scenario in section 8 that
+          demonstrates it.
+        </p>
+      </section>
+
+      <section id="s2">
+        <h2 class="sec"><span class="n">2</span>The system in one picture</h2>
+        <p>
+          Four kinds of person arrive, at one front door, and what they came for
+          decides which of four lanes they take. Only the first lane involves a
+          language model.
+        </p>
+
+        <div class="figure">
+          <div class="scroller">
+            <svg class="flow" viewBox="0 0 1180 460" role="img"
+                 aria-label="Residents, visitors, providers and office staff all arrive through one conversation. A gateway establishes who they are and which community they belong to. Four lanes follow: asking about the rules, which searches that community's documents and is rephrased by our own GPU or a cloud engine; finding and booking a tradesperson and paying; issuing a parking pass; and office work. Only the first lane uses a language model.">
+              <defs>
+                <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M0 0 L10 5 L0 10 z" fill="var(--faint)"></path>
+                </marker>
+              </defs>
+
+              <rect class="fbox you" x="20" y="24" width="122" height="42" rx="7"></rect>
+              <text class="ft" x="81" y="50">Residents</text>
+              <rect class="fbox you" x="20" y="76" width="122" height="42" rx="7"></rect>
+              <text class="ft" x="81" y="102">Visitors</text>
+              <rect class="fbox you" x="20" y="128" width="122" height="42" rx="7"></rect>
+              <text class="ft" x="81" y="154">Providers</text>
+              <rect class="fbox you" x="20" y="180" width="122" height="42" rx="7"></rect>
+              <text class="ft" x="81" y="206">The office</text>
+
+              <path class="fl" d="M142 45 L176 45 L176 116"></path>
+              <path class="fl" d="M142 97 L176 97"></path>
+              <path class="fl" d="M142 149 L176 149 L176 130"></path>
+              <path class="fl" d="M142 201 L176 201 L176 130"></path>
+              <path class="fl" d="M176 123 L206 123" marker-end="url(#fa)"></path>
+
+              <rect class="fbox" x="206" y="92" width="132" height="62" rx="8"></rect>
+              <text class="ft" x="272" y="118">One conversation</text>
+              <text class="fs" x="272" y="136">or the screens</text>
+
+              <path class="fl" d="M338 123 L372 123" marker-end="url(#fa)"></path>
+
+              <rect class="fbox" x="372" y="92" width="140" height="62" rx="8"></rect>
+              <text class="ft" x="442" y="118">Gateway</text>
+              <text class="fs" x="442" y="136">who, which community</text>
+
+              <path class="fl" d="M512 123 L546 123 L546 56 L578 56" marker-end="url(#fa)"></path>
+              <path class="fl" d="M546 123 L546 176 L578 176" marker-end="url(#fa)"></path>
+              <path class="fl" d="M546 123 L546 276 L578 276" marker-end="url(#fa)"></path>
+              <path class="fl" d="M546 123 L546 376 L578 376" marker-end="url(#fa)"></path>
+
+              <rect class="fbox gate" x="578" y="24" width="572" height="88" rx="8"></rect>
+              <text class="ft" x="864" y="50">Asking about the rules</text>
+              <text class="fs" x="864" y="72">search their documents, then the gate, then rephrase it</text>
+              <text class="fs" x="864" y="92">the only lane that uses an engine: our own GPU, or the cloud</text>
+
+              <rect class="fbox" x="578" y="146" width="572" height="66" rx="8"></rect>
+              <text class="ft" x="864" y="172">Getting work done</text>
+              <text class="fs" x="864" y="192">who can do it, when they are free, booked, paid, tipped</text>
+
+              <rect class="fbox" x="578" y="246" width="572" height="66" rx="8"></rect>
+              <text class="ft" x="864" y="272">Parking</text>
+              <text class="fs" x="864" y="292">a pass with a code the gate can check on a phone</text>
+
+              <rect class="fbox" x="578" y="346" width="572" height="66" rx="8"></rect>
+              <text class="ft" x="864" y="372">The office</text>
+              <text class="fs" x="864" y="392">documents in and out, the engine switch, reporting</text>
+
+              <text class="flab" x="864" y="436">everything above is scoped to one community, before anything is searched</text>
+            </svg>
+          </div>
+          <p class="figcap">One front door, four lanes, one of which is the AI.</p>
+        </div>
+
+        <div class="callout">
+          <p>
+            <strong>Three of the four lanes are ordinary software.</strong>
+            Booking a tradesperson, issuing a parking pass and taking a payment
+            involve no model at all. That is worth knowing for two reasons: it is
+            why an engine outage cannot take the product down, and it is why the
+            parts of this system that touch somebody's money and somebody's home
+            behave the same way every time.
+          </p>
+        </div>
+
+        <div class="callout">
+          <p>
+            <strong>And in the lane that does use one, the engine is chosen
+            last.</strong> Which passage answers a question is settled before
+            that, by searching the association's own documents. The engine only
+            turns the passage it was handed into a sentence, which is why
+            changing the engine cannot change what a resident is told.
+          </p>
+        </div>
+      </section>
+
+      <section id="s3">
+        <h2 class="sec"><span class="n">3</span>Who uses it</h2>
+        <div class="scroller">
+          <table class="spec">
+            <thead><tr><th>Actor</th><th>Who they are</th><th>What they may do</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Resident</td>
+                <td>Somebody who lives in one of the associations</td>
+                <td>Ask questions, download documents, book a tradesperson, pay, request a parking pass</td>
+              </tr>
+              <tr>
+                <td>Visitor</td>
+                <td>Not signed in</td>
+                <td>Ask questions and browse services. Cannot book, pay, or hold a pass</td>
+              </tr>
+              <tr>
+                <td>Provider</td>
+                <td>A tradesperson or firm</td>
+                <td>Manage their own listing, prices, working hours, closures and diary</td>
+              </tr>
+              <tr>
+                <td>Office</td>
+                <td>Association staff, and gate staff</td>
+                <td>Add and withdraw documents, check a parking pass, read reporting, switch the answering engine</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          A provider sees only their own business. An office user is the only
+          actor who can change what the system knows, and every one of those
+          actions is recorded.
+        </p>
+      </section>
+
+      <section id="s4">
+        <h2 class="sec"><span class="n">4</span>What it does</h2>
+        <p>
+          Grouped by the part of the product they belong to. Only the second
+          group involves a language model.
+        </p>
+
+        <h3 class="sub">Everybody, whatever they came for</h3>
+        <ol class="reqs">
+          <li><span class="id">FR-1</span><span class="txt">Offer one conversation as the way in, and work out from what somebody types or says whether they want the rules, a tradesperson, a parking pass, or something else. Every screen in the product is reachable without knowing it exists.</span></li>
+          <li><span class="id">FR-2</span><span class="txt">Know which community a person belongs to, remember it, and scope everything they see to it: their documents, their rules, their parking.</span></li>
+        </ol>
+
+        <h3 class="sub">Asking about the rules</h3>
+        <ol class="reqs">
+          <li><span class="id">FR-3</span><span class="txt">Answer a resident's question from their own association's documents, in plain words.</span></li>
+          <li><span class="id">FR-4</span><span class="txt">Say plainly when the documents do not cover the question, and list what that association does hold.</span></li>
+          <li><span class="id">FR-5</span><span class="txt">Show the document every answer came from, named and ready to open or download.</span></li>
+          <li><span class="id">FR-6</span><span class="txt">Accept a spoken question and reply out loud, as an alternative to typing.</span></li>
+        </ol>
+
+        <h3 class="sub">Getting work done</h3>
+        <ol class="reqs">
+          <li><span class="id">FR-7</span><span class="txt">Take a description of a problem in the resident's own words and find tradespeople who handle it.</span></li>
+          <li><span class="id">FR-8</span><span class="txt">Show a chosen provider's real free times, from their own diary, and take a booking in one step.</span></li>
+          <li><span class="id">FR-9</span><span class="txt">Take payment by card, by PayPal, or in cash on the day, and allow a tip that belongs entirely to the provider.</span></li>
+          <li><span class="id">FR-10</span><span class="txt">Keep a record of a problem even when it does not become a booking, so the office can see what residents needed and nobody covered.</span></li>
+        </ol>
+
+        <h3 class="sub">Parking</h3>
+        <ol class="reqs">
+          <li><span class="id">FR-11</span><span class="txt">Issue a visitor parking pass carrying a code, without a telephone call to the office.</span></li>
+          <li><span class="id">FR-12</span><span class="txt">Let gate staff check that code on a phone and see at arm's length whether it is valid, and record the vehicle leaving.</span></li>
+        </ol>
+
+        <h3 class="sub">Providers running their own business</h3>
+        <ol class="reqs">
+          <li><span class="id">FR-13</span><span class="txt">Let a provider maintain their own listing, prices, working hours and closures without contacting us, and see only their own business.</span></li>
+          <li><span class="id">FR-14</span><span class="txt">Hold a new provider's application until the office approves it, so anybody may apply and only the office decides who is bookable.</span></li>
+        </ol>
+
+        <h3 class="sub">The office</h3>
+        <ol class="reqs">
+          <li><span class="id">FR-15</span><span class="txt">Add or withdraw a community document, and have it answerable within seconds, without a deployment.</span></li>
+          <li><span class="id">FR-16</span><span class="txt">Choose which engine writes the answers, and start or stop the hardware behind it.</span></li>
+          <li><span class="id">FR-17</span><span class="txt">See what the system has been doing: bookings, payments, passes issued, and which engine answered.</span></li>
+        </ol>
+      </section>
+
+      <section id="s5">
+        <h2 class="sec"><span class="n">5</span>How it must behave</h2>
+        <p class="lede">
+          The five qualities the system is judged on. Each names the scenario in
+          section 8 that shows it happening.
+        </p>
+
+        <h3 class="sub" id="s51"><span class="n">5.1</span>Scalability</h3>
+        <ol class="reqs">
+          <li><span class="id">NFR-1</span><span class="txt">Serve at least 150 residents asking questions at the same time without an answer taking longer than 4 seconds at the 95th percentile.</span></li>
+          <li><span class="id">NFR-2</span><span class="txt">Queue rather than refuse when demand exceeds capacity, and shed load in a stated, visible way rather than failing silently.</span></li>
+          <li><span class="id">NFR-3</span><span class="txt">Add a community, or a document, without redeploying and without slowing existing communities.</span></li>
+        </ol>
+        <div class="callout">
+          <p>
+            <strong>Where it stands today.</strong> The searching step is a
+            single arithmetic operation over a small index and is not the
+            constraint. The constraint is the server: production currently runs
+            one process on a machine with 1GB of memory, and it is at the top of
+            that allowance. NFR-1 is a requirement, not a description, and
+            meeting it means a larger machine or a second one.
+          </p>
+        </div>
+        <a class="shows" href="#s8">Scenario: a hundred at once</a>
+
+        <h3 class="sub" id="s52"><span class="n">5.2</span>Fallback</h3>
+        <ol class="reqs">
+          <li><span class="id">NFR-4</span><span class="txt">When the documents do not support an answer, refuse. No engine is called and no answer is composed, so there is nothing that could be wrong.</span></li>
+          <li><span class="id">NFR-5</span><span class="txt">When the chosen engine is unavailable, route to the other one automatically, without a person deciding and without the resident noticing.</span></li>
+          <li><span class="id">NFR-6</span><span class="txt">When no engine is available at all, reply with plain composed text rather than an error.</span></li>
+        </ol>
+        <p>
+          Three layers, in that order. The first is the important one:
+          <strong>a refusal is a small annoyance, and an invented rule about
+          somebody's home is not</strong>.
+        </p>
+        <p>
+          Between the two engines the behaviour is a circuit breaker: repeated
+          failures route traffic away, and recovery is tested with a single
+          request before traffic returns. It is built as a cached health reading
+          rather than as a formal breaker, but that is the shape of it.
+        </p>
+        <a class="shows" href="#s8">Scenario: the GPU dies, and both engines slow</a>
+
+        <h3 class="sub" id="s53"><span class="n">5.3</span>Availability</h3>
+        <ol class="reqs">
+          <li><span class="id">NFR-7</span><span class="txt">No single component may be able to take the service down. Losing an engine, the hardware behind it, or the network to it must cost quality, never availability.</span></li>
+          <li><span class="id">NFR-8</span><span class="txt">Switching engines, adding documents and starting or stopping hardware must all happen without an interruption in service.</span></li>
+        </ol>
+        <p>
+          The number that matters is not uptime, which is easy to claim. It is
+          <strong>requests dropped</strong>, which should be zero through every
+          scenario in section 8, including the ones that break things on
+          purpose.
+        </p>
+        <p>
+          Note what section 2 makes visible: <strong>only one of the four lanes
+          uses a language model at all</strong>. An engine failing degrades that
+          lane, and even then it falls back. Bookings, parking passes and
+          payments do not notice, because there is nothing in them that could.
+        </p>
+        <a class="shows" href="#s8">Watch: dropped, and uptime</a>
+
+        <h3 class="sub" id="s54"><span class="n">5.4</span>Security</h3>
+        <ol class="reqs">
+          <li><span class="id">NFR-9</span><span class="txt">One association's documents must never answer another association's question, whatever the question says and however well the text matches.</span></li>
+          <li><span class="id">NFR-10</span><span class="txt">Passwords are never stored, only an irreversible derivation of them at 480,000 rounds. Sessions are revocable and only their hash is kept.</span></li>
+          <li><span class="id">NFR-11</span><span class="txt">Repeated failed sign-ins are throttled per account and per address.</span></li>
+          <li><span class="id">NFR-12</span><span class="txt">A refusal must reveal nothing. Being told a document exists elsewhere is itself a disclosure.</span></li>
+        </ol>
+        <p>
+          NFR-9 is enforced before ranking rather than after it, so a document
+          belonging to another association is never a candidate in the first
+          place. It cannot be reached by phrasing a question cleverly.
+        </p>
+        <a class="shows" href="#s8">Scenario: someone probes it</a>
+
+        <h3 class="sub" id="s55"><span class="n">5.5</span>Observability</h3>
+        <ol class="reqs">
+          <li><span class="id">NFR-13</span><span class="txt">Every answer records which engine produced it, so nobody can claim work the other engine did.</span></li>
+          <li><span class="id">NFR-14</span><span class="txt">The office can see, without asking us, what the system is doing: what answered, what was refused, what was turned away, and what the hardware is costing.</span></li>
+        </ol>
+        <p>
+          The console in section 8 is this requirement drawn out. Everything on
+          it is a thing the system is required to be able to tell you about
+          itself.
+        </p>
+        <a class="shows" href="#s8">The whole of Fig. 1</a>
+      </section>
+
+      <section id="s6">
+        <h2 class="sec"><span class="n">6</span>Assumptions and limits</h2>
+        <ol class="reqs">
+          <li><span class="id">A-1</span><span class="txt">The associations supply their own documents. The quality of the answers is bounded by the quality and completeness of what is supplied, and four of the six communities currently hold very little.</span></li>
+          <li><span class="id">A-2</span><span class="txt">A scanned page is a picture. It can be stored and handed out but it cannot be answered from.</span></li>
+          <li><span class="id">A-3</span><span class="txt">Production runs a single process on a 1GB machine and is at the limit of it. See 5.1.</span></li>
+          <li><span class="id">A-4</span><span class="txt">Card and PayPal confirmation depends on the payment provider being able to reach us. Those addresses are not yet registered, so online payment cannot confirm itself in production today.</span></li>
+          <li><span class="id">A-5</span><span class="txt">Backups are taken by hand. There is no automatic schedule.</span></li>
+        </ol>
+      </section>
+
+      <section id="s7">
+        <h2 class="sec"><span class="n">7</span>Out of scope</h2>
+        <p>Deliberate exclusions, not gaps.</p>
+        <ol class="reqs">
+          <li><span class="id">X-1</span><span class="txt">Reading scanned documents. A wrong figure taken from a bad scan becomes a rule about somebody's home.</span></li>
+          <li><span class="id">X-2</span><span class="txt">Answering one association from another's rules, under any circumstances.</span></li>
+          <li><span class="id">X-3</span><span class="txt">Learning from conversations. Nothing a resident asks changes what anybody else is told.</span></li>
+          <li><span class="id">X-4</span><span class="txt">Choosing between documents that contradict each other. Both are reported, each against its source, because choosing would mean inventing a rule.</span></li>
+          <li><span class="id">X-5</span><span class="txt">Legal advice, and any question the documents do not answer.</span></li>
+        </ol>
+      </section>
+
+      <section id="s8">
+        <h2 class="sec"><span class="n">8</span>Fig. 1, the live model</h2>
+        <p>
+          A working model of section 2, running now, carrying the mix a real
+          morning carries: questions about the rules, people booking a
+          tradesperson, parking passes, payments, and the office at work.
+        </p>
+        <p>
+          Press a scenario and watch the counters. Two hold throughout, whatever
+          you break: <strong>dropped</strong> stays at zero and
+          <strong>uptime</strong> stays at 100%. And when you kill the GPU,
+          watch <strong>bookings and passes carry on climbing at full
+          speed</strong>, because nothing in those lanes was ever asking an
+          engine for anything.
+        </p>
+
+        <div class="console">
+          <header>
+            <h3>Fig. 1 &middot; the platform under load, under failure, and under attack</h3>
+            <span class="modelled" id="clock">00:00</span>
+          </header>
+
+          <div class="stage">
+            <svg viewBox="0 0 1180 440" role="img"
+                 aria-label="A live model of the platform. Requests arrive, pass a gateway, and take one of four lanes: asking about the rules, which uses an engine; getting work done; parking; and office work. Counters below show what each lane produced.">
+              <defs>
+                <marker id="ca" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M0 0 L10 5 L0 10 z" fill="var(--faint)"></path>
+                </marker>
+              </defs>
+
+              <path class="edge" d="M130 200 L160 200" marker-end="url(#ca)"></path>
+              <path class="edge" id="e-block" d="M220 230 L220 280" marker-end="url(#ca)"></path>
+
+              <path class="edge" d="M280 200 L305 200 L305 48 L330 48" marker-end="url(#ca)"></path>
+              <path class="edge" d="M305 200 L330 200" marker-end="url(#ca)"></path>
+              <path class="edge" d="M305 200 L305 288 L330 288" marker-end="url(#ca)"></path>
+              <path class="edge" d="M305 200 L305 378 L330 378" marker-end="url(#ca)"></path>
+
+              <path class="edge" d="M440 48 L465 48" marker-end="url(#ca)"></path>
+              <path class="edge" d="M585 48 L610 48" marker-end="url(#ca)"></path>
+              <path class="edge" id="e-eng" d="M720 48 L745 48" marker-end="url(#ca)"></path>
+              <path class="edge" id="e-refuse" d="M665 76 L665 118" marker-end="url(#ca)"></path>
+
+              <path class="edge" d="M470 200 L495 200" marker-end="url(#ca)"></path>
+              <path class="edge" d="M625 200 L650 200" marker-end="url(#ca)"></path>
+
+              <rect class="nbox" id="n-res" x="20" y="170" width="110" height="60" rx="8"></rect>
+              <text class="nt" x="75" y="196">Residents</text>
+              <text class="ns" x="75" y="214" id="n-res-sub">0 online</text>
+
+              <rect class="nbox" id="n-gate" x="160" y="170" width="120" height="60" rx="8"></rect>
+              <text class="nt" x="220" y="196">Gateway</text>
+              <text class="ns" x="220" y="214">who, and where</text>
+
+              <rect class="nbox" id="n-blk" x="140" y="280" width="160" height="50" rx="8"></rect>
+              <text class="nt" x="220" y="302">Turned away</text>
+              <text class="ns" x="220" y="319" id="n-blk-sub">0</text>
+
+              <text class="elab" x="332" y="20" style="text-anchor:start">ASKING ABOUT THE RULES</text>
+              <rect class="nbox" id="n-srch" x="330" y="20" width="110" height="56" rx="8"></rect>
+              <text class="nt" x="385" y="44">Search</text>
+              <text class="ns" x="385" y="62">the passage</text>
+
+              <rect class="nbox" id="n-docs" x="465" y="20" width="120" height="56" rx="8"></rect>
+              <text class="nt" x="525" y="44">Documents</text>
+              <text class="ns" x="525" y="62">208 sections</text>
+
+              <rect class="nbox" id="n-grd" x="610" y="20" width="110" height="56" rx="8"></rect>
+              <text class="nt" x="665" y="44">The gate</text>
+              <text class="ns" x="665" y="62">enough?</text>
+
+              <rect class="nbox" id="n-eng" x="745" y="20" width="150" height="56" rx="8"></rect>
+              <text class="nt" x="820" y="44" id="n-eng-t">Our own GPU</text>
+              <text class="ns" x="820" y="62" id="n-eng-sub">healthy</text>
+
+              <rect class="nbox" id="n-ref" x="590" y="118" width="150" height="50" rx="8"></rect>
+              <text class="nt" x="665" y="140">"I do not have that"</text>
+              <text class="ns" x="665" y="157" id="n-ref-sub">0</text>
+
+              <text class="elab" x="332" y="172" style="text-anchor:start">GETTING WORK DONE</text>
+              <rect class="nbox" id="n-find" x="330" y="172" width="140" height="56" rx="8"></rect>
+              <text class="nt" x="400" y="196">Who can do it</text>
+              <text class="ns" x="400" y="214">their trades</text>
+
+              <rect class="nbox" id="n-diary" x="495" y="172" width="130" height="56" rx="8"></rect>
+              <text class="nt" x="560" y="196">Their diary</text>
+              <text class="ns" x="560" y="214">real free times</text>
+
+              <rect class="nbox" id="n-book" x="650" y="172" width="150" height="56" rx="8"></rect>
+              <text class="nt" x="725" y="196">Booked and paid</text>
+              <text class="ns" x="725" y="214" id="n-book-sub">0</text>
+
+              <text class="elab" x="332" y="262" style="text-anchor:start">PARKING</text>
+              <rect class="nbox" id="n-park" x="330" y="262" width="180" height="52" rx="8"></rect>
+              <text class="nt" x="420" y="284">Pass issued</text>
+              <text class="ns" x="420" y="301" id="n-park-sub">0</text>
+
+              <text class="elab" x="332" y="352" style="text-anchor:start">THE OFFICE</text>
+              <rect class="nbox" id="n-off" x="330" y="352" width="180" height="52" rx="8"></rect>
+              <text class="nt" x="420" y="374">Office work</text>
+              <text class="ns" x="420" y="391" id="n-off-sub">0</text>
+
+              <text class="elab" x="900" y="200" style="text-anchor:start">three of the four</text>
+              <text class="elab" x="900" y="216" style="text-anchor:start">lanes never touch</text>
+              <text class="elab" x="900" y="232" style="text-anchor:start">an engine at all</text>
+
+              <g id="pips"></g>
+            </svg>
+          </div>
+
+          <div class="scenarios" role="group" aria-label="Scenarios">
+            <button type="button" data-sc="normal" aria-pressed="true">A normal morning</button>
+            <button type="button" data-sc="load" aria-pressed="false">A hundred at once</button>
+            <button type="button" data-sc="gpudown" aria-pressed="false">The GPU dies</button>
+            <button type="button" data-sc="bothslow" aria-pressed="false">Both engines slow</button>
+            <button type="button" data-sc="probe" aria-pressed="false">Someone probes it</button>
+            <button type="button" class="quiet" id="b-reset">Reset</button>
+          </div>
+
+          <div class="dials">
+            <div class="dial">
+              <label for="d-res">Residents online <b id="v-res">12</b></label>
+              <input type="range" id="d-res" min="0" max="500" step="5" value="12">
+            </div>
+            <div class="dial">
+              <label for="d-rate">Questions each, per minute <b id="v-rate">3</b></label>
+              <input type="range" id="d-rate" min="1" max="12" step="1" value="3">
+            </div>
+            <div class="dial">
+              <label for="d-cap">Server capacity <b id="v-cap">24</b></label>
+              <input type="range" id="d-cap" min="4" max="80" step="4" value="24">
+            </div>
+          </div>
+
+          <div class="tiles">
+            <div class="tile"><div class="k">Answers a second</div><div class="v" id="m-tput">0.0</div></div>
+            <div class="tile"><div class="k">Response, median</div><div class="v" id="m-p50">0<span class="u">ms</span></div></div>
+            <div class="tile"><div class="k">Response, 95th</div><div class="v" id="m-p95">0<span class="u">ms</span></div></div>
+            <div class="tile"><div class="k">In flight / queued</div><div class="v" id="m-flight">0<span class="u">/0</span></div></div>
+            <div class="tile"><div class="k">Uptime</div><div class="v good" id="m-up">100.0<span class="u">%</span></div></div>
+            <div class="tile"><div class="k">Requests dropped</div><div class="v" id="m-drop">0</div></div>
+
+            <div class="tile"><div class="k">Questions, our GPU</div><div class="v ours" id="m-ours">0</div></div>
+            <div class="tile"><div class="k">Questions, the cloud</div><div class="v cloud" id="m-cloud">0</div></div>
+            <div class="tile"><div class="k">Refused honestly</div><div class="v refuse" id="m-ref">0</div></div>
+            <div class="tile"><div class="k">Bookings taken</div><div class="v" id="m-book">0</div></div>
+            <div class="tile"><div class="k">Passes issued</div><div class="v" id="m-park">0</div></div>
+            <div class="tile"><div class="k">Payments taken</div><div class="v" id="m-pay">0</div></div>
+
+            <div class="tile"><div class="k">Turned away</div><div class="v block" id="m-blk">0</div></div>
+            <div class="tile"><div class="k">Circuit breaker</div><div class="v" style="font-size:15px;padding-top:4px"><span class="pill closed" id="m-brk">closed</span></div></div>
+            <div class="tile"><div class="k">Engine in use</div><div class="v" style="font-size:15px;padding-top:6px" id="m-eng">our GPU</div></div>
+          </div>
+
+          <div class="charts">
+            <div class="chart">
+              <div class="k">Answers a second, last 60</div>
+              <svg id="sp-tput" viewBox="0 0 300 58" preserveAspectRatio="none" aria-hidden="true"></svg>
+            </div>
+            <div class="chart">
+              <div class="k">Response at the 95th, last 60</div>
+              <svg id="sp-p95" viewBox="0 0 300 58" preserveAspectRatio="none" aria-hidden="true"></svg>
+            </div>
+          </div>
+
+          <ul class="log" id="log" aria-live="polite" aria-relevant="additions"></ul>
+        </div>
+
+        <p class="figcap" style="margin-top:12px">
+          A model of the design, not a measurement of the server. Engine speeds
+          are taken from measured figures; the load behaviour is modelled.
+        </p>
+      </section>
+
+      <div class="foot">
+        <p>
+          Measured figures in this document come from the running system: the
+          document index holds 208 sections across 6 communities, the cloud
+          engine answers in about 690ms, and our own GPU produces 45 to 55 words
+          a second. Figures describing load are modelled, and section 5.1 says
+          where the current server stands against them.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ── the model ───────────────────────────────────────────────────────────
+     Station costs are small and real: the search is arithmetic over a small
+     index, not a network call. The engines are where the time goes, and those
+     two figures are measured rather than invented.                          */
+  const STATION_MS = { gateway: 5, understand: 15, search: 40, documents: 10, gate: 1 };
+  const OURS_MS   = [820, 1500];
+  const CLOUD_MS  = [640, 1250];
+  const SLOW_MS   = [5200, 8000];
+  const ENGINE_TIMEOUT = 3000;
+  const PLAIN_MS  = [4, 9];
+
+  /* What a morning is actually made of. Only the first of these involves an
+     engine; the other four are ordinary software, which is the point the whole
+     page is making and the reason an engine outage cannot take the product
+     down. */
+  const LANES = [
+    { key: "rules",   share: 0.55 },
+    { key: "booking", share: 0.20, ms: [200, 320] },
+    { key: "parking", share: 0.12, ms: [90, 160] },
+    { key: "payment", share: 0.08, ms: [700, 1200] },  // a round trip to Stripe
+    { key: "office",  share: 0.05, ms: [50, 120] },
+  ];
+
+  function pickLane() {
+    let r = Math.random();
+    for (const l of LANES) { r -= l.share; if (r <= 0) return l; }
+    return LANES[0];
+  }
+
+  const MISS_RATE  = 0.18;   // questions the documents cannot answer
+  const QUEUE_MAX  = 140;    // beyond this, load is shed rather than hidden
+  const BREAK_AFTER = 3;     // consecutive failures before the breaker opens
+  const PROBE_AFTER = 6000;  // how long it stays open before testing again
+
+  const rand  = (lo, hi) => lo + Math.random() * (hi - lo);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  const S = {
+    t: 0,
+    residents: 12,
+    rate: 3,
+    capacity: 24,
+    gpuHealthy: true,
+    cloudSlow: false,
+    probing: false,          // the security scenario, not the breaker state
+    breaker: "closed",       // closed | open | probing
+    fails: 0,
+    openedAt: 0,
+    ramp: null,
+    inFlight: [],
+    queue: [],
+    done: [],                // recent durations, for the percentiles
+    counts: { ours: 0, cloud: 0, plain: 0, refused: 0, blocked: 0, dropped: 0,
+              answered: 0, bookings: 0, passes: 0, payments: 0, office: 0 },
+    perSec: [],
+    p95s: [],
+    thisSec: 0,
+    lastSec: 0,
+    nextArrival: 0,
+    pips: [],
+    scenario: "normal",
+  };
+
+  const el = (id) => document.getElementById(id);
+  const logEl = el("log");
+  const pipLayer = el("pips");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const stamp = () => {
+    const m = Math.floor(S.t / 60), s = Math.floor(S.t % 60);
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  };
+
+  function say(msg, tone) {
+    const li = document.createElement("li");
+    if (tone) li.className = tone;
+    const t = document.createElement("span"); t.className = "t"; t.textContent = stamp();
+    const m = document.createElement("span"); m.className = "m"; m.textContent = msg;
+    li.append(t, m);
+    logEl.prepend(li);
+    while (logEl.children.length > 60) logEl.lastChild.remove();
+  }
+
+  /* ── routes through the diagram ─────────────────────────────────────── */
+  const IN = [[75, 200], [220, 200]];                    // arrive, then the gateway
+  const TO_RULES = [[305, 200], [305, 48], [385, 48]];   // up into the first lane
+  const ROUTES = {
+    blocked: [...IN, [220, 305]],
+    refused: [...IN, ...TO_RULES, [525, 48], [665, 48], [665, 143]],
+    ours:    [...IN, ...TO_RULES, [525, 48], [665, 48], [820, 48]],
+    cloud:   [...IN, ...TO_RULES, [525, 48], [665, 48], [820, 48]],
+    plain:   [...IN, ...TO_RULES, [525, 48], [665, 48], [820, 48]],
+    booking: [...IN, [305, 200], [400, 200], [560, 200], [725, 200]],
+    payment: [...IN, [305, 200], [400, 200], [560, 200], [725, 200]],
+    parking: [...IN, [305, 200], [305, 288], [420, 288]],
+    office:  [...IN, [305, 200], [305, 378], [420, 378]],
+  };
+  const BOXES = [
+    [20, 170, 130, 230], [160, 170, 280, 230], [140, 280, 300, 330],
+    [330, 20, 440, 76], [465, 20, 585, 76], [610, 20, 720, 76], [745, 20, 895, 76],
+    [590, 118, 740, 168],
+    [330, 172, 470, 228], [495, 172, 625, 228], [650, 172, 800, 228],
+    [330, 262, 510, 314], [330, 352, 510, 404],
+  ];
+  const inABox = (x, y) => BOXES.some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
+
+  /* ── the breaker ─────────────────────────────────────────────────────── */
+  function engineFor() {
+    if (S.breaker === "open") return "cloud";
+    if (S.breaker === "probing") {
+      // Taking the probe reopens the breaker and restarts the cooldown, so a
+      // failed probe waits the full interval before the next one rather than
+      // hammering an engine that is plainly down.
+      S.breaker = "open";
+      S.openedAt = S.t;
+      return "ours-probe";
+    }
+    return "ours";
+  }
+
+  function engineFailed() {
+    S.fails += 1;
+    if (S.breaker !== "open" && S.fails >= BREAK_AFTER) {
+      S.breaker = "open";
+      S.openedAt = S.t;
+      say("our GPU failed repeatedly, breaker open, everything to the cloud", "warn");
+    }
+  }
+
+  function engineRecovered() {
+    if (S.breaker !== "closed") {
+      S.breaker = "closed";
+      say("our GPU answered a test request, breaker closed", "ours");
+    }
+    S.fails = 0;
+  }
+
+  function stepBreaker() {
+    if (S.breaker === "open" && S.t - S.openedAt >= PROBE_AFTER / 1000) {
+      S.breaker = "probing";
+      say("breaker probing, sending one request to our GPU", "warn");
+    }
+  }
+
+  /* ── a request ───────────────────────────────────────────────────────── */
+  function arrive() {
+    // The security scenario mixes in requests that have no business being served.
+    const hostile = S.probing && Math.random() < 0.45;
+    if (hostile) {
+      S.counts.blocked += 1;
+      fire("blocked");
+      const why = ["a question about another community's rules",
+                   "an expired session",
+                   "a sixth failed sign-in from one address"][Math.floor(Math.random() * 3)];
+      say("turned away at the gateway: " + why, "block");
+      return;
+    }
+
+    const req = { lane: pickLane(), outcome: null, cost: 0, started: S.t };
+    if (S.queue.length >= QUEUE_MAX) {
+      S.counts.dropped += 1;
+      say("queue full, request shed rather than left hanging", "warn");
+      return;
+    }
+    S.queue.push(req);
+  }
+
+  function start(req) {
+    const entry = STATION_MS.gateway + STATION_MS.understand;
+
+    // The other four lanes. No engine, no gate, no chance of a refusal: this
+    // is ordinary software doing an ordinary thing, and it keeps working
+    // whatever the engines are doing.
+    if (req.lane.key !== "rules") {
+      req.outcome = req.lane.key;
+      req.cost = entry + rand(...req.lane.ms);
+      if (req.lane.key === "booking") S.counts.bookings += 1;
+      else if (req.lane.key === "parking") S.counts.passes += 1;
+      else if (req.lane.key === "payment") S.counts.payments += 1;
+      else S.counts.office += 1;
+      return req;
+    }
+
+    let cost = entry + STATION_MS.search + STATION_MS.documents + STATION_MS.gate;
+
+    if (Math.random() < MISS_RATE) {
+      // The honesty gate. No engine is involved at all, which is why it is fast.
+      req.outcome = "refused";
+      req.cost = cost;
+      S.counts.refused += 1;
+      return req;
+    }
+
+    const choice = engineFor();
+    const wantOurs = choice === "ours" || choice === "ours-probe";
+
+    if (wantOurs && S.gpuHealthy) {
+      req.outcome = "ours";
+      req.cost = cost + rand(...OURS_MS);
+      S.counts.ours += 1;
+      if (choice === "ours-probe") engineRecovered();
+      return req;
+    }
+
+    if (wantOurs && !S.gpuHealthy) {
+      engineFailed();
+      // It still answers. The cloud picks the request up in the same breath.
+      cost += 120;
+    }
+
+    const cloud = S.cloudSlow ? rand(...SLOW_MS) : rand(...CLOUD_MS);
+    if (cloud > ENGINE_TIMEOUT) {
+      // Both engines unusable. Plain composed text rather than an error.
+      req.outcome = "plain";
+      req.cost = cost + ENGINE_TIMEOUT + rand(...PLAIN_MS);
+      S.counts.plain += 1;
+      return req;
+    }
+
+    req.outcome = "cloud";
+    req.cost = cost + cloud;
+    S.counts.cloud += 1;
+    return req;
+  }
+
+  function finish(req) {
+    S.counts.answered += 1;
+    S.thisSec += 1;
+    S.done.push(req.total);
+    if (S.done.length > 120) S.done.shift();
+    fire(req.outcome);
+  }
+
+  /* ── pips ────────────────────────────────────────────────────────────── */
+  //: Colour says what happened, not which lane it took. Green is our own
+  //: hardware, blue is anything the cloud or ordinary software handled, grey
+  //: is an honest refusal, rust is something turned away.
+  const PIP_CLASS = {
+    blocked: "p-block", refused: "p-refuse", plain: "p-refuse",
+    ours: "p-ours", cloud: "p-cloud",
+    booking: "p-cloud", payment: "p-cloud", parking: "p-cloud", office: "p-cloud",
+  };
+
+  function fire(outcome) {
+    if (reduced || S.pips.length > 46) return;
+    const path = ROUTES[outcome];
+    if (!path) return;
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("r", "4.5");
+    c.setAttribute("class", PIP_CLASS[outcome] || "p-cloud");
+    pipLayer.appendChild(c);
+    S.pips.push({ node: c, path, at: 0, outcome });
+  }
+
+  function movePips(dt) {
+    for (let i = S.pips.length - 1; i >= 0; i--) {
+      const p = S.pips[i];
+      p.at += dt * 0.5;
+      if (p.at >= 1) { p.node.remove(); S.pips.splice(i, 1); continue; }
+      const [x, y] = along(p.path, p.at);
+      p.node.setAttribute("cx", x);
+      p.node.setAttribute("cy", y);
+      p.node.setAttribute("opacity", inABox(x, y) ? "0" : "1");
+    }
+  }
+
+  function along(path, t) {
+    const segs = [];
+    let total = 0;
+    for (let i = 1; i < path.length; i++) {
+      const d = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+      segs.push(d); total += d;
+    }
+    let want = t * total;
+    for (let i = 0; i < segs.length; i++) {
+      if (want <= segs[i] || i === segs.length - 1) {
+        const f = segs[i] === 0 ? 0 : clamp(want / segs[i], 0, 1);
+        return [path[i][0] + (path[i + 1][0] - path[i][0]) * f,
+                path[i][1] + (path[i + 1][1] - path[i][1]) * f];
+      }
+      want -= segs[i];
+    }
+    return path[path.length - 1];
+  }
+
+  /* ── percentiles ─────────────────────────────────────────────────────── */
+  function pct(p) {
+    if (!S.done.length) return 0;
+    const sorted = [...S.done].sort((a, b) => a - b);
+    return sorted[clamp(Math.floor(sorted.length * p), 0, sorted.length - 1)];
+  }
+
+  /* ── sparklines ──────────────────────────────────────────────────────── */
+  function spark(svg, data, colour, hi) {
+    if (!data.length) { svg.innerHTML = ""; return; }
+    const top = Math.max(hi, ...data) || 1;
+    const step = 300 / Math.max(data.length - 1, 1);
+    const pts = data.map((v, i) => [i * step, 54 - (v / top) * 48]);
+    const line = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const area = `0,54 ${line} 300,54`;
+    const last = pts[pts.length - 1];
+    svg.innerHTML =
+      `<polyline points="${area}" fill="${colour}" opacity=".13" stroke="none"></polyline>` +
+      `<line x1="0" y1="54" x2="300" y2="54" stroke="var(--rule)" stroke-width="1"></line>` +
+      `<polyline points="${line}" fill="none" stroke="${colour}" stroke-width="1.8"></polyline>` +
+      `<circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.6" fill="${colour}"></circle>`;
+  }
+
+  /* ── drawing ─────────────────────────────────────────────────────────── */
+  function paint() {
+    el("clock").textContent = stamp();
+
+    const c = S.counts;
+    const total = c.answered + c.dropped;
+    const window10 = S.perSec.slice(-10);
+    el("m-tput").textContent = window10.length
+      ? (window10.reduce((a, b) => a + b, 0) / window10.length).toFixed(1)
+      : "0.0";
+    el("m-p50").innerHTML = Math.round(pct(0.5)) + '<span class="u">ms</span>';
+    el("m-p95").innerHTML = Math.round(pct(0.95)) + '<span class="u">ms</span>';
+    el("m-flight").innerHTML = S.inFlight.length + '<span class="u">/' + S.queue.length + '</span>';
+    el("m-up").innerHTML = (total ? (c.answered / total) * 100 : 100).toFixed(1) + '<span class="u">%</span>';
+
+    const drop = el("m-drop");
+    drop.textContent = c.dropped;
+    drop.className = "v" + (c.dropped ? " block" : "");
+
+    el("m-ours").textContent = c.ours;
+    el("m-cloud").innerHTML = c.cloud
+      + (c.plain ? ' <span class="u">+' + c.plain + " plain</span>" : "");
+    el("m-ref").textContent = c.refused;
+    el("m-book").textContent = c.bookings;
+    el("m-park").textContent = c.passes;
+    el("m-pay").textContent = c.payments;
+    el("m-blk").textContent = c.blocked;
+
+    const brk = el("m-brk");
+    brk.className = "pill " + S.breaker;
+    brk.textContent = S.breaker;
+
+    el("m-eng").textContent =
+      S.breaker === "open" ? "the cloud" :
+      S.gpuHealthy ? "our GPU" : "the cloud";
+
+    el("n-res-sub").textContent = S.residents + " online";
+    el("n-blk-sub").textContent = c.blocked;
+    el("n-ref-sub").textContent = c.refused;
+    el("n-book-sub").textContent = c.bookings + " booked";
+    el("n-park-sub").textContent = c.passes + " issued";
+    el("n-off-sub").textContent = c.office;
+    el("n-eng-t").textContent = S.breaker === "open" ? "The cloud engine" : "Our own GPU";
+    el("n-eng-sub").textContent =
+      !S.gpuHealthy && S.cloudSlow ? "both unavailable"
+      : S.breaker === "open" ? "our GPU is out"
+      : S.breaker === "probing" ? "testing our GPU"
+      : S.gpuHealthy ? "healthy" : "failing";
+
+    const live = new Set(S.pips.map((p) => p.outcome));
+    const inRules = live.has("ours") || live.has("cloud")
+                 || live.has("plain") || live.has("refused");
+
+    lit("n-res", live.size ? "hot" : "");
+    lit("n-gate", live.size ? "hot" : "");
+    lit("n-srch", inRules ? "hot" : "");
+    lit("n-docs", inRules ? "hot" : "");
+    lit("n-grd", live.has("refused") ? "stop" : inRules ? "hot" : "");
+    lit("n-eng", !S.gpuHealthy && S.cloudSlow ? "dead"
+               : S.breaker === "open" ? "cloud"
+               : S.gpuHealthy ? "ours" : "cloud");
+    lit("n-ref", live.has("refused") ? "stop" : "");
+    lit("n-blk", live.has("blocked") ? "stop" : "");
+
+    // The three lanes that carry on regardless. Watching these stay lit while
+    // the engine box is dashed red is the whole availability argument.
+    const working = live.has("booking") || live.has("payment");
+    lit("n-find", working ? "hot" : "");
+    lit("n-diary", working ? "hot" : "");
+    lit("n-book", working ? "hot" : "");
+    lit("n-park", live.has("parking") ? "hot" : "");
+    lit("n-off", live.has("office") ? "hot" : "");
+
+  }
+
+  function drawSparks() {
+    const css = getComputedStyle(document.documentElement);
+    spark(el("sp-tput"), S.perSec.slice(-60), css.getPropertyValue("--ours").trim(), 2);
+    spark(el("sp-p95"), S.p95s.slice(-60), css.getPropertyValue("--cloud").trim(), 2000);
+  }
+
+  const lit = (id, cls) => el(id).setAttribute("class", "nbox" + (cls ? " " + cls : ""));
+
+  /* ── the clock ───────────────────────────────────────────────────────────
+     The model runs on an interval and the animation runs on frames, and they
+     are deliberately separate. Browsers throttle requestAnimationFrame hard
+     for anything they consider offscreen, including an embedded viewer, and a
+     model driven by frames then runs in slow motion while every number on the
+     panel quietly lies. An interval keeps ticking.
+
+     The step is taken from the real clock rather than assumed, and capped at
+     two seconds so a tab that was genuinely asleep resumes rather than
+     simulating the whole lunch break in one go.                             */
+  function step(dt) {
+    S.t += dt;
+
+    if (S.ramp) {
+      S.residents = Math.round(clamp(S.ramp.from + (S.ramp.to - S.ramp.from) * ((S.t - S.ramp.at) / S.ramp.over), 0, 500));
+      el("d-res").value = S.residents;
+      el("v-res").textContent = S.residents;
+      if (S.t - S.ramp.at >= S.ramp.over) S.ramp = null;
+    }
+
+    stepBreaker();
+
+    // Arrivals, exponentially spaced so they clump the way real ones do.
+    const lambda = (S.residents * S.rate) / 60;
+    if (lambda > 0) {
+      while (S.t >= S.nextArrival) {
+        arrive();
+        S.nextArrival = S.t + (-Math.log(1 - Math.random()) / lambda);
+      }
+    } else {
+      S.nextArrival = S.t + 0.5;
+    }
+
+    // Admit from the queue up to capacity.
+    while (S.inFlight.length < S.capacity && S.queue.length) {
+      const req = start(S.queue.shift());
+      req.left = req.cost / 1000;
+      req.total = (S.t - req.started) * 1000 + req.cost;
+      S.inFlight.push(req);
+    }
+
+    for (let i = S.inFlight.length - 1; i >= 0; i--) {
+      S.inFlight[i].left -= dt;
+      if (S.inFlight[i].left <= 0) { finish(S.inFlight[i]); S.inFlight.splice(i, 1); }
+    }
+
+    if (Math.floor(S.t) !== S.lastSec) {
+      S.lastSec = Math.floor(S.t);
+      S.perSec.push(S.thisSec);
+      S.p95s.push(pct(0.95));
+      if (S.perSec.length > 120) S.perSec.shift();
+      if (S.p95s.length > 120) S.p95s.shift();
+      S.thisSec = 0;
+      drawSparks();
+    }
+
+    paint();
+  }
+
+  let lastTick = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    const dt = Math.min((now - lastTick) / 1000, 2);
+    lastTick = now;
+    if (dt > 0) step(dt);
+  }, 100);
+
+  let lastFrame = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - lastFrame) / 1000, 0.5);
+    lastFrame = now;
+    if (!reduced) movePips(dt);
+    requestAnimationFrame(frame);
+  }
+
+  /* ── scenarios ───────────────────────────────────────────────────────── */
+  const SCENARIOS = {
+    normal() {
+      Object.assign(S, { residents: 12, rate: 3, capacity: 24, gpuHealthy: true,
+                         cloudSlow: false, probing: false, breaker: "closed", fails: 0, ramp: null });
+      say("a normal morning: twelve residents, everything healthy", "ours");
+    },
+    load() {
+      Object.assign(S, { rate: 4, capacity: 24, gpuHealthy: true, cloudSlow: false, probing: false });
+      S.ramp = { from: S.residents, to: 150, over: 8, at: S.t };
+      say("a hundred and fifty residents arriving over the next few seconds", "warn");
+    },
+    gpudown() {
+      Object.assign(S, { gpuHealthy: false, cloudSlow: false, probing: false });
+      say("our GPU has stopped answering", "warn");
+    },
+    bothslow() {
+      Object.assign(S, { gpuHealthy: false, cloudSlow: true, probing: false });
+      say("both engines unavailable, replies composed without one", "warn");
+    },
+    probe() {
+      Object.assign(S, { probing: true, gpuHealthy: true, cloudSlow: false });
+      say("something is probing the gateway", "block");
+    },
+  };
+
+  document.querySelectorAll("[data-sc]").forEach((b) => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll("[data-sc]").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+      S.scenario = b.dataset.sc;
+      SCENARIOS[b.dataset.sc]();
+      sync();
+    });
+  });
+
+  el("b-reset").addEventListener("click", () => {
+    S.pips.forEach((p) => p.node.remove());
+    Object.assign(S, {
+      t: 0, gpuHealthy: true, cloudSlow: false, probing: false, breaker: "closed",
+      fails: 0, ramp: null, inFlight: [], queue: [], done: [], perSec: [], p95s: [],
+      counts: { ours: 0, cloud: 0, plain: 0, refused: 0, blocked: 0, dropped: 0,
+                answered: 0, bookings: 0, passes: 0, payments: 0, office: 0 },
+      thisSec: 0, lastSec: 0, nextArrival: 0, pips: [],
+    });
+    SCENARIOS.normal();
+    document.querySelectorAll("[data-sc]").forEach((o) =>
+      o.setAttribute("aria-pressed", String(o.dataset.sc === "normal")));
+    logEl.replaceChildren();
+    lastTick = performance.now();
+    sync();
+    say("reset", null);
+  });
+
+  function sync() {
+    el("d-res").value = S.residents;  el("v-res").textContent = S.residents;
+    el("d-rate").value = S.rate;      el("v-rate").textContent = S.rate;
+    el("d-cap").value = S.capacity;   el("v-cap").textContent = S.capacity;
+  }
+
+  el("d-res").addEventListener("input", (e) => {
+    S.residents = Number(e.target.value); S.ramp = null; el("v-res").textContent = S.residents;
+  });
+  el("d-rate").addEventListener("input", (e) => {
+    S.rate = Number(e.target.value); el("v-rate").textContent = S.rate;
+  });
+  el("d-cap").addEventListener("input", (e) => {
+    S.capacity = Number(e.target.value); el("v-cap").textContent = S.capacity;
+  });
+
+  sync();
+  say("ready, answering from our own GPU", "ours");
+  requestAnimationFrame(frame);
+})();
+</script>
