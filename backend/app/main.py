@@ -17,8 +17,8 @@ from app.models import (  # noqa: F401 - imported so create_all registers every 
     Account, Session, ServiceRequest, ParkingPass,
 )
 from app.api import (
-    admin, auth, booking, cart, chat, docs, documents, jobs, media, parking,
-    payments, providers, requests as service_requests, services, voice,
+    admin, ai_admin, auth, booking, cart, chat, docs, documents, jobs, media,
+    parking, payments, providers, requests as service_requests, services, voice,
 )
 
 
@@ -121,6 +121,7 @@ app.add_middleware(
 )
 
 app.include_router(admin.router,    prefix="/api/v1")
+app.include_router(ai_admin.router, prefix="/api/v1")
 app.include_router(chat.router,     prefix="/api/v1")
 app.include_router(jobs.router,     prefix="/api/v1")
 app.include_router(payments.router, prefix="/api/v1")

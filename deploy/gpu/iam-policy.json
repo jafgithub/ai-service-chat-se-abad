@@ -1,0 +1,36 @@
+{
+  "_comment": [
+    "For the IAM USER the service assistant signs with. Not a role: this box is",
+    "Lightsail, which carries an AWS managed role and cannot be given a custom",
+    "instance profile, so there is nothing to attach a role to.",
+    "",
+    "Start and stop are pinned to one instance ARN, so this key cannot touch",
+    "anything else in the account even if it leaks. The describe actions cannot",
+    "be narrowed the same way: AWS does not support resource level permissions",
+    "on them. They are read only, so what a leak buys is the ability to list",
+    "instances, which is an acceptable trade for what this key is for.",
+    "",
+    "Replace ACCOUNT_ID and GPU_INSTANCE_ID before using it."
+  ],
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StartAndStopTheOneGpu",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:StartInstances",
+        "ec2:StopInstances"
+      ],
+      "Resource": "arn:aws:ec2:us-west-2:ACCOUNT_ID:instance/GPU_INSTANCE_ID"
+    },
+    {
+      "Sid": "ReadWhetherItIsRunningAndWhereItIs",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

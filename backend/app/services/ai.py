@@ -40,9 +40,13 @@ Reply in ONE short sentence, plain text only (no markdown).
 
 def _complete(system: str, user: str, max_tokens: int = 300) -> Optional[str]:
     # Gemini path (local demo). Returns None on failure → deterministic fallback.
+    # Through llm rather than straight to Gemini, so the admin panel's engine
+    # switch reaches this as well as the document answers. llm falls back to
+    # Gemini by itself when the GPU is not there, so the meaning of this branch
+    # has not changed.
     if settings.LLM_PROVIDER == "gemini":
-        from app.services import gemini_service
-        return gemini_service.generate(system, user, max_tokens=max_tokens)
+        from app.services import llm
+        return llm.generate(system, user, max_tokens=max_tokens)
 
     if client is None:
         return None

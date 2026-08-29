@@ -51,6 +51,33 @@ class Settings(BaseSettings):
     # transcription is deliberately left on GEMINI_MODEL either way.
     GEMINI_TEXT_MODEL: str = "gemini-flash-lite-latest"
 
+    # ── our own GPU ──────────────────────────────────────────────────────────
+    # Which engine answers is NOT set here: it is switched from the admin panel
+    # and lives in app/data/ai_runtime.json, because this object is built once
+    # at import and changing a value here would need a restart. See
+    # services/ai_runtime.py. Everything below is the machine, not the choice.
+    #
+    # All of it defaults to off, so this can be deployed long before the GPU
+    # exists without changing how anything behaves.
+    #
+    # OLLAMA_URL is a manual override for pointing at a box by hand. Leave it
+    # empty in production: the address changes every time the instance is
+    # stopped and started, so it is read from the AWS API instead.
+    OLLAMA_URL: str = ""
+    OLLAMA_MODEL: str = "llama3.1:8b"
+    OLLAMA_TIMEOUT_SECONDS: int = 45
+    GPU_INSTANCE_ID: str = ""
+    #: What the GPU's own shutdown timer is set to. Held here only so the admin
+    #: panel can say when the machine will switch itself off; nothing in the
+    #: application enforces it.
+    GPU_IDLE_MINUTES: int = 20
+    AWS_REGION: str = "us-west-2"
+    # A dedicated IAM user, not a role: this box is Lightsail and cannot be
+    # given a custom instance profile. The policy allows start and stop on one
+    # instance ARN and nothing else.
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+
     # Do not ask a model to reword a reply the code has already composed.
     #
     # A search reply is a numbered product list built in services/response.py,

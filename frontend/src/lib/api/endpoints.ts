@@ -332,3 +332,55 @@ export const parkingApi = {
   all: (headers: Record<string, string>, signal?: AbortSignal) =>
     apiClient.get<ParkingPassHolder[]>("/api/v1/parking/all", signal, headers),
 };
+
+// ── which engine answers, and the GPU behind it ──────────────────────────────
+
+/** What actually answered the last question, which is not the same fact as
+ *  which engine is switched on. */
+export interface AiServing {
+  /** "gemini", "gpu", or "" before anything has been asked. */
+  served_by: string;
+  at: number;
+  /** True when the switch says GPU and Gemini answered instead. */
+  fell_back: boolean;
+  reason: string;
+}
+
+export interface AiGpu {
+  configured: boolean;
+  /** AWS's own word: pending, running, stopping, stopped, plus our
+   *  "not-configured" and "unknown". */
+  state: string;
+  ip?: string | null;
+  since?: string | null;
+  ready: boolean;
+  reason: string;
+  error: string;
+  endpoint: string;
+}
+
+export interface AiStatus {
+  /** "gemini" or "gpu". What is switched on, not what answered. */
+  provider: string;
+  serving: AiServing;
+  gpu: AiGpu;
+  model: string;
+  idle_minutes: number;
+  region: string;
+}
+
+export const aiRuntimeApi = {
+  status: (headers: Record<string, string>, signal?: AbortSignal) =>
+    apiClient.get<AiStatus>("/api/v1/admin/ai/status", signal, headers),
+
+  /* POST, not PUT: apiClient.put takes no headers argument and so cannot carry
+     the admin token. */
+  setProvider: (provider: string, headers: Record<string, string>, signal?: AbortSignal) =>
+    apiClient.post<AiStatus>("/api/v1/admin/ai/provider", { provider }, signal, headers),
+
+  start: (headers: Record<string, string>, signal?: AbortSignal) =>
+    apiClient.post<AiStatus>("/api/v1/admin/ai/gpu/start", {}, signal, headers),
+
+  stop: (headers: Record<string, string>, signal?: AbortSignal) =>
+    apiClient.post<AiStatus>("/api/v1/admin/ai/gpu/stop", {}, signal, headers),
+};

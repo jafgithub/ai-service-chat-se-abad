@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "The execution role for lambda_auto_stop.py.",
+    "",
+    "Note the difference from iam-policy.json: StopInstances here IS scoped, by",
+    "tag rather than by ARN, so the Lambda physically cannot stop anything that",
+    "is not tagged AutoStop=true. It has no StartInstances at all, because a",
+    "backstop that could start machines is a backstop that could cost money."
+  ],
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "FindTheTaggedInstances",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "cloudwatch:GetMetricStatistics"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "StopOnlyWhatIsTaggedForIt",
+      "Effect": "Allow",
+      "Action": "ec2:StopInstances",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/AutoStop": "true"
+        }
+      }
+    },
+    {
+      "Sid": "WriteItsOwnLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
+    }
+  ]
+}

@@ -22,7 +22,7 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.services import doc_library, docs_index, gemini_service
+from app.services import doc_library, docs_index, llm
 
 logger = logging.getLogger("docs")
 
@@ -350,7 +350,7 @@ def answer_from_documents(question: str,
     if not hits:
         return None
 
-    reply = gemini_service.generate(
+    reply = llm.generate(
         SYSTEM,
         f"{_context(hits)}\n\n{_asked(question)}",
         max_tokens=MAX_ANSWER_TOKENS,
@@ -431,7 +431,7 @@ def ask(payload: AskIn) -> AskOut:
         return AskOut(answer=not_in_documents(question, payload.community),
                       grounded=False, kind="no_answer")
 
-    reply = gemini_service.generate(
+    reply = llm.generate(
         SYSTEM,
         f"{_context(hits)}\n\n{_asked(question)}",
         max_tokens=MAX_ANSWER_TOKENS,

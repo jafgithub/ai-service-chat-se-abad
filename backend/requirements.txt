@@ -15,6 +15,11 @@ pydantic[email]
 openai==1.57.0
 httpx>=0.27,<0.29
 
+# Starting and stopping the GPU instance from the admin panel. Only ever
+# imported inside the functions that need it, so a deployment with no GPU set
+# up never loads it.
+boto3==1.35.76
+
 # Payments. Stripe's SDK is here mainly for Webhook.construct_event, which does
 # the signature verification; PayPal is called over httpx and needs no SDK.
 stripe==11.4.0

@@ -1,0 +1,12 @@
+[Unit]
+Description=Check every five minutes whether this GPU is still needed
+
+[Timer]
+# Five minutes after boot, then every five. Frequent enough that the machine is
+# never idle for much longer than its timeout, cheap enough to be free.
+OnBootSec=5min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

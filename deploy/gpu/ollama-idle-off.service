@@ -1,0 +1,8 @@
+[Unit]
+Description=Stop this GPU when Ollama has been idle
+After=ollama.service
+
+[Service]
+Type=oneshot
+Environment=IDLE_MINUTES=20
+ExecStart=/usr/local/bin/ollama-idle-off.sh

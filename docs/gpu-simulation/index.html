@@ -1,0 +1,1009 @@
+<title>The GPU Switch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+/* ── tokens ───────────────────────────────────────────────────────────────
+   Dark first: this is a machine running in a rack, and the panel should read
+   like one. The bare :root therefore holds the dark set, and light is applied
+   by the two guarded blocks below, which is the same three-state pattern the
+   other way round.
+
+   The two accents mean something rather than decorate. Amber is our own metal:
+   hot, ours, costing money by the second. Teal is Gemini: remote, cool, and
+   somebody else's problem.                                                   */
+:root {
+  --ground:      #0c1418;
+  --surface:     #121d22;
+  --raised:      #18272d;
+  --line:        #22363e;
+  --line-soft:   #1a2b32;
+
+  --ink:         #e6f0f2;
+  --ink-muted:   #93a9b0;
+  --ink-faint:   #647a82;
+
+  --ours:        #f2a03d;
+  --ours-soft:   #3a2a14;
+  --gemini:      #45c2cf;
+  --gemini-soft: #10333a;
+  --refused:     #7d8f96;
+  --refused-soft:#1b262b;
+  --danger:      #e8635c;
+  --danger-soft: #35191a;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.28);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ground:      #eef2f2;
+    --surface:     #ffffff;
+    --raised:      #f5f8f8;
+    --line:        #d3dfe1;
+    --line-soft:   #e4ecec;
+
+    --ink:         #0e1a1e;
+    --ink-muted:   #4e6670;
+    --ink-faint:   #74898f;
+
+    --ours:        #a75f06;
+    --ours-soft:   #fdf1e0;
+    --gemini:      #0b6f7c;
+    --gemini-soft: #e0f2f4;
+    --refused:     #5f757d;
+    --refused-soft:#eceff0;
+    --danger:      #b3322c;
+    --danger-soft: #fbeceb;
+
+    --shadow: 0 1px 2px rgba(16,40,48,.06), 0 8px 24px rgba(16,40,48,.07);
+  }
+}
+
+:root[data-theme="light"] {
+  --ground:      #eef2f2;
+  --surface:     #ffffff;
+  --raised:      #f5f8f8;
+  --line:        #d3dfe1;
+  --line-soft:   #e4ecec;
+
+  --ink:         #0e1a1e;
+  --ink-muted:   #4e6670;
+  --ink-faint:   #74898f;
+
+  --ours:        #a75f06;
+  --ours-soft:   #fdf1e0;
+  --gemini:      #0b6f7c;
+  --gemini-soft: #e0f2f4;
+  --refused:     #5f757d;
+  --refused-soft:#eceff0;
+  --danger:      #b3322c;
+  --danger-soft: #fbeceb;
+
+  --shadow: 0 1px 2px rgba(16,40,48,.06), 0 8px 24px rgba(16,40,48,.07);
+}
+
+/* ── page ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 32px) 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.mono { font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+h1 {
+  margin: 6px 0 0;
+  font-size: clamp(28px, 4.4vw, 42px);
+  font-weight: 600;
+  letter-spacing: -.02em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.standfirst {
+  margin: 12px 0 0;
+  max-width: 62ch;
+  color: var(--ink-muted);
+  font-size: clamp(15.5px, 1.5vw, 17px);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.card > header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 16px;
+}
+
+.card > header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+.caption {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* ── the signal path ──────────────────────────────────────────────────── */
+.stage { padding: 6px 10px 2px; overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; min-width: 780px; }
+
+.node-box {
+  fill: var(--raised);
+  stroke: var(--line);
+  stroke-width: 1.5;
+  transition: fill .18s ease, stroke .18s ease;
+}
+.node-box.lit-ours   { fill: var(--ours-soft);    stroke: var(--ours); }
+.node-box.lit-gemini { fill: var(--gemini-soft);  stroke: var(--gemini); }
+.node-box.lit-plain  { fill: var(--refused-soft); stroke: var(--refused); }
+.node-box.dead       { fill: var(--danger-soft);  stroke: var(--danger); stroke-dasharray: 6 4; }
+
+.node-t {
+  fill: var(--ink);
+  font: 600 14px "IBM Plex Sans", sans-serif;
+  text-anchor: middle;
+}
+.node-s {
+  fill: var(--ink-muted);
+  font: 400 11.5px "IBM Plex Mono", monospace;
+  text-anchor: middle;
+}
+.edge {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+  transition: stroke .18s ease;
+}
+.edge.hot-ours   { stroke: var(--ours); }
+.edge.hot-gemini { stroke: var(--gemini); }
+.edge.hot-plain  { stroke: var(--refused); }
+.edge-label {
+  fill: var(--ink-faint);
+  font: 500 11px "IBM Plex Mono", monospace;
+  text-anchor: middle;
+}
+.pip-ours   { fill: var(--ours); }
+.pip-gemini { fill: var(--gemini); }
+.pip-plain  { fill: var(--refused); }
+
+/* ── controls ─────────────────────────────────────────────────────────── */
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 18px 22px;
+  padding: 18px;
+}
+
+.ctl { display: flex; flex-direction: column; gap: 8px; }
+
+.ctl > label,
+.ctl > .ctl-label {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ctl > label b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--ours);
+  height: 22px;
+  cursor: pointer;
+}
+
+.seg { display: flex; gap: 6px; }
+.seg button {
+  flex: 1;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--ink-muted);
+  font: 600 13px "IBM Plex Sans", sans-serif;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.seg button:hover:not(:disabled) { border-color: var(--ink-faint); color: var(--ink); }
+.seg button[aria-pressed="true"] {
+  color: var(--ink);
+  border-color: var(--gemini);
+  background: var(--gemini-soft);
+}
+.seg button[aria-pressed="true"][data-engine="gpu"] {
+  border-color: var(--ours);
+  background: var(--ours-soft);
+}
+
+.btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--ink);
+  font: 600 13px "IBM Plex Sans", sans-serif;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, opacity .15s ease;
+}
+.btn:hover:not(:disabled) { border-color: var(--ink-faint); }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn.primary { background: var(--ours); border-color: var(--ours); color: #1b1206; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.harm { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+:where(button, input, a):focus-visible {
+  outline: 2px solid var(--ours);
+  outline-offset: 2px;
+}
+
+/* ── telemetry ────────────────────────────────────────────────────────── */
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line-soft);
+  border-top: 1px solid var(--line);
+}
+.ro { background: var(--surface); padding: 14px 16px; }
+.ro .k {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.ro .v {
+  margin-top: 4px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 23px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.ro .u { font-size: 12px; color: var(--ink-faint); margin-left: 3px; }
+.v.ours { color: var(--ours); }
+.v.gemini { color: var(--gemini); }
+.v.plain { color: var(--refused); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .04em;
+}
+.pill::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.pill.off      { background: var(--refused-soft); color: var(--refused); }
+.pill.starting { background: var(--ours-soft);    color: var(--ours); }
+.pill.running  { background: var(--ours-soft);    color: var(--ours); }
+.pill.stopping { background: var(--refused-soft); color: var(--refused); }
+.pill.wedged   { background: var(--danger-soft);  color: var(--danger); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pill.running::before,
+  .pill.starting::before { animation: beat 1.6s ease-in-out infinite; }
+}
+@keyframes beat { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* ── notice + log ─────────────────────────────────────────────────────── */
+.notice {
+  margin: 0;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  background: var(--ours-soft);
+  color: var(--ours);
+}
+.notice b { font-weight: 600; }
+
+.log {
+  margin: 0;
+  padding: 10px 18px 16px;
+  max-height: 230px;
+  overflow-y: auto;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.75;
+  list-style: none;
+}
+.log li { display: flex; gap: 12px; color: var(--ink-muted); }
+.log li .t { color: var(--ink-faint); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.log li.ours   .m { color: var(--ours); }
+.log li.gemini .m { color: var(--gemini); }
+.log li.warn   .m { color: var(--danger); }
+
+/* ── prose ────────────────────────────────────────────────────────────── */
+.prose { max-width: 68ch; display: flex; flex-direction: column; gap: 14px; }
+.prose h2 {
+  margin: 22px 0 0;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+}
+.prose p { margin: 0; color: var(--ink-muted); }
+.prose strong { color: var(--ink); font-weight: 600; }
+.prose ul { margin: 0; padding-left: 20px; color: var(--ink-muted); display: flex; flex-direction: column; gap: 8px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-muted); }
+.legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+.foot {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Service Assistant &middot; how the answers are made</p>
+    <h1>Our own GPU, and what happens when it is not there</h1>
+    <p class="standfirst">
+      A working model of the assistant, running on simulated time so a twenty
+      minute idle timeout takes twenty seconds to watch. Switch engines, start
+      and stop the machine, break it on purpose. Nothing here touches the real
+      system, and nothing here is charged for.
+    </p>
+  </header>
+
+  <section class="card" aria-label="The request path">
+    <header>
+      <h2>Fig. 1 &middot; a question, from asked to answered</h2>
+      <span class="caption" id="clock">00:00 simulated &middot; 60x</span>
+    </header>
+
+    <div class="stage">
+      <svg viewBox="0 0 1000 330" role="img"
+           aria-label="A question is searched against the association's documents, then either refused when nothing matches or sent to whichever engine is switched on: our own GPU, or Gemini.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="var(--line)"></path>
+          </marker>
+        </defs>
+
+        <path class="edge" id="e-ask"    d="M 152 120 L 196 120" marker-end="url(#ar)"></path>
+        <path class="edge" id="e-search" d="M 348 120 L 392 120" marker-end="url(#ar)"></path>
+        <path class="edge" id="e-gate"   d="M 552 120 L 596 120" marker-end="url(#ar)"></path>
+        <path class="edge" id="e-refuse" d="M 472 158 L 472 246" marker-end="url(#ar)"></path>
+        <path class="edge" id="e-gpu"    d="M 752 104 L 796 62"  marker-end="url(#ar)"></path>
+        <path class="edge" id="e-gem"    d="M 752 136 L 796 214" marker-end="url(#ar)"></path>
+
+        <text class="edge-label" x="488" y="206" style="text-anchor:start">nothing matched</text>
+
+        <rect class="node-box" id="n-ask" x="24" y="86" width="128" height="68" rx="9"></rect>
+        <text class="node-t" x="88" y="115">A resident</text>
+        <text class="node-s" x="88" y="134">asks a question</text>
+
+        <rect class="node-box" id="n-search" x="196" y="86" width="152" height="68" rx="9"></rect>
+        <text class="node-t" x="272" y="115">Their documents</text>
+        <text class="node-s" x="272" y="134">searched here, no model</text>
+
+        <rect class="node-box" id="n-gate" x="392" y="86" width="160" height="68" rx="9"></rect>
+        <text class="node-t" x="472" y="115">Close enough?</text>
+        <text class="node-s" x="472" y="134">the honesty gate</text>
+
+        <rect class="node-box" id="n-router" x="596" y="86" width="156" height="68" rx="9"></rect>
+        <text class="node-t" x="674" y="115">Which engine</text>
+        <text class="node-s" x="674" y="134">is switched on</text>
+
+        <rect class="node-box" id="n-gpu" x="796" y="26" width="180" height="72" rx="9"></rect>
+        <text class="node-t" x="886" y="56">Our own GPU</text>
+        <text class="node-s" x="886" y="75" id="n-gpu-sub">NVIDIA L4, llama3.1:8b</text>
+
+        <rect class="node-box" id="n-gem" x="796" y="178" width="180" height="72" rx="9"></rect>
+        <text class="node-t" x="886" y="208">Gemini</text>
+        <text class="node-s" x="886" y="227">Google, always on</text>
+
+        <rect class="node-box" id="n-refuse" x="368" y="246" width="208" height="64" rx="9"></rect>
+        <text class="node-t" x="472" y="274">"I do not have that"</text>
+        <text class="node-s" x="472" y="292">no model was called at all</text>
+
+        <g id="pips"></g>
+      </svg>
+    </div>
+
+    <div class="readouts">
+      <div class="ro">
+        <div class="k">Cost this session</div>
+        <div class="v ours" id="m-cost">$0.0000</div>
+      </div>
+      <div class="ro">
+        <div class="k">The GPU</div>
+        <div class="v" style="font-size:15px;padding-top:5px">
+          <span class="pill off" id="m-state">off</span>
+        </div>
+      </div>
+      <div class="ro">
+        <div class="k">Answered by our GPU</div>
+        <div class="v ours" id="m-gpu">0</div>
+      </div>
+      <div class="ro">
+        <div class="k">Answered by Gemini</div>
+        <div class="v gemini" id="m-gem">0</div>
+      </div>
+      <div class="ro">
+        <div class="k">Refused, no model</div>
+        <div class="v plain" id="m-ref">0</div>
+      </div>
+      <div class="ro">
+        <div class="k">Speed</div>
+        <div class="v" id="m-speed">0<span class="u">tok/s</span></div>
+      </div>
+      <div class="ro">
+        <div class="k">Answer time</div>
+        <div class="v" id="m-lat">0<span class="u">ms</span></div>
+      </div>
+      <div class="ro">
+        <div class="k">Switches itself off in</div>
+        <div class="v" id="m-idle">&ndash;</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Controls">
+    <header><h2>Your hands on it</h2></header>
+    <div class="controls">
+      <div class="ctl">
+        <span class="ctl-label">Which engine answers</span>
+        <div class="seg" role="group" aria-label="Which engine answers">
+          <button type="button" data-engine="gemini" aria-pressed="true">Gemini</button>
+          <button type="button" data-engine="gpu" aria-pressed="false">Our own GPU</button>
+        </div>
+      </div>
+
+      <div class="ctl">
+        <span class="ctl-label">The machine</span>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="b-start">Start the GPU</button>
+          <button type="button" class="btn" id="b-stop" disabled>Stop it</button>
+        </div>
+      </div>
+
+      <div class="ctl">
+        <label for="r-rate">Questions a minute <b id="v-rate">6</b></label>
+        <input type="range" id="r-rate" min="0" max="30" step="1" value="6">
+      </div>
+
+      <div class="ctl">
+        <label for="r-idle">Idle minutes before it stops <b id="v-idle">20</b></label>
+        <input type="range" id="r-idle" min="5" max="60" step="5" value="20">
+      </div>
+
+      <div class="ctl">
+        <span class="ctl-label">Break it on purpose</span>
+        <div class="btn-row">
+          <button type="button" class="btn harm" id="b-wedge" disabled>Wedge the GPU</button>
+          <button type="button" class="btn" id="b-reset">Reset</button>
+        </div>
+      </div>
+
+      <div class="ctl">
+        <span class="ctl-label">Colour</span>
+        <div class="legend">
+          <span><i style="background:var(--ours)"></i> our GPU</span>
+          <span><i style="background:var(--gemini)"></i> Gemini</span>
+          <span><i style="background:var(--refused)"></i> refused</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-label="What is happening">
+    <header><h2>What it is doing</h2></header>
+    <p class="notice" id="notice" hidden></p>
+    <ul class="log" id="log" aria-live="polite" aria-relevant="additions"></ul>
+  </section>
+
+  <section class="prose">
+    <h2>What you are looking at</h2>
+    <p>
+      Every answer the assistant gives starts by searching your association's own
+      documents. That search happens on our server and involves no model at all.
+      <strong>If nothing in your documents is close enough to the question, no
+      answer is written</strong>, and the resident is told so. That is the box at
+      the bottom of the diagram, and it is the reason the assistant cannot invent
+      a rule about somebody's home.
+    </p>
+    <p>
+      Only when something does match does a model get asked to put it into plain
+      words. That is the only job a model does here, and it is the job the GPU
+      would be doing.
+    </p>
+
+    <h2>Why there is a switch at all</h2>
+    <p>
+      A GPU costs about eighty cents an hour while it is running, and nothing at
+      all while it is stopped. Switch it on before a meeting, and the assistant
+      is answering from hardware we control. Leave it running for a month by
+      accident and it is roughly $580.
+    </p>
+    <p>
+      So the machine stops itself. Twenty minutes with no questions and it shuts
+      down, and a second check running outside the machine catches it if it ever
+      hangs. Drag the idle slider above and watch the countdown.
+    </p>
+
+    <h2>The part worth trying</h2>
+    <p>
+      Switch to <strong>our own GPU</strong> while the machine is off, and keep
+      the questions coming. Residents still get answers, because Gemini quietly
+      picks up the work, and the panel says plainly that it did. Then press
+      <strong>wedge the GPU</strong> while it is running and watch the same thing
+      happen mid conversation.
+    </p>
+    <p>
+      That is the behaviour that matters in front of a room. A demonstration
+      fails when a machine is still booting; this one does not, and nobody
+      watching would know unless we told them. We tell them.
+    </p>
+
+    <p class="foot">
+      A simulation, not a live reading. Speeds and latencies are modelled on an
+      NVIDIA L4 running an 8B model, and the clock runs at sixty times real time
+      so an idle timeout is watchable. Nothing on this page connects to the
+      running system.
+    </p>
+  </section>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ── how the model behaves ───────────────────────────────────────────────
+  // Numbers chosen to match an L4 running llama3.1:8b, and Gemini over the
+  // public internet from Oregon. They are a model, not a measurement.
+  const RATE_PER_HOUR = 0.8048;   // g6.xlarge on demand, us-west-2
+  const SIM_SPEED     = 60;       // simulated seconds per real second
+  const BOOT_SIM_SECS = 165;      // about 2m45s, which is what a cold start costs
+  const STOP_SIM_SECS = 40;
+  const GPU_TOK_S     = [44, 56];
+  const GPU_FIRST_MS  = [90, 180];
+  const GEM_FIRST_MS  = [420, 900];
+  const GEM_TOK_S     = [70, 110];
+  const ANSWER_TOKENS = [55, 130];
+  const MISS_RATE     = 0.18;     // questions the documents cannot answer
+
+  const QUESTIONS = [
+    "what are the quiet hours",
+    "can I keep a dog",
+    "how do I get a parking pass",
+    "when is the trash collected",
+    "what colour can I paint my door",
+    "do I need approval for a fence",
+    "how long does the application take",
+    "who manages this community",
+    "can I rent my home out",
+    "when can builders work",
+  ];
+  const MISSES = [
+    "is there a swimming pool rota",
+    "what is the wifi password",
+    "who won the board election",
+    "can I keep bees",
+  ];
+
+  const rand  = (lo, hi) => lo + Math.random() * (hi - lo);
+  const pick  = (a) => a[Math.floor(Math.random() * a.length)];
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  // ── state ───────────────────────────────────────────────────────────────
+  const S = {
+    engine: "gemini",          // what the switch says
+    gpu: "off",                // off | starting | running | stopping | wedged
+    gpuAt: 0,                  // sim seconds the current gpu phase began
+    simSecs: 0,
+    billedSecs: 0,
+    lastGpuUse: 0,             // sim seconds of the last question the GPU took
+    rate: 6,
+    idleMins: 20,
+    counts: { gpu: 0, gem: 0, ref: 0 },
+    lastSpeed: 0,
+    lastLatency: 0,
+    fellBack: "",
+    nextAsk: 0,
+    pips: [],
+  };
+
+  // ── the routes a question can take, as polylines through the diagram ────
+  const R = {
+    stem:   [[88, 120], [196, 120], [272, 120], [392, 120], [472, 120]],
+    refuse: [[472, 158], [472, 246]],
+    router: [[472, 120], [596, 120], [674, 120]],
+    gpu:    [[752, 112], [886, 62]],
+    gem:    [[752, 128], [886, 214]],
+  };
+  const route = (kind) =>
+    kind === "refused" ? [...R.stem, ...R.refuse]
+    : kind === "gpu"   ? [...R.stem, ...R.router, ...R.gpu]
+                       : [...R.stem, ...R.router, ...R.gem];
+
+  const el = (id) => document.getElementById(id);
+  const pipLayer = el("pips");
+  const logEl = el("log");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ── log ─────────────────────────────────────────────────────────────────
+  function stamp() {
+    const m = Math.floor(S.simSecs / 60), s = Math.floor(S.simSecs % 60);
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  }
+  function say(message, tone) {
+    const li = document.createElement("li");
+    if (tone) li.className = tone;
+    const t = document.createElement("span");
+    t.className = "t";
+    t.textContent = stamp();
+    const m = document.createElement("span");
+    m.className = "m";
+    m.textContent = message;
+    li.append(t, m);
+    logEl.prepend(li);
+    while (logEl.children.length > 80) logEl.lastChild.remove();
+  }
+
+  // ── the gpu's own state machine ─────────────────────────────────────────
+  function setGpu(next) {
+    S.gpu = next;
+    S.gpuAt = S.simSecs;
+  }
+
+  function stepGpu() {
+    if (S.gpu === "starting" && S.simSecs - S.gpuAt >= BOOT_SIM_SECS) {
+      setGpu("running");
+      S.lastGpuUse = S.simSecs;
+      say("the GPU is up, model loaded and answering", "ours");
+    } else if (S.gpu === "stopping" && S.simSecs - S.gpuAt >= STOP_SIM_SECS) {
+      setGpu("off");
+      say("instance stopped, billing stopped", "ours");
+    }
+
+    // Billed while it is on, whether or not anybody is using it. That is the
+    // whole argument for the switch. Counted in simulated seconds, the same
+    // clock everything else on the panel runs on.
+    if (S.gpu === "starting" || S.gpu === "running" || S.gpu === "wedged") {
+      S.billedSecs += SIM_SPEED / 20;
+    }
+
+    // The idle timer, which is the thing that makes this affordable.
+    if (S.gpu === "running") {
+      const idleFor = (S.simSecs - S.lastGpuUse) / 60;
+      if (idleFor >= S.idleMins) {
+        say(`${S.idleMins} minutes with no questions, stopping the instance`, "warn");
+        setGpu("stopping");
+      }
+    }
+  }
+
+  const gpuReady = () => S.gpu === "running";
+
+  // ── one question ────────────────────────────────────────────────────────
+  function ask() {
+    const missed = Math.random() < MISS_RATE;
+    if (missed) {
+      S.counts.ref += 1;
+      launch("refused", pick(MISSES));
+      return;
+    }
+
+    const question = pick(QUESTIONS);
+
+    if (S.engine === "gpu" && gpuReady()) {
+      const tokS = rand(...GPU_TOK_S);
+      const tokens = rand(...ANSWER_TOKENS);
+      S.lastSpeed = tokS;
+      S.lastLatency = rand(...GPU_FIRST_MS) + (tokens / tokS) * 1000;
+      S.lastGpuUse = S.simSecs;
+      S.counts.gpu += 1;
+      S.fellBack = "";
+      launch("gpu", question);
+      return;
+    }
+
+    if (S.engine === "gpu") {
+      S.fellBack =
+        S.gpu === "off"      ? "The GPU is stopped."
+        : S.gpu === "starting" ? "The GPU is still starting."
+        : S.gpu === "stopping" ? "The GPU is stopping."
+        : S.gpu === "wedged"   ? "The GPU stopped answering."
+        : "The GPU is not ready.";
+      say(`switched to our GPU, served by Gemini: ${S.fellBack.toLowerCase()}`, "gemini");
+    } else {
+      S.fellBack = "";
+    }
+
+    const tokS = rand(...GEM_TOK_S);
+    const tokens = rand(...ANSWER_TOKENS);
+    S.lastSpeed = tokS;
+    S.lastLatency = rand(...GEM_FIRST_MS) + (tokens / tokS) * 1000;
+    S.counts.gem += 1;
+    launch("gemini", question);
+  }
+
+  function launch(kind, question) {
+    const path = route(kind);
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("r", "5");
+    c.setAttribute("class", kind === "gpu" ? "pip-ours" : kind === "gemini" ? "pip-gemini" : "pip-plain");
+    c.setAttribute("cx", path[0][0]);
+    c.setAttribute("cy", path[0][1]);
+    pipLayer.appendChild(c);
+    S.pips.push({ node: c, path, at: 0, kind });
+
+    if (kind === "refused") {
+      say(`"${question}" is not in the documents, so nothing was written`, null);
+    } else if (kind === "gpu") {
+      say(`"${question}" answered on our GPU, ${Math.round(S.lastSpeed)} tokens a second`, "ours");
+    } else if (!S.fellBack) {
+      say(`"${question}" answered by Gemini`, "gemini");
+    }
+  }
+
+  // ── the pips travelling the diagram ─────────────────────────────────────
+  function movePips(dt) {
+    const speed = 0.55; // fraction of the route per second
+    for (let i = S.pips.length - 1; i >= 0; i--) {
+      const p = S.pips[i];
+      p.at += dt * speed;
+      if (p.at >= 1) {
+        p.node.remove();
+        S.pips.splice(i, 1);
+        continue;
+      }
+      const [x, y] = along(p.path, p.at);
+      p.node.setAttribute("cx", x);
+      p.node.setAttribute("cy", y);
+      // Inside a box, the pip would sit on top of that box's own title. The
+      // box lights up instead, which says the same thing more legibly.
+      p.node.setAttribute("opacity", inABox(x, y) ? "0" : "1");
+    }
+  }
+
+  //: x ranges of the boxes on the main row, which all share y 86 to 154.
+  const ROW = [[24, 152], [196, 348], [392, 552], [596, 752]];
+  const BOXES = [
+    ...ROW.map(([a, b]) => [a, 86, b, 154]),
+    [796, 26, 976, 98],    // our GPU
+    [796, 178, 976, 250],  // Gemini
+    [368, 246, 576, 310],  // refused
+  ];
+
+  function inABox(x, y) {
+    return BOXES.some(([x0, y0, x1, y1]) => x >= x0 && x <= x1 && y >= y0 && y <= y1);
+  }
+
+  function along(path, t) {
+    let total = 0;
+    const segs = [];
+    for (let i = 1; i < path.length; i++) {
+      const d = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+      segs.push(d);
+      total += d;
+    }
+    let want = t * total;
+    for (let i = 0; i < segs.length; i++) {
+      if (want <= segs[i] || i === segs.length - 1) {
+        const f = segs[i] === 0 ? 0 : clamp(want / segs[i], 0, 1);
+        return [
+          path[i][0] + (path[i + 1][0] - path[i][0]) * f,
+          path[i][1] + (path[i + 1][1] - path[i][1]) * f,
+        ];
+      }
+      want -= segs[i];
+    }
+    return path[path.length - 1];
+  }
+
+  // ── drawing ─────────────────────────────────────────────────────────────
+  const STATE_WORDS = {
+    off: "off", starting: "starting", running: "running",
+    stopping: "stopping", wedged: "not answering",
+  };
+
+  function paint() {
+    el("clock").textContent = `${stamp()} simulated · ${SIM_SPEED}x`;
+
+    const cost = (S.billedSecs / 3600) * RATE_PER_HOUR;
+    el("m-cost").textContent = "$" + cost.toFixed(4);
+    el("m-gpu").textContent = S.counts.gpu;
+    el("m-gem").textContent = S.counts.gem;
+    el("m-ref").textContent = S.counts.ref;
+    el("m-speed").innerHTML = Math.round(S.lastSpeed) + '<span class="u">tok/s</span>';
+    el("m-lat").innerHTML = Math.round(S.lastLatency) + '<span class="u">ms</span>';
+
+    const pill = el("m-state");
+    pill.className = "pill " + (S.gpu === "wedged" ? "wedged" : S.gpu);
+    pill.textContent = STATE_WORDS[S.gpu];
+
+    const idleBox = el("m-idle");
+    if (S.gpu === "running") {
+      const left = S.idleMins - (S.simSecs - S.lastGpuUse) / 60;
+      idleBox.textContent = left > 0 ? left.toFixed(1) + " min" : "now";
+    } else {
+      idleBox.textContent = "–";
+    }
+
+    // The nodes light in the colour of whatever is currently carrying work.
+    const live = new Set(S.pips.map((p) => p.kind));
+    lightNode("n-ask", live.size ? "lit-plain" : "");
+    lightNode("n-search", live.size ? "lit-plain" : "");
+    lightNode("n-gate", live.size ? "lit-plain" : "");
+    lightNode("n-refuse", live.has("refused") ? "lit-plain" : "");
+    lightNode("n-router", live.has("gpu") ? "lit-ours" : live.has("gemini") ? "lit-gemini" : "");
+    lightNode("n-gpu", S.gpu === "wedged" ? "dead" : gpuReady() ? "lit-ours" : "");
+    lightNode("n-gem", live.has("gemini") ? "lit-gemini" : "");
+
+    lightEdge("e-refuse", live.has("refused") ? "hot-plain" : "");
+    lightEdge("e-gpu", live.has("gpu") ? "hot-ours" : "");
+    lightEdge("e-gem", live.has("gemini") ? "hot-gemini" : "");
+
+    el("n-gpu-sub").textContent =
+      S.gpu === "off" ? "stopped, costing nothing"
+      : S.gpu === "starting" ? "starting, 2 to 4 minutes"
+      : S.gpu === "wedged" ? "up, but not answering"
+      : S.gpu === "stopping" ? "stopping"
+      : "NVIDIA L4, llama3.1:8b";
+
+    const notice = el("notice");
+    if (S.engine === "gpu" && S.fellBack) {
+      notice.hidden = false;
+      notice.innerHTML =
+        "<b>Switched to our own GPU, but Gemini is answering.</b> " +
+        S.fellBack +
+        " Residents still get answers, so nothing looks broken to them.";
+    } else {
+      notice.hidden = true;
+    }
+
+    el("b-start").disabled = S.gpu !== "off";
+    el("b-stop").disabled = !(S.gpu === "running" || S.gpu === "wedged");
+    el("b-wedge").disabled = S.gpu !== "running";
+  }
+
+  function lightNode(id, cls) {
+    el(id).setAttribute("class", "node-box" + (cls ? " " + cls : ""));
+  }
+  function lightEdge(id, cls) {
+    el(id).setAttribute("class", "edge" + (cls ? " " + cls : ""));
+  }
+
+  // ── the clock ───────────────────────────────────────────────────────────
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.25);
+    last = now;
+
+    const steps = Math.round(dt * 20);
+    for (let i = 0; i < steps; i++) {
+      S.simSecs += SIM_SPEED / 20;
+      stepGpu();
+      if (S.rate > 0 && S.simSecs >= S.nextAsk) {
+        ask();
+        // Exponential gaps, so questions arrive in clumps the way real ones do.
+        S.nextAsk = S.simSecs + (-Math.log(1 - Math.random()) * 60) / S.rate;
+      }
+    }
+
+    if (!reduced) movePips(dt);
+    else S.pips.forEach((p) => { p.node.remove(); });
+    if (reduced) S.pips.length = 0;
+
+    paint();
+    requestAnimationFrame(frame);
+  }
+
+  // ── controls ────────────────────────────────────────────────────────────
+  document.querySelectorAll("[data-engine]").forEach((b) => {
+    b.addEventListener("click", () => {
+      S.engine = b.dataset.engine;
+      document.querySelectorAll("[data-engine]").forEach((o) =>
+        o.setAttribute("aria-pressed", String(o === b)));
+      S.fellBack = "";
+      say(S.engine === "gpu"
+        ? "switched to our own GPU"
+        : "switched to Gemini", S.engine === "gpu" ? "ours" : "gemini");
+    });
+  });
+
+  el("b-start").addEventListener("click", () => {
+    setGpu("starting");
+    say("starting the instance, this takes 2 to 4 minutes", "ours");
+  });
+
+  el("b-stop").addEventListener("click", () => {
+    setGpu("stopping");
+    say("stopping the instance by hand", "ours");
+  });
+
+  el("b-wedge").addEventListener("click", () => {
+    setGpu("wedged");
+    say("the GPU has stopped answering, and is still being billed", "warn");
+  });
+
+  el("b-reset").addEventListener("click", () => {
+    S.pips.forEach((p) => p.node.remove());
+    Object.assign(S, {
+      engine: S.engine, gpu: "off", gpuAt: 0, simSecs: 0, billedSecs: 0,
+      lastGpuUse: 0, counts: { gpu: 0, gem: 0, ref: 0 },
+      lastSpeed: 0, lastLatency: 0, fellBack: "", nextAsk: 0, pips: [],
+    });
+    logEl.replaceChildren();
+    say("reset", null);
+  });
+
+  el("r-rate").addEventListener("input", (e) => {
+    S.rate = Number(e.target.value);
+    el("v-rate").textContent = S.rate;
+  });
+
+  el("r-idle").addEventListener("input", (e) => {
+    S.idleMins = Number(e.target.value);
+    el("v-idle").textContent = S.idleMins;
+  });
+
+  say("ready, answering from Gemini", "gemini");
+  requestAnimationFrame(frame);
+})();
+</script>

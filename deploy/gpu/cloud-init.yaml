@@ -1,0 +1,80 @@
+#cloud-config
+#
+# Paste this into "User data" when creating the GPU instance. It installs
+# Ollama, pulls the model, and arms the idle shutdown, so first boot needs no
+# SSH at all.
+#
+# Assumes the Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04): the
+# NVIDIA driver is already on it, which is the longest and most failure prone
+# part of the job to do by hand.
+#
+# Progress is in /var/log/cloud-init-output.log on the instance. Pulling the
+# model is about 5GB, so first boot takes roughly 5 to 10 minutes longer than
+# the machine takes to answer SSH.
+
+write_files:
+  # Ollama listens on localhost by default, which would make it unreachable
+  # from the service assistant. KEEP_ALIVE is deliberately longer than the idle
+  # timeout: otherwise the model unloads while the machine is still running and
+  # the next question in a seminar pays a cold reload for nothing.
+  - path: /etc/systemd/system/ollama.service.d/override.conf
+    content: |
+      [Service]
+      Environment="OLLAMA_HOST=0.0.0.0:11434"
+      Environment="OLLAMA_KEEP_ALIVE=25m"
+
+  - path: /etc/systemd/system/ollama-idle-off.service
+    content: |
+      [Unit]
+      Description=Stop this GPU when Ollama has been idle
+      After=ollama.service
+
+      [Service]
+      Type=oneshot
+      Environment=IDLE_MINUTES=20
+      ExecStart=/usr/local/bin/ollama-idle-off.sh
+
+  - path: /etc/systemd/system/ollama-idle-off.timer
+    content: |
+      [Unit]
+      Description=Check every five minutes whether this GPU is still needed
+
+      [Timer]
+      OnBootSec=5min
+      OnUnitActiveSec=5min
+      AccuracySec=30s
+
+      [Install]
+      WantedBy=timers.target
+
+  - path: /usr/local/bin/ollama-idle-off.sh
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      IDLE_MINUTES="${IDLE_MINUTES:-20}"
+
+      uptime_seconds=$(cut -d. -f1 /proc/uptime)
+      if (( uptime_seconds < IDLE_MINUTES * 60 )); then
+          echo "up for ${uptime_seconds}s, under the floor; leaving it alone"
+          exit 0
+      fi
+
+      if journalctl -u ollama --since "${IDLE_MINUTES} min ago" --no-pager 2>/dev/null \
+           | grep -qE 'POST[[:space:]]+/api/'; then
+          echo "a request arrived recently; leaving it alone"
+          exit 0
+      fi
+
+      logger -t ollama-idle-off "no requests for ${IDLE_MINUTES} minutes, shutting down"
+      /sbin/shutdown -h now
+
+runcmd:
+  - curl -fsSL https://ollama.com/install.sh | sh
+  - systemctl daemon-reload
+  - systemctl enable --now ollama
+  # Give the service a moment to bind before asking it to pull anything.
+  - sleep 10
+  - OLLAMA_HOST=127.0.0.1:11434 ollama pull llama3.1:8b
+  - systemctl enable --now ollama-idle-off.timer
+  - logger -t gpu-setup "ollama ready, idle shutdown armed"
