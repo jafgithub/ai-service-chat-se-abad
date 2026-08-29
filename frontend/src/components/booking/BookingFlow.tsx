@@ -13,7 +13,8 @@ import { Empty, Failed, Loading } from "@/components/ui/States";
 import { ProviderCard } from "./ProviderCard";
 import { ProviderProfilePanel } from "./ProviderProfilePanel";
 import { SlotPicker } from "./SlotPicker";
-import { BookingReview } from "./BookingReview";
+import { BookingReview, tipValue } from "./BookingReview";
+import type { TipChoice } from "./BookingReview";
 import { BookingConfirmation } from "./BookingConfirmation";
 import { formatWhen } from "@/lib/datetime";
 
@@ -76,6 +77,7 @@ export function BookingFlow({
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cod");
+  const [tip, setTip] = useState<TipChoice>({ kind: "none" });
 
   const [requestId, setRequestId] = useState<number | null>(serviceRequestId ?? null);
   const [booking, setBooking] = useState<Booked | null>(null);
@@ -122,6 +124,14 @@ export function BookingFlow({
         notes: notes.trim() || undefined,
         service_request_id: attached ?? undefined,
         payment_method: method,
+        /* Only ever one of the two. A percentage is a request for the server to
+           work the money out; an amount is only sent when they typed one, and
+           is clamped on that side regardless of what arrives. */
+        tip_percent: tip.kind === "percent" ? tip.percent : undefined,
+        tip_amount:
+          tip.kind === "custom" && offer
+            ? tipValue(tip, offer.price) || undefined
+            : undefined,
       });
       onBooked?.(result);
 
@@ -178,7 +188,7 @@ export function BookingFlow({
       placingRef.current = false;
       setPlacing(false);
     }
-  }, [offer, slot, service.id, address, notes, method, ensureRequest, onBooked]);
+  }, [offer, slot, service.id, address, notes, method, tip, ensureRequest, onBooked]);
 
   // ── each step ──────────────────────────────────────────────────────────────
 
@@ -225,6 +235,8 @@ export function BookingFlow({
             onNotesChange={setNotes}
             method={method}
             onMethodChange={setMethod}
+            tip={tip}
+            onTipChange={setTip}
             failure={failure}
           />
         ) : status === "loading" ? (

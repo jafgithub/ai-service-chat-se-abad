@@ -24,6 +24,44 @@ import { cn } from "@/lib/utils";
  * methods it can actually take, so what it promises matches what is configured.
  */
 
+/**
+ * What the customer has chosen to add for the provider.
+ *
+ * A union rather than a percentage and an amount side by side, because two
+ * nullable numbers can express states that do not exist ("18% and also $40")
+ * and this cannot. The server is told the percentage when there is one and
+ * works the money out itself; the typed amount is only ever sent when they
+ * actually typed one.
+ */
+export type TipChoice =
+  | { kind: "none" }
+  | { kind: "percent"; percent: number }
+  | { kind: "custom"; amount: string };
+
+/** The percentages offered. Must match job_service.TIP_PERCENTS on the server,
+ *  which refuses anything else. */
+export const TIP_PERCENTS = [15, 18, 20] as const;
+
+/** Mirrors job_service.tip_cap. Shown so somebody typing 5000 finds out here
+ *  rather than discovering the clamp on the confirmation screen. */
+export function tipCap(price: number): number {
+  return Math.round(Math.min(Math.max(price, 0) * 2, 500) * 100) / 100;
+}
+
+/** What the chosen tip is worth, for display only. The server decides the
+ *  figure that is actually charged. */
+export function tipValue(choice: TipChoice, price: number): number {
+  if (choice.kind === "percent") {
+    return Math.round(price * choice.percent) / 100;
+  }
+  if (choice.kind === "custom") {
+    const typed = Number.parseFloat(choice.amount);
+    if (!Number.isFinite(typed) || typed <= 0) return 0;
+    return Math.round(Math.min(typed, tipCap(price)) * 100) / 100;
+  }
+  return 0;
+}
+
 interface BookingReviewProps {
   service: ServiceResult;
   offer: ProviderOffer;
@@ -35,6 +73,8 @@ interface BookingReviewProps {
   onNotesChange: (value: string) => void;
   method: PaymentMethod;
   onMethodChange: (method: PaymentMethod) => void;
+  tip: TipChoice;
+  onTipChange: (tip: TipChoice) => void;
   /** Set when the booking attempt failed, so the reason sits with the button. */
   failure?: string;
 }
@@ -49,8 +89,13 @@ const METHODS: Record<PaymentMethod, { title: string; hint: string; icon: string
 
 export function BookingReview({
   service, offer, slot, account, address, onAddressChange, notes, onNotesChange,
-  method, onMethodChange, failure,
+  method, onMethodChange, tip, onTipChange, failure,
 }: BookingReviewProps) {
+  const tipping = tipValue(tip, offer.price);
+  const total = Math.round((offer.price + tipping) * 100) / 100;
+  const cap = tipCap(offer.price);
+  const typedOver =
+    tip.kind === "custom" && (Number.parseFloat(tip.amount) || 0) > cap;
   /* Cash is always offered: it needs no provider, and if the server has it
      switched off the booking call says so rather than us guessing here. The
      online ones depend on what is configured, so a deployment with no Stripe
@@ -90,9 +135,84 @@ export function BookingReview({
             label="Price"
             value={formatMoney(offer.price)}
             sub="Set by this provider for this service"
-            strong
+            strong={tipping === 0}
           />
+          {tipping > 0 && <Row label="Tip" value={formatMoney(tipping)} />}
+          {tipping > 0 && (
+            <Row label="Total" value={formatMoney(total)} strong />
+          )}
         </dl>
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+          Add a tip
+        </h3>
+
+        <div className="rounded-card border border-line p-3">
+          <p className="mb-2.5 text-xs leading-relaxed text-ink-muted">
+            Optional, and all of it goes to {offer.business_name}.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <TipButton
+              label="No tip"
+              chosen={tip.kind === "none"}
+              onClick={() => onTipChange({ kind: "none" })}
+            />
+            {TIP_PERCENTS.map((percent) => (
+              <TipButton
+                key={percent}
+                label={`${percent}%`}
+                sub={formatMoney(Math.round(offer.price * percent) / 100)}
+                chosen={tip.kind === "percent" && tip.percent === percent}
+                onClick={() => onTipChange({ kind: "percent", percent })}
+              />
+            ))}
+            <TipButton
+              label="Other"
+              chosen={tip.kind === "custom"}
+              onClick={() =>
+                onTipChange({
+                  kind: "custom",
+                  amount: tip.kind === "custom" ? tip.amount : "",
+                })
+              }
+            />
+          </div>
+
+          {tip.kind === "custom" && (
+            <div className="mt-3">
+              <label
+                htmlFor="tip-amount"
+                className="mb-1 block text-xs font-medium text-ink-muted"
+              >
+                How much would you like to add?
+              </label>
+              <input
+                id="tip-amount"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={cap}
+                step="0.01"
+                value={tip.amount}
+                onChange={(e) =>
+                  onTipChange({ kind: "custom", amount: e.target.value })
+                }
+                placeholder="0.00"
+                className="h-10 w-32 rounded-control border border-line bg-surface px-3 text-sm text-ink
+                           focus:border-brand-500 focus:outline-none"
+              />
+              {typedOver && (
+                <p className="mt-1.5 text-xs text-warn">
+                  The most that can be added to this job is {formatMoney(cap)}, so
+                  that is what will be charged.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </section>
 
       <section>
@@ -169,8 +289,12 @@ export function BookingReview({
 
         <p className="mt-2 text-xs leading-relaxed text-ink-muted">
           {method === "cod"
-            ? `Nothing is taken now. You settle up with ${offer.business_name} once the work is done.`
-            : "Your time is held either way. We will take you to their secure payment page next, and you can still pay on the day if you change your mind."}
+            ? tipping > 0
+              ? `Nothing is taken now. You hand ${offer.business_name} ${formatMoney(total)} once the work is done, the tip included.`
+              : `Nothing is taken now. You settle up with ${offer.business_name} once the work is done.`
+            : tipping > 0
+              ? `Your time is held either way. We will take you to their secure payment page next for ${formatMoney(total)}, and you can still pay on the day if you change your mind.`
+              : "Your time is held either way. We will take you to their secure payment page next, and you can still pay on the day if you change your mind."}
         </p>
       </section>
 
@@ -180,6 +304,32 @@ export function BookingReview({
         </p>
       )}
     </div>
+  );
+}
+
+function TipButton({
+  label, sub, chosen, onClick,
+}: {
+  label: string;
+  sub?: string;
+  chosen: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={chosen}
+      className={cn(
+        "min-w-[68px] rounded-control border px-3 py-2 text-center transition-colors",
+        chosen
+          ? "border-brand-500 bg-brand-50"
+          : "border-line bg-surface hover:bg-surface-hover"
+      )}
+    >
+      <span className="block text-sm font-semibold text-ink">{label}</span>
+      {sub && <span className="block text-[11px] text-ink-faint">{sub}</span>}
+    </button>
   );
 }
 

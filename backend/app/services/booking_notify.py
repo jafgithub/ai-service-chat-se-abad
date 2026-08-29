@@ -56,7 +56,11 @@ def send_booking_emails(appointment_id: int) -> None:
         reference = _reference(job.id)
         service_name = _job_name(job)
         duration = int((appointment.ends_at - appointment.starts_at).total_seconds() // 60)
-        price = float(job.total_amount or 0)
+        # total_amount is price + tip. The emails want them apart: a provider
+        # reading "your price" wants the work, and reading "collect" wants the
+        # bill, and one number cannot be both.
+        tip = float(job.tip_amount or 0)
+        price = round(float(job.total_amount or 0) - tip, 2)
         currency = job.currency or settings.PAYMENT_CURRENCY
         address = customer.address if customer else None
         method = job.payment_method or "cod"
@@ -79,6 +83,7 @@ def send_booking_emails(appointment_id: int) -> None:
                     notes=job.access_notes,
                     payment_method=method,
                     paid=paid,
+                    tip=tip,
                 )
                 logger.info(f"[EMAIL] {reference} confirmation sent to the customer")
             except Exception as exc:  # noqa: BLE001 - best effort, already booked
@@ -123,6 +128,7 @@ def send_booking_emails(appointment_id: int) -> None:
                 notes=job.access_notes,
                 payment_method=method,
                 paid=paid,
+                tip=tip,
             )
             logger.info(f"[EMAIL] {reference} notification sent to the provider")
         except Exception as exc:  # noqa: BLE001

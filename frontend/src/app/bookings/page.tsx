@@ -227,7 +227,7 @@ export default function BookingsPage() {
                 </div>
 
                 <div className="flex-shrink-0 text-right">
-                  <p className="text-sm font-bold text-ink">{formatMoney(row.price, row.currency)}</p>
+                  <p className="text-sm font-bold text-ink">{formatMoney(row.total, row.currency)}</p>
                   <p className={cn(
                     "text-[11px]",
                     row.payment_status === "paid" ? "font-semibold text-positive" : "text-ink-faint"
@@ -266,7 +266,7 @@ export default function BookingsPage() {
                     never be offered a second chance to pay. */}
                 {row.payment_status === "unpaid" && row.status !== "cancelled" && (
                   <Button size="sm" onClick={() => pay(row)} disabled={paying === row.job_id}>
-                    {paying === row.job_id ? "Opening…" : `Pay ${formatMoney(row.price, row.currency)}`}
+                    {paying === row.job_id ? "Opening…" : `Pay ${formatMoney(row.total, row.currency)}`}
                   </Button>
                 )}
                 {row.status !== "cancelled" && row.status !== "completed" && (

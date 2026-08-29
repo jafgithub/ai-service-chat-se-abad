@@ -944,3 +944,187 @@ def test_the_provider_is_told_whether_to_collect(monkeypatch):
 
     booking_emails.send_provider_notification(**common, payment_method="stripe", paid=True)
     assert "Do not collect anything" in seen["html"]
+
+
+# ── the tip ──────────────────────────────────────────────────────────────────
+#
+# The rule these all circle: what the customer is tipping is decided on this
+# side, from the price we hold, and never read out of the request body. A
+# browser can ask for twenty percent; it cannot say what twenty percent is.
+
+
+def _book_with_tip(client, db, tip: dict, price=99):
+    """Book one job with whatever tip fields are given. Returns (response, headers).
+
+    The headers come back because sign_in_customer registers a fixed address, so
+    a test that also wants to read /booking/mine has to reuse this session rather
+    than sign in a second time.
+    """
+    service = a_service(db)
+    provider = a_provider(db)
+    offers(db, provider, service, price=price, minutes=60)
+    headers = sign_in_customer(client)
+    slot = LocalCalendar(db, provider.id).free_slots(service.id, 60, days_ahead=7)[0]
+
+    res = client.post("/api/v1/booking/book", headers=headers, json={
+        "provider_id": provider.id, "service_id": service.id,
+        "starts_at": slot.starts_at.isoformat(), **tip,
+    })
+    return res, headers
+
+
+def test_a_booking_without_a_tip_is_exactly_what_it_always_was(client, db):
+    """The guard on every total asserted anywhere else in this suite."""
+    res, headers = _book_with_tip(client, db, {})
+
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["price"] == 99
+    assert body["tip"] == 0
+    assert body["total"] == 99
+
+    from app.models.job import Job
+    job = db.query(Job).order_by(Job.id.desc()).first()
+    assert float(job.tip_amount) == 0
+    assert float(job.total_amount) == 99
+
+
+def test_a_percentage_is_worked_out_from_the_price(client, db):
+    res, headers = _book_with_tip(client, db, {"tip_percent": 15})
+
+    body = res.json()
+    assert body["price"] == 99, "still the work, not the bill"
+    assert body["tip"] == 14.85
+    assert body["total"] == 113.85
+
+
+def test_the_percentage_wins_over_any_amount_sent_with_it(client, db):
+    """The one that matters. An edited client cannot name its own figure."""
+    res, headers = _book_with_tip(client, db, {"tip_percent": 20, "tip_amount": 4000})
+
+    body = res.json()
+    assert body["tip"] == 19.8
+    assert body["total"] == 118.8
+
+
+def test_a_percentage_we_do_not_offer_is_refused(client, db):
+    res, headers = _book_with_tip(client, db, {"tip_percent": 75})
+
+    assert res.status_code == 422
+    assert "15%" in res.json()["detail"]
+
+
+def test_a_typed_amount_is_taken_as_given(client, db):
+    res, headers = _book_with_tip(client, db, {"tip_amount": 10})
+
+    body = res.json()
+    assert body["tip"] == 10
+    assert body["total"] == 109
+
+
+def test_an_absurd_typed_amount_is_clamped_rather_than_refused(client, db):
+    """Somebody who meant $50 and typed $5000 wants to tip, not to see an error."""
+    res, headers = _book_with_tip(client, db, {"tip_amount": 5000})
+
+    assert res.status_code == 200, res.text
+    assert res.json()["tip"] == 198, "twice the job, which is the lower of the two caps"
+
+
+def test_a_negative_tip_is_refused(client, db):
+    res, headers = _book_with_tip(client, db, {"tip_amount": -1})
+
+    assert res.status_code == 422
+
+
+def test_a_cash_booking_keeps_its_tip_and_is_still_owed(client, db):
+    res, headers = _book_with_tip(client, db, {"tip_percent": 18, "payment_method": "cod"})
+
+    body = res.json()
+    assert body["tip"] == 17.82
+    assert body["total"] == 116.82
+    assert body["payment_status"] == "cod"
+    assert body["payment_due"] is False, "cash is settled with the provider, not owed to us"
+
+
+def test_the_tip_is_written_into_the_notes_that_reach_the_client(client, db):
+    """jobs.tip_amount does not sync. notes does, so the tip goes in there too."""
+    res, headers = _book_with_tip(client, db, {"tip_percent": 20})
+    assert res.status_code == 200, res.text
+
+    from app.models.job import Job
+    job = db.query(Job).order_by(Job.id.desc()).first()
+    assert "Tip for the provider" in (job.notes or "")
+    assert "19.80" in job.notes
+
+
+def test_my_bookings_reports_the_work_and_the_bill_apart(client, db):
+    res, headers = _book_with_tip(client, db, {"tip_percent": 15})
+    assert res.status_code == 200, res.text
+
+    mine = client.get("/api/v1/booking/mine", headers=headers)
+    assert mine.status_code == 200, mine.text
+    row = mine.json()[0]
+    assert row["price"] == 99, "price is the job, and stayed the job"
+    assert row["tip"] == 14.85
+    assert row["total"] == 113.85
+
+
+def test_the_provider_is_told_what_the_tip_is(monkeypatch):
+    """The whole point of a tip is that the person it is for finds out about it."""
+    from app.services import booking_emails
+
+    seen = {}
+    monkeypatch.setattr(booking_emails, "_send",
+                        lambda to, subject, html: seen.update(html=html))
+
+    common = dict(
+        to="firm@example.com", provider_name="Quickfix Drains", reference="BK-1",
+        service_name="Leak", customer_name="Alex", customer_email="a@example.com",
+        customer_phone="1", starts_at=datetime(2026, 8, 12, 17, 0),
+        duration_minutes=60, price=110.0, currency="USD", address="X", notes=None,
+    )
+
+    booking_emails.send_provider_notification(**common, payment_method="cod", tip=20.0)
+
+    assert "Collect $130.00 on the day" in seen["html"], "the bill, not the job"
+    assert "$110.00" in seen["html"], "and the job as well, so they can see both"
+    assert "$20.00 tip" in seen["html"]
+
+
+def test_the_customer_is_shown_the_tip_and_the_total(monkeypatch):
+    from app.services import booking_emails
+
+    seen = {}
+    monkeypatch.setattr(booking_emails, "_send",
+                        lambda to, subject, html: seen.update(html=html))
+
+    booking_emails.send_customer_confirmation(
+        to="a@example.com", customer_name="Alex", reference="BK-1",
+        service_name="Leak found and fixed", provider_name="Quickfix Drains",
+        provider_phone="1", starts_at=datetime(2026, 8, 12, 17, 0),
+        duration_minutes=60, price=110.0, currency="USD", address="X", notes=None,
+        payment_method="cod", tip=20.0,
+    )
+
+    assert "Tip for the provider" in seen["html"]
+    assert "$130.00" in seen["html"]
+
+
+def test_an_email_with_no_tip_reads_exactly_as_it_did_before(monkeypatch):
+    """The default is what protects every caller written before tips existed."""
+    from app.services import booking_emails
+
+    seen = {}
+    monkeypatch.setattr(booking_emails, "_send",
+                        lambda to, subject, html: seen.update(html=html))
+
+    booking_emails.send_provider_notification(
+        to="firm@example.com", provider_name="Quickfix Drains", reference="BK-1",
+        service_name="Leak", customer_name="Alex", customer_email="a@example.com",
+        customer_phone="1", starts_at=datetime(2026, 8, 12, 17, 0),
+        duration_minutes=60, price=110.0, currency="USD", address="X", notes=None,
+        payment_method="cod",
+    )
+
+    assert "Collect $110.00 on the day" in seen["html"]
+    assert "Tip" not in seen["html"], "no empty tip row on a job that had none"

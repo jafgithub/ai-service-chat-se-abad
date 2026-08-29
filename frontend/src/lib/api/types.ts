@@ -256,6 +256,10 @@ export interface BookIn {
   notes?: string;
   service_request_id?: number | null;
   payment_method?: PaymentMethod;
+  /** One of the offered percentages. The server works the money out from it. */
+  tip_percent?: number | null;
+  /** Only when they typed their own. Ignored if a percentage is sent too. */
+  tip_amount?: number | null;
 }
 
 /** Everything the confirmation screen needs, so it makes no second call.
@@ -278,7 +282,11 @@ export interface Booked {
   duration_minutes: number;
   label: string;
 
+  /** The provider's price for the work, before any tip. */
   price: number;
+  /** What was added for the provider, and what the customer actually pays. */
+  tip: number;
+  total: number;
   currency: string;
   payment_method: string;
   /** "cod", "unpaid" or "paid". Only the payment provider's webhook may make
@@ -309,7 +317,10 @@ export interface BookingSummary {
   provider_phone?: string | null;
   provider_website?: string | null;
   service?: string | null;
+  /** The work, before any tip. `total` is what is owed or was paid. */
   price: number;
+  tip: number;
+  total: number;
   currency: string;
   address?: string | null;
   notes?: string | null;
@@ -369,6 +380,14 @@ export interface ProviderAppointment {
   customer_phone?: string | null;
   address?: string | null;
   notes?: string | null;
+  /** The work, what the customer added on top, and what that comes to. On a
+   *  cash job the total is what there is to collect at the door. */
+  price: number;
+  tip: number;
+  total: number;
+  currency: string;
+  payment_method?: string;
+  payment_status: string;
 }
 
 // ── still the shop's, kept for the admin pages and for Phase G ───────────────

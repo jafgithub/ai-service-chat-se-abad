@@ -24,7 +24,7 @@ from app.models.provider import Provider, ProviderService
 from app.models.service import Service
 from app.models.service_request import ServiceRequest
 from app.api.deps import require_customer
-from app.services import booking_service, calendly
+from app.services import booking_service, calendly, job_service
 from app.services.booking_notify import (send_booking_emails,
                                          send_cancellation_email)
 
@@ -173,6 +173,12 @@ class BookIn(BaseModel):
     #: needs nothing further; the other two send the customer to that provider's
     #: own page, and the booking is held meanwhile.
     payment_method: str = Field(default="cod", pattern="^(cod|stripe|paypal)$")
+    #: What they chose to add for the provider. One of the offered percentages,
+    #: or their own amount when they typed one. Both are optional and both are
+    #: only ever a request: the money is worked out on this side, in
+    #: job_service.tip_for, and the percentage wins if somehow both arrive.
+    tip_percent: int | None = None
+    tip_amount: float | None = None
 
 
 class BookedOut(BaseModel):
@@ -201,7 +207,13 @@ class BookedOut(BaseModel):
     duration_minutes: int
     label: str
 
+    #: The provider's price for the work, before any tip. Deliberately unchanged
+    #: by this feature: a screen or a test reading `price` is asking what the job
+    #: cost, and it should keep getting that answer.
     price: float
+    #: What was added for the provider, and what the customer actually pays.
+    tip: float = 0.0
+    total: float
     currency: str
     #: What was chosen: cod, stripe or paypal.
     payment_method: str = "cod"
@@ -284,21 +296,35 @@ def book(payload: BookIn,
         if request is None:
             raise HTTPException(status_code=404, detail="Not one of your requests.")
 
+    # Worked out here rather than taken from the body. See job_service.tip_for.
+    try:
+        tip = job_service.tip_for(price, payload.tip_percent, payload.tip_amount)
+    except job_service.TipError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    currency = settings.PAYMENT_CURRENCY
+
     job = Job(
         customer_id=customer.id,
         provider_id=provider.id,
         provider_service_id=offering.id,
         service_request_id=request.id if request else None,
-        currency=settings.PAYMENT_CURRENCY,
+        currency=currency,
         status="pending",
-        total_amount=price,
+        tip_amount=tip,
+        # What the customer pays, which is what api/payments.py charges. The
+        # tip is kept separately above so the two can still be told apart.
+        total_amount=round(price + tip, 2),
+        # No tip line here on purpose. Everything that reads items_json treats
+        # every entry as a priced service line, and api/payments.py builds the
+        # description on the payment page from the first of them.
         items_json=[{
             "item_id": service.id,
             "name": service.name,
             "price": price,
             "quantity": 1,
         }],
-        notes=payload.notes or None,
+        notes=job_service.note_with_tip(payload.notes or None, tip, currency),
         access_notes=payload.notes or None,
     )
     db.add(job)
@@ -363,6 +389,8 @@ def book(payload: BookIn,
         duration_minutes=duration,
         label=appointment.starts_at.strftime("%A %-d %B, %-I:%M %p"),
         price=price,
+        tip=tip,
+        total=float(job.total_amount or 0),
         currency=job.currency or settings.PAYMENT_CURRENCY,
         payment_method=job.payment_method,
         payment_status=job.payment_status,
@@ -412,7 +440,12 @@ def my_bookings(when: str = Query("all", pattern="^(all|upcoming|past|cancelled)
         "provider_name": p.business_name if p else None,
         "provider_phone": p.phone if p else None,
         "service": (j.items_json or [{}])[0].get("name"),
-        "price": float(j.total_amount or 0),
+        # `price` is the work, not the bill. It was total_amount until tips
+        # existed, and leaving it that way would have quietly changed what this
+        # field means for every screen already reading it.
+        "price": round(float(j.total_amount or 0) - float(j.tip_amount or 0), 2),
+        "tip": float(j.tip_amount or 0),
+        "total": float(j.total_amount or 0),
         "currency": j.currency or settings.PAYMENT_CURRENCY,
         "starts_at": a.starts_at,
         "ends_at": a.ends_at,

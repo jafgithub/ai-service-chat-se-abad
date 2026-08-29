@@ -32,6 +32,14 @@ class Job(Base):
         default="pending",
     )
     total_amount = Column(Numeric(10, 2), nullable=False, default=0)
+    # What the customer added for the provider on top of the price. The whole
+    # of it is theirs. `total_amount` above is price + tip, because that is what
+    # api/payments.py charges; this column is how anyone tells the two apart
+    # afterwards.
+    #
+    # Like `payment_method` below, it does NOT reach the client's system, so the
+    # tip is also written into `notes`. See job_service.note_with_tip.
+    tip_amount   = Column(Numeric(10, 2), nullable=False, default=0)
     items_json   = Column(JSON)          # list of order line items stored inline
     notes        = Column(Text)
     # The slot the customer chose. Nullable only because a job can be taken by

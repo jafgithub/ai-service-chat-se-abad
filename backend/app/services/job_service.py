@@ -169,6 +169,76 @@ def totals_for(subtotal_amount: float) -> tuple[float, float]:
     return tax_amount, grand_total
 
 
+# ── the tip ──────────────────────────────────────────────────────────────────
+
+#: What the booking screen offers. A percentage arriving from a browser has to
+#: be one of these; anything else is a client that has been edited, not a
+#: customer being generous.
+TIP_PERCENTS = (0, 15, 18, 20)
+
+#: Ceilings on a typed-in amount. Two of them, because either alone is wrong:
+#: a multiple alone lets a $900 boiler job carry a $1800 tip, and a flat cap
+#: alone makes a fat-fingered tip on a $60 callout look reasonable.
+TIP_MAX_MULTIPLE = 2.0
+TIP_MAX_ABSOLUTE = 500.0
+
+
+class TipError(Exception):
+    """A tip that cannot be honoured as sent."""
+
+
+def tip_cap(price: float) -> float:
+    return round(min(max(price, 0.0) * TIP_MAX_MULTIPLE, TIP_MAX_ABSOLUTE), 2)
+
+
+def tip_for(price: float,
+            tip_percent: int | None = None,
+            tip_amount: float | None = None) -> float:
+    """What the customer is actually tipping, decided here and not in the browser.
+
+    The percentage wins when both are sent, and the money is recomputed from the
+    price rather than read from `tip_amount`. That is the whole point: a request
+    carrying `20` and `$4000` gets twenty percent of the job. The amount is only
+    consulted when the customer typed their own, and it is clamped rather than
+    refused, because somebody who meant $50 and typed $5000 wants to tip, not to
+    see an error.
+
+    Raises TipError for a percentage we do not offer, or a negative amount.
+    """
+    base = max(float(price or 0), 0.0)
+
+    if tip_percent is not None:
+        if tip_percent not in TIP_PERCENTS:
+            raise TipError(
+                f"Choose one of {', '.join(f'{p}%' for p in TIP_PERCENTS[1:])}, "
+                "or enter your own amount."
+            )
+        return round(base * tip_percent / 100.0, 2)
+
+    if tip_amount is None:
+        return 0.0
+
+    given = float(tip_amount)
+    if given < 0:
+        raise TipError("A tip cannot be negative.")
+    return round(min(given, tip_cap(base)), 2)
+
+
+def note_with_tip(notes: str | None, tip: float, currency: str) -> str | None:
+    """Put the tip into the job's notes, for the same reason as the method above.
+
+    `jobs.tip_amount` does not reach the client's system either: sync_to_remote
+    keeps only the columns both databases share. Without this line his copy of
+    the job shows a total that does not add up from the parts, which is the sort
+    of discrepancy that gets read as overcharging rather than as a gratuity.
+    """
+    if not tip:
+        return notes
+    line = f"Tip for the provider: {currency} {tip:.2f}"
+    typed = (notes or "").strip()
+    return f"{line}\n{typed}" if typed else line
+
+
 def create_order(
     db: Session,
     customer: Customer,

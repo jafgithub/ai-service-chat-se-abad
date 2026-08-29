@@ -56,7 +56,21 @@ export function BookingConfirmation({ booking, onDone }: BookingConfirmationProp
         <Row label="Date" value={formatDay(booking.starts_at)} strong />
         <Row label="Time" value={formatTime(booking.starts_at)} strong />
         <Row label="How long" value={formatDuration(booking.duration_minutes)} />
-        <Row label="Price" value={formatMoney(booking.price, booking.currency)} strong />
+        <Row
+          label="Price"
+          value={formatMoney(booking.price, booking.currency)}
+          strong={!booking.tip}
+        />
+        {booking.tip > 0 && (
+          <Row
+            label="Tip"
+            value={formatMoney(booking.tip, booking.currency)}
+            sub={`All of it goes to ${booking.provider_name}`}
+          />
+        )}
+        {booking.tip > 0 && (
+          <Row label="Total" value={formatMoney(booking.total, booking.currency)} strong />
+        )}
         <Row
           label="Payment"
           value={paid ? "Paid" : cash ? "Cash on the day" : "Not paid yet"}
@@ -64,7 +78,9 @@ export function BookingConfirmation({ booking, onDone }: BookingConfirmationProp
             paid
               ? undefined
               : cash
-                ? "Settle up with the provider once the work is done"
+                ? booking.tip > 0
+                  ? "Hand it to the provider once the work is done, the tip included"
+                  : "Settle up with the provider once the work is done"
                 : "You can pay from My bookings, or on the day"
           }
         />

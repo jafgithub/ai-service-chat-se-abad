@@ -176,6 +176,10 @@ def list_orders(
             # still has money outstanding.
             "payment_method": o.payment_method,
             "total": float(o.total_amount or 0),
+            # Part of the total above, and owed to the provider rather than
+            # earned on the job. Worth its own field so the two can be reported
+            # apart.
+            "tip": float(o.tip_amount or 0),
             "items": len(o.items_json or []),
             "customer_name": c.name if c else None,
             "customer_email": c.email if c else None,

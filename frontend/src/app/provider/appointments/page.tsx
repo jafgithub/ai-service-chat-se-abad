@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { ProviderShell } from "@/components/provider/ProviderShell";
 import { Empty, Failed, Loading } from "@/components/ui/States";
 import { formatTime, groupSlotsByDay } from "@/lib/datetime";
+import { formatMoney } from "@/lib/service";
 import { cn } from "@/lib/utils";
 
 /**
@@ -108,6 +109,28 @@ export default function ProviderAppointmentsPage() {
                       <div className="flex-shrink-0 text-right">
                         <p className="text-sm font-bold text-ink">{formatTime(row.starts_at)}</p>
                         <p className="text-[11px] text-ink-muted">to {formatTime(row.ends_at)}</p>
+                        {row.total > 0 && (
+                          <p className="mt-1.5 text-sm font-semibold text-ink">
+                            {formatMoney(row.total, row.currency)}
+                          </p>
+                        )}
+                        {row.tip > 0 && (
+                          <p className="text-[11px] text-positive">
+                            includes {formatMoney(row.tip, row.currency)} tip
+                          </p>
+                        )}
+                        {/* The one operational fact: whether to ask for money
+                            at the door. Everything else on this card is about
+                            getting there. */}
+                        {row.total > 0 && (
+                          <p className="text-[11px] text-ink-muted">
+                            {row.payment_status === "paid"
+                              ? "Paid online"
+                              : row.payment_method === "cod"
+                                ? "Collect on the day"
+                                : "Not paid yet"}
+                          </p>
+                        )}
                       </div>
                     </div>
 

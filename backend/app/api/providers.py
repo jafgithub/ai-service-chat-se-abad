@@ -332,6 +332,15 @@ def my_appointments(upcoming_only: bool = Query(True),
         "customer_phone": c.phone if c else None,
         "address": c.address if c else None,
         "notes": j.access_notes,
+        # The diary carried no money at all until tips existed. On a cash job
+        # this is now the only place the provider can see what to collect, so
+        # all three are here rather than just the tip.
+        "price": round(float(j.total_amount or 0) - float(j.tip_amount or 0), 2),
+        "tip": float(j.tip_amount or 0),
+        "total": float(j.total_amount or 0),
+        "currency": j.currency or settings.PAYMENT_CURRENCY,
+        "payment_method": j.payment_method or "cod",
+        "payment_status": j.payment_status or "unpaid",
     } for a, j, c in rows]
 
 

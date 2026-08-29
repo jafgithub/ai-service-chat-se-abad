@@ -113,18 +113,23 @@ def send_customer_confirmation(
     notes: str | None,
     payment_method: str = "cod",
     paid: bool = False,
+    tip: float = 0.0,
 ) -> None:
     """What the customer keeps. The reference and the time carry the message."""
     when = _when(starts_at)
+    # `price` is the work. What they owe is the work plus anything they added.
+    # Defaulting the tip to zero keeps every caller written before tips existed
+    # saying exactly what it said before.
+    total = round(price + (tip or 0), 2)
 
     # Says what is actually true of this booking rather than one line for all
     # three cases. Somebody paying by card who reads "you settle up with the
     # provider" will turn up expecting to pay twice.
     if paid:
-        payment_line = f"Paid in full, {_money(price, currency)}. Nothing to settle on the day."
+        payment_line = f"Paid in full, {_money(total, currency)}. Nothing to settle on the day."
     elif payment_method == "cod":
         payment_line = (f"Nothing has been charged. You settle up with {provider_name} "
-                        f"for the work itself, {_money(price, currency)}.")
+                        f"on the day, {_money(total, currency)}.")
     else:
         method_name = "card" if payment_method == "stripe" else "PayPal"
         payment_line = (f"Payment by {method_name} has not completed yet. You can pay from "
@@ -149,7 +154,9 @@ def send_customer_confirmation(
           {_row("Phone", provider_phone or "")}
           {_row("When", when, strong=True)}
           {_row("How long", _duration(duration_minutes))}
-          {_row("Price", _money(price, currency), strong=True)}
+          {_row("Price", _money(price, currency), strong=not tip)}
+          {_row("Tip for the provider", _money(tip, currency) if tip else "")}
+          {_row("Total", _money(total, currency) if tip else "", strong=True)}
           {_row("Where", address or "")}
           {_row("Your notes", (notes or "").strip())}
         </table>
@@ -184,22 +191,26 @@ def send_provider_notification(
     notes: str | None,
     payment_method: str = "cod",
     paid: bool = False,
+    tip: float = 0.0,
 ) -> None:
     """What the provider needs in order to turn up: where, when, and who to ring."""
     when = _when(starts_at)
+    total = round(price + (tip or 0), 2)
 
     # Whether to ask for money at the door is the one operational fact a
     # provider needs from this email, so it is stated rather than implied.
+    tip_note = f" That includes a {_money(tip, currency)} tip." if tip else ""
     if paid:
-        collect_line = (f"<strong>Already paid online, {_money(price, currency)}. "
-                        "Do not collect anything.</strong>")
+        collect_line = (f"<strong>Already paid online, {_money(total, currency)}. "
+                        f"Do not collect anything.</strong>{tip_note}")
     elif payment_method == "cod":
-        collect_line = (f"<strong>Collect {_money(price, currency)} on the day.</strong> "
-                        "Nothing has been paid through us.")
+        collect_line = (f"<strong>Collect {_money(total, currency)} on the day.</strong> "
+                        f"Nothing has been paid through us.{tip_note}")
     else:
         method_name = "card" if payment_method == "stripe" else "PayPal"
         collect_line = (f"They chose to pay by {method_name} and it has not completed yet. "
-                        f"If it has not by the time you attend, collect {_money(price, currency)}.")
+                        f"If it has not by the time you attend, collect "
+                        f"{_money(total, currency)}.{tip_note}")
 
     # The address is the one thing that decides whether this job can happen, so
     # it is called out rather than sitting in the middle of a table.
@@ -228,7 +239,9 @@ def send_provider_notification(
           {_row("Job", service_name, strong=True)}
           {_row("When", when, strong=True)}
           {_row("How long", _duration(duration_minutes))}
-          {_row("Your price", _money(price, currency), strong=True)}
+          {_row("Your price", _money(price, currency), strong=not tip)}
+          {_row("Tip from the customer", _money(tip, currency) if tip else "")}
+          {_row("Total", _money(total, currency) if tip else "", strong=True)}
           {_row("Customer", customer_name)}
           {_row("Phone", customer_phone or "Not given")}
           {_row("Email", customer_email or "")}
