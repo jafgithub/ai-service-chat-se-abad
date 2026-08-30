@@ -76,3 +76,101 @@ press start.
 About $0.80 an hour while running, plus about $8 a month for the disk whether
 it runs or not. Left running, it is roughly $580 a month. The whole gap between
 those two numbers is the auto-off, which is why it has two mechanisms.
+
+---
+
+# What actually happened, 2026-08-30
+
+The client's key arrived (`ollm_admin`) and all of the above was attempted for
+real. Two things stop a `g6.xlarge` existing today, and **only the account
+owner can clear either**.
+
+## Blocker 1: the account is on the AWS Free Tier plan
+
+`RunInstances` refuses outright:
+
+    InvalidParameterCombination: The specified instance type is not eligible
+    for Free Tier.
+
+The only types this account may launch are `t3.micro`, `t3.small`,
+`t4g.micro`, `t4g.small`, `c7i-flex.large` and `m7i-flex.large`. No GPU type is
+free tier eligible, so no quota increase can help until the account is moved to
+a paid plan in Billing. This is not the quota, and it is not something an IAM
+user can change.
+
+## Blocker 2: the G quota is 0
+
+As the section above predicted. A request for 4 vCPUs was submitted on
+2026-08-30 and is pending:
+
+    id 256c84003f43406fb6217f053ce0b130J36szWFS   desired 4   PENDING
+
+Both have to clear. Neither can be worked around from here.
+
+## What was built anyway, and proved
+
+Account `253918336085`, us-west-2, which is **not** the account the three
+application boxes live in (`952427475294`). So this is cross account, and the
+private networking in `gpu-setup` does not apply: the apps reach the model over
+the public internet, and the security group is the only thing in front of it.
+
+    security group  sg-06ad9397831595b43   ollama-gpu
+      11434  from 35.91.251.211/32, 54.188.207.85/32, 54.254.25.0/32
+      22     from the operator's own address
+      and nothing else, ever
+
+    key pair        ollama-gpu (ed25519)
+    instance        i-040f1f3ecffb0356e   m7i-flex.large, 8 GB, Ubuntu 24.04
+    model           llama3.1:8b, the one the application is configured for
+
+Verified, in this order:
+
+1. `11434` refused from a machine that is not one of the three, and answered
+   from all three of them. The boundary is real, not assumed.
+2. A generation cross account, over the internet: 19s for a trivial prompt.
+3. The switch set to `gpu`, a real resident question answered from the real
+   model, grounded, citing Rule 2 and Rule 18: `served_by: gpu`,
+   `fell_back: false`. 70 seconds, because this is a CPU.
+4. `OLLAMA_TIMEOUT_SECONDS` is 45 and an 8B model on 2 CPU cores cannot finish
+   a retrieval prompt inside it, so the first three questions fell back to
+   Gemini with `The GPU stopped answering mid-question.` **That is the design
+   working**, not a fault: three residents got correct answers and the panel
+   said who wrote them. 45s stays, because an L4 answers in a few seconds.
+5. The instance stopped, as the idle timer will stop it every day. A resident
+   asked a question and got a correct answer **in 1.6 seconds** from Gemini,
+   with the panel reporting `fell_back: true` and naming the reason.
+
+The instance is left **stopped**. Compute is not billed while stopped; the
+40GB volume is, at roughly $3.20 a month.
+
+## Turning it into the real thing, once both blockers clear
+
+Not a rebuild. Stop it, change the type, start it:
+
+    aws ec2 modify-instance-attribute --instance-id i-040f1f3ecffb0356e \
+        --instance-type g6.xlarge
+
+Then re-run the Ollama installer on the box: it detects the NVIDIA card and
+pulls the driver itself. Everything else, the AMI, the security group, the
+model, the idle timer, the address the applications call, is already right.
+
+## The one bug this found in the automation
+
+`ollama pull` from cloud-init dies with `panic: $HOME is not defined`. The CLI
+reads `$HOME` to find its model directory and cloud-init has none, so the first
+unattended build finished with Ollama running and no model in it, which looks
+from the outside exactly like a model that failed to download. `userdata.sh`
+now pulls through the HTTP API instead, and so does the idle check.
+
+## The scripts here
+
+    awsenv.py      reads the key out of the client's CSV so it is never typed
+    survey.py      what exists, and what the quota actually is
+    quota.py       reads the request history and submits the increase
+    provision.py   security group and key pair, idempotent
+    launch.py      the instance, with shutdown behaviour set to stop
+    userdata.sh    the unattended install, including the idle timer
+
+Run them with any Python that has boto3:
+
+    .venv/bin/python deploy/gpu/survey.py

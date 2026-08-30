@@ -23,3 +23,9 @@ tsconfig.tsbuildinfo
 
 # Build output
 build/web/
+
+# The client's AWS key lives in ~/Downloads and is read from there at run time.
+# Nothing under deploy/gpu may ever carry it.
+deploy/gpu/*.pem
+deploy/gpu/*credential*
+deploy/gpu/*accessKey*
