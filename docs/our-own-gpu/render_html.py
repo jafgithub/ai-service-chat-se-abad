@@ -334,7 +334,7 @@ def main() -> None:
 <style>{STYLE}</style>
 </head>
 <body>
-<a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
+<a class="back" href="https://marketz.smartzees.com/docs/">All documents</a>
 <div class="masthead">
   <p class="eyebrow">For the client</p>
   <p class="title">Our own GPU, in plain words</p>

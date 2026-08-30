@@ -3,7 +3,7 @@
 The technical half. Everything needed to create the GPU machine and wire it to
 the Service Assistant, written to be followed by somebody who is not us.
 
-Live at `serviceagent.fordev.fun/docs/gpu-setup/`.
+Live at `servicez.smartzees.com/docs/gpu-setup/`.
 
 The client's half of the same subject is `../our-own-gpu/`. That one has no
 commands in it and does not mention AWS.

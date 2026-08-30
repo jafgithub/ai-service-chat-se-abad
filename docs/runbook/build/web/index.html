@@ -135,7 +135,7 @@ tbody tr:last-child td { border-bottom: none; }
 </style>
 </head>
 <body>
-<a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
+<a class="back" href="https://marketz.smartzees.com/docs/">All documents</a>
 <div class="masthead">
   <p class="eyebrow">Handover document</p>
   <p class="title">Service Agent: application spin-off and plumbing handover</p>
@@ -147,7 +147,7 @@ tbody tr:last-child td { border-bottom: none; }
 <p>Two applications share one codebase. The <strong>Product Application</strong> is a grocery shop. The <strong>Plumbing Application</strong>, Service Agent, is a booking platform. The second was built from the first.</p>
 <p>This document shows how to run either one, and how to build a third the same way. Every command was run against the live servers.</p>
 <p>Wherever a command appears, the line under it says what you should see when it worked. If you see something else, that is where to stop and look.</p>
-<p><strong>Product:</strong> https://dev.agent.fordev.fun <strong>Plumbing:</strong> https://serviceagent.fordev.fun</p>
+<p><strong>Product:</strong> https://marketz.smartzees.com <strong>Plumbing:</strong> https://servicez.smartzees.com</p>
 <hr>
 <h1 id="s2-architecture-overview">2. Architecture Overview</h1>
 <figure><img src="img/d01_architecture.png" width="1500" height="646" alt="One machine, four parts" loading="lazy"></figure>
@@ -164,7 +164,7 @@ tbody tr:last-child td { border-bottom: none; }
 <thead><tr><th></th><th>Product</th><th>Plumbing</th></tr></thead>
 <tbody>
 <tr><td>Machine</td><td>54.255.130.57</td><td>52.25.174.57</td></tr>
-<tr><td>Address</td><td>dev.agent.fordev.fun</td><td>serviceagent.fordev.fun</td></tr>
+<tr><td>Address</td><td>marketz.smartzees.com</td><td>servicez.smartzees.com</td></tr>
 <tr><td>Application port</td><td>8000</td><td>8100</td></tr>
 <tr><td>Service name</td><td><code>aiorder</code></td><td><code>plumber</code></td></tr>
 <tr><td>Website folder</td><td><code>/var/www/ai-order/frontend-dist</code></td><td><code>/var/www/serviceagent</code></td></tr>
@@ -172,7 +172,7 @@ tbody tr:last-child td { border-bottom: none; }
 <tr><td>Database</td><td><code>aidata2prd_dev</code></td><td><code>plumber_assistant</code></td></tr>
 </tbody></table></div>
 <p>The two application folders are in different places. Worth knowing before going looking for one.</p>
-<p><strong>The community documents.</strong> The plumbing application also answers questions from the association&#x27;s own PDFs, in the floating panel and in the booking chat. That index is built offline and shipped as JSON inside the application folder, so it needs nothing on the machine and no build step here. How it is routed, scoped and rebuilt, and the one hand maintained list that has to be updated when a new community is added, are in its own reference: https://serviceagent.fordev.fun/docs/community-rag/</p>
+<p><strong>The community documents.</strong> The plumbing application also answers questions from the association&#x27;s own PDFs, in the floating panel and in the booking chat. That index is built offline and shipped as JSON inside the application folder, so it needs nothing on the machine and no build step here. How it is routed, scoped and rebuilt, and the one hand maintained list that has to be updated when a new community is added, are in its own reference: https://servicez.smartzees.com/docs/community-rag/</p>
 <hr>
 <h1 id="s3-sop-spinning-off-a-new-application">3. SOP: Spinning Off a New Application</h1>
 <figure><img src="img/d05_routes.png" width="1500" height="636" alt="Two ways to get a new machine" loading="lazy"></figure>
@@ -181,7 +181,7 @@ tbody tr:last-child td { border-bottom: none; }
 <h1 id="s3-1-route-a-from-a-snapshot-of-service-assistant">3.1 Route A: from a snapshot of Service Assistant</h1>
 <figure><img src="img/d06_snapshot.png" width="1500" height="480" alt="Route A: the whole journey" loading="lazy"></figure>
 <p>A snapshot is a photograph of a whole machine, disk and all, taken while it runs. Launch a new machine from one and it starts up already finished: nginx, MySQL, Python, ffmpeg, the code, the settings and the data are all there, and the application is already running.</p>
-<p>The work is not building anything. The work is changing the handful of things that still say <strong>serviceagent.fordev.fun</strong>.</p>
+<p>The work is not building anything. The work is changing the handful of things that still say <strong>servicez.smartzees.com</strong>.</p>
 <figure><img src="img/d07_carried.png" width="1500" height="513" alt="What the copy brings with it" loading="lazy"></figure>
 <h2 id="sstage-1-take-the-snapshot">Stage 1: Take the snapshot</h2>
 <p>Lightsail console, the Service Assistant instance, the <strong>Snapshots</strong> tab, <strong>Create snapshot</strong>. Name it with the date.</p>
@@ -204,14 +204,14 @@ systemctl is-active plumber nginx mysql</code></pre>
 <p>Everything here is a copy of ours until you change it.</p>
 <p><strong>1. The name in the front door.</strong></p>
 <pre><code>sudo nano /etc/nginx/sites-available/serviceagent</code></pre>
-<p>Change <strong>every</strong> <code>server_name serviceagent.fordev.fun;</code> to the new name. There are two, one in each block.</p>
+<p>Change <strong>every</strong> <code>server_name servicez.smartzees.com;</code> to the new name. There are two, one in each block.</p>
 <pre><code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
 <p class="expect">You should see: <code>syntax is ok</code> and <code>test is successful</code>.</p>
 <p><strong>2. The certificate.</strong> The one in the picture is ours and has our name on it, so a browser will warn until you get your own.</p>
 <pre><code>sudo certbot --nginx -d newname.fordev.fun --agree-tos -m you@example.com --redirect</code></pre>
 <p class="expect">You should see: &quot;Congratulations&quot;. If it fails, the subdomain is not pointing here yet: go back to stage 3.</p>
 <p>Then remove ours, which will never renew on this machine:</p>
-<pre><code>sudo certbot delete --cert-name serviceagent.fordev.fun</code></pre>
+<pre><code>sudo certbot delete --cert-name servicez.smartzees.com</code></pre>
 <p><strong>3 and 4. The two passwords.</strong> The database password and the admin token are both ours, and both are in a file another team has seen.</p>
 <pre><code>sudo mysql -e &quot;ALTER USER &#x27;aiorder&#x27;@&#x27;localhost&#x27; IDENTIFIED BY &#x27;A_NEW_PASSWORD&#x27;;&quot;
 nano /home/ubuntu/plumber/backend/.env      # DB_PASSWORD and ADMIN_TOKEN
@@ -435,7 +435,7 @@ ssh ubuntu@HOST &#x27;sudo rsync -a --delete /tmp/fe-stage/ /var/www/serviceagen
 <hr>
 <h1 id="s8-verification-smoke-tests">8. Verification / Smoke Tests</h1>
 <pre><code>systemctl is-active plumber
-curl -s -o /dev/null -w &quot;%{http_code}\n&quot; https://serviceagent.fordev.fun/health</code></pre>
+curl -s -o /dev/null -w &quot;%{http_code}\n&quot; https://servicez.smartzees.com/health</code></pre>
 <p>Then five things by hand, because these are the paths that fail quietly:</p>
 <ol><li>Describe a problem in the chat. Services come back with prices.</li><li>Pick one. Real times appear.</li><li>Book it. The confirmation email arrives.</li><li>Sign in as a provider. The appointment is on the diary.</li><li>Speak a request. The reply is spoken back.</li></ol>
 <hr>

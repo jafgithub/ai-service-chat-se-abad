@@ -1,0 +1,421 @@
+/* ── tokens ───────────────────────────────────────────────────────────────
+   The palette is the one the other five documents in this set already use:
+   rust badge, deep navy ink, and the blue / green / amber semantic trio from
+   render_diagrams.py. Continuity with the house style, not a sixth identity.
+
+   In the console those colours carry meaning rather than decoration. Green is
+   our own hardware, blue is the cloud engine that catches it, grey is an
+   honest refusal, rust is something being turned away at the gate.           */
+:root {
+  --paper:      #f6f7f9;
+  --card:       #ffffff;
+  --sunken:     #eef1f5;
+  --rule:       #dde3ea;
+  --rule-soft:  #e8edf2;
+
+  --ink:        #14213a;
+  --muted:      #5b6b86;
+  --faint:      #8494ab;
+
+  --brand:      #c2451b;
+  --brand-soft: #fdf1ec;
+
+  --ours:       #2f6b4c;
+  --ours-soft:  #eaf6ef;
+  --cloud:      #2258d4;
+  --cloud-soft: #eef3fd;
+  --refuse:     #5b6b86;
+  --refuse-soft:#eef1f5;
+  --warn:       #b1791a;
+  --warn-soft:  #fffaf0;
+
+  --shadow: 0 1px 2px rgba(20,33,58,.05), 0 10px 28px rgba(20,33,58,.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #0e1420;
+    --card:       #151d2c;
+    --sunken:     #1b2534;
+    --rule:       #263143;
+    --rule-soft:  #1f2a39;
+
+    --ink:        #e7edf5;
+    --muted:      #9fb0c6;
+    --faint:      #71829a;
+
+    --brand:      #ef7a4d;
+    --brand-soft: #331a12;
+
+    --ours:       #57b98a;
+    --ours-soft:  #12301f;
+    --cloud:      #6f9df0;
+    --cloud-soft: #131f38;
+    --refuse:     #8fa0b8;
+    --refuse-soft:#1b2534;
+    --warn:       #d8a441;
+    --warn-soft:  #2e2410;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:      #0e1420;
+  --card:       #151d2c;
+  --sunken:     #1b2534;
+  --rule:       #263143;
+  --rule-soft:  #1f2a39;
+
+  --ink:        #e7edf5;
+  --muted:      #9fb0c6;
+  --faint:      #71829a;
+
+  --brand:      #ef7a4d;
+  --brand-soft: #331a12;
+
+  --ours:       #57b98a;
+  --ours-soft:  #12301f;
+  --cloud:      #6f9df0;
+  --cloud-soft: #131f38;
+  --refuse:     #8fa0b8;
+  --refuse-soft:#1b2534;
+  --warn:       #d8a441;
+  --warn-soft:  #2e2410;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16.5px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono, .id, .num {
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+.shell {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 60px) clamp(16px, 4vw, 34px) 96px;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 20px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.back::before { content: "\2190"; margin-right: 7px; }
+.back:hover { color: var(--brand); }
+
+/* ── masthead, in the manner of a document of record ──────────────────── */
+.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 22px; margin-bottom: 34px; }
+
+.badge {
+  display: inline-block;
+  background: var(--brand);
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 4px 11px;
+  border-radius: 4px;
+}
+
+h1 {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: clamp(32px, 5vw, 50px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -.015em;
+  margin: 16px 0 0;
+  text-wrap: balance;
+}
+
+.standfirst {
+  margin: 14px 0 0;
+  max-width: 60ch;
+  font-size: clamp(16.5px, 1.6vw, 18.5px);
+  color: var(--muted);
+}
+
+.docmeta {
+  margin: 22px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px 24px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+}
+.docmeta dt { color: var(--faint); text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; }
+.docmeta dd { margin: 3px 0 0; color: var(--ink); font-weight: 500; }
+
+/* ── layout: sticky contents beside the text at wide widths ───────────── */
+.layout { display: block; }
+@media (min-width: 1040px) {
+  .layout { display: grid; grid-template-columns: 218px minmax(0, 1fr); gap: 52px; align-items: start; }
+  .toc { position: sticky; top: 28px; }
+}
+
+.toc { margin-bottom: 40px; }
+.toc h2 {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.toc ol ol { margin: 3px 0 6px 16px; }
+.toc a {
+  display: flex;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 13.5px;
+  padding: 3px 0;
+  border-radius: 3px;
+}
+.toc a:hover { color: var(--brand); }
+.toc a .n { color: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; flex: 0 0 auto; padding-top: 1px; }
+
+/* ── prose ────────────────────────────────────────────────────────────── */
+.body > section { margin-bottom: 52px; scroll-margin-top: 24px; }
+
+h2.sec {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: clamp(24px, 2.6vw, 31px);
+  font-weight: 500;
+  letter-spacing: -.01em;
+  margin: 0 0 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  text-wrap: balance;
+}
+h2.sec .n { color: var(--brand); font-family: "IBM Plex Mono", monospace; font-size: .62em; margin-right: 12px; }
+
+h3.sub {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 30px 0 8px;
+  letter-spacing: -.005em;
+}
+h3.sub .n { color: var(--brand); font-family: "IBM Plex Mono", monospace; font-size: .82em; margin-right: 9px; font-weight: 500; }
+
+p { margin: 0 0 14px; max-width: 66ch; }
+p:last-child { margin-bottom: 0; }
+.body strong { font-weight: 700; }
+
+.lede { font-size: 17.5px; color: var(--muted); max-width: 62ch; }
+
+/* requirement lists */
+.reqs { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.reqs li {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  align-items: baseline;
+}
+.reqs li:nth-child(odd) { background: var(--sunken); }
+.reqs .id {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  letter-spacing: .02em;
+}
+.reqs .txt { max-width: 60ch; }
+
+.callout {
+  border-left: 3px solid var(--brand);
+  background: var(--brand-soft);
+  padding: 13px 0 13px 17px;
+  margin: 18px 0;
+  border-radius: 0 6px 6px 0;
+}
+.callout p { margin: 0; max-width: 62ch; }
+
+.shows {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 4px 13px;
+  text-decoration: none;
+}
+.shows:hover { border-color: var(--brand); color: var(--brand); }
+.shows::before { content: "▸"; color: var(--brand); }
+
+.scroller { overflow-x: auto; margin: 20px 0; }
+table.spec { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14.5px; }
+table.spec th, table.spec td { text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+table.spec th { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+table.spec td:first-child { font-weight: 600; white-space: nowrap; }
+table.spec .num { font-variant-numeric: tabular-nums; }
+
+.figure { margin: 22px 0 0; }
+.figure .scroller { border: 1px solid var(--rule); border-radius: 10px; background: var(--card); padding: 14px 12px 8px; }
+.figcap { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--faint); margin-top: 9px; }
+
+/* ── the static flow diagram ──────────────────────────────────────────── */
+.flow { display: block; width: 100%; height: auto; min-width: 880px; }
+.fbox { fill: var(--sunken); stroke: var(--rule); stroke-width: 1.5; }
+.fbox.gate { fill: var(--brand-soft); stroke: var(--brand); }
+.fbox.you  { fill: var(--warn-soft); stroke: var(--warn); }
+.fbox.ours { fill: var(--ours-soft); stroke: var(--ours); }
+.fbox.cloud{ fill: var(--cloud-soft); stroke: var(--cloud); }
+.ft { fill: var(--ink); font: 600 13px "Public Sans", sans-serif; text-anchor: middle; }
+.fs { fill: var(--muted); font: 400 11px "IBM Plex Mono", monospace; text-anchor: middle; }
+.fl { stroke: var(--faint); stroke-width: 1.6; fill: none; }
+.flab { fill: var(--faint); font: 500 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+
+/* ── the console ──────────────────────────────────────────────────────── */
+.console { border: 1px solid var(--rule); border-radius: 12px; background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+.console > header {
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--rule);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px;
+}
+.console > header h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.console .modelled {
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--faint);
+  margin-left: auto;
+}
+
+.stage { padding: 10px 12px 2px; overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; min-width: 900px; }
+
+.nbox { fill: var(--sunken); stroke: var(--rule); stroke-width: 1.6; transition: fill .16s, stroke .16s; }
+.nbox.hot   { fill: var(--cloud-soft); stroke: var(--cloud); }
+.nbox.ours  { fill: var(--ours-soft);  stroke: var(--ours); }
+.nbox.cloud { fill: var(--cloud-soft); stroke: var(--cloud); }
+.nbox.stop  { fill: var(--brand-soft); stroke: var(--brand); stroke-dasharray: 6 4; }
+.nbox.dead  { fill: var(--brand-soft); stroke: var(--brand); stroke-dasharray: 6 4; }
+.nt { fill: var(--ink); font: 600 13px "Public Sans", sans-serif; text-anchor: middle; }
+.ns { fill: var(--muted); font: 400 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+.edge { stroke: var(--rule); stroke-width: 2; fill: none; transition: stroke .16s; }
+.elab { fill: var(--faint); font: 500 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+.p-ours { fill: var(--ours); } .p-cloud { fill: var(--cloud); }
+.p-refuse { fill: var(--refuse); } .p-block { fill: var(--brand); }
+
+.scenarios { display: flex; flex-wrap: wrap; gap: 8px; padding: 15px 18px; border-top: 1px solid var(--rule); }
+.scenarios button {
+  min-height: 40px; padding: 7px 15px; border-radius: 7px;
+  border: 1px solid var(--rule); background: var(--sunken); color: var(--ink);
+  font: 600 13px "Public Sans", sans-serif; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.scenarios button:hover { border-color: var(--faint); }
+.scenarios button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.scenarios button.quiet { margin-left: auto; background: transparent; }
+
+.dials { display: flex; flex-wrap: wrap; gap: 20px 28px; padding: 0 18px 16px; }
+.dial { flex: 1 1 190px; display: flex; flex-direction: column; gap: 5px; }
+.dial label {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.dial label b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dial input[type="range"] { width: 100%; accent-color: var(--brand); height: 20px; cursor: pointer; }
+
+.tiles {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 1px; background: var(--rule-soft); border-top: 1px solid var(--rule);
+}
+.tile { background: var(--card); padding: 13px 15px; }
+.tile .k {
+  font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint);
+}
+.tile .v {
+  margin-top: 3px; font-family: "IBM Plex Mono", monospace; font-size: 22px;
+  font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+.tile .v .u { font-size: 11.5px; color: var(--faint); margin-left: 2px; }
+.v.ours { color: var(--ours); } .v.cloud { color: var(--cloud); }
+.v.refuse { color: var(--refuse); } .v.block { color: var(--brand); }
+.v.good { color: var(--ours); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px; font-weight: 500;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.closed  { background: var(--ours-soft);  color: var(--ours); }
+.pill.open    { background: var(--brand-soft); color: var(--brand); }
+.pill.probing { background: var(--warn-soft);  color: var(--warn); }
+
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: var(--rule-soft); border-top: 1px solid var(--rule); }
+.chart { background: var(--card); padding: 13px 15px 8px; }
+.chart .k { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.chart svg { display: block; width: 100%; height: 58px; }
+
+.log {
+  margin: 0; padding: 11px 18px 16px; max-height: 210px; overflow-y: auto;
+  font-family: "IBM Plex Mono", monospace; font-size: 12.5px; line-height: 1.7; list-style: none;
+  border-top: 1px solid var(--rule);
+}
+.log li { display: flex; gap: 12px; color: var(--muted); }
+.log li .t { color: var(--faint); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.log li.ours .m   { color: var(--ours); }
+.log li.cloud .m  { color: var(--cloud); }
+.log li.block .m  { color: var(--brand); }
+.log li.warn .m   { color: var(--warn); }
+
+:where(a, button, input):focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 13.5px; }
+.foot p { max-width: 68ch; }
+/* ── added for the hand written documents that came after the SRS ──────────
+   The SRS had no code in it, so it had no rule for a block of it. `.block` was
+   already taken by a colour in the log widget above, hence `.code`.          */
+.code {
+  margin: 16px 0;
+  padding: 13px 15px;
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--brand);
+  border-radius: 0 8px 8px 0;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre;
+}
+.code code { font: inherit; color: inherit; }
+
+/* A step's headline, inside the numbered list the requirement rows also use. */
+.reqs .txt strong { color: var(--ink); font-weight: 600; }
+.reqs .txt em { color: var(--muted); font-style: italic; }
+
+/* Inline monospace inside prose, which the SRS only ever needed for numbers. */
+p .mono, td .mono, li .mono, dd .mono {
+  font-size: .92em;
+  background: var(--sunken);
+  border-radius: 4px;
+  padding: 1px 5px;
+}

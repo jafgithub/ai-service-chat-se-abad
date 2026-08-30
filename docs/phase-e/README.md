@@ -4,9 +4,9 @@ A walkthrough of the booking platform: what a customer does, what a provider
 does, what it is built from, where it runs, and the result of every test.
 Written to be shown to the client and to be edited by hand.
 
-**Live:** https://dev.agent.fordev.fun/docs/phase-e/
+**Live:** https://marketz.smartzees.com/docs/phase-e/
 **Word:** `build/Service_Assistant_Booking_Platform.docx`, also at
-https://dev.agent.fordev.fun/docs/Service_Assistant_Booking_Platform.docx
+https://marketz.smartzees.com/docs/Service_Assistant_Booking_Platform.docx
 
 ## Editing it
 

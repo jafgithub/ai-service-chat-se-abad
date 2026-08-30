@@ -42,7 +42,7 @@ SPEC = [
      "so this is only worth checking if the browser shows a warning."),
 
     ("t04_verify", "Check 4", "All three parts answer",
-     "curl -o /dev/null -w '%{http_code}' https://serviceagent.fordev.fun/",
+     "curl -o /dev/null -w '%{http_code}' https://servicez.smartzees.com/",
      "04_verify.txt", "200",
      "200 means success. The home page and the health check both returning it "
      "means the website, the application and the database are all talking."),

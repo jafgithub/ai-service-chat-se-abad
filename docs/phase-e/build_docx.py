@@ -56,7 +56,7 @@ def main() -> None:
         [
             "**Prepared by:** Abad Naseer",
             "**Project:** Service Assistant, conversational service booking",
-            "**Environment:** Development, dev.agent.fordev.fun/plumber",
+            "**Environment:** Development, marketz.smartzees.com/plumber",
             "**Catalogue:** 32 services, 8 seeded providers",
             "**Captured:** 12 August 2026",
             "",

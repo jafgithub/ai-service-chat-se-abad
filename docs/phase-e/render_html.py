@@ -273,7 +273,7 @@ def main() -> None:
 <style>{STYLE}</style>
 </head>
 <body>
-<a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
+<a class="back" href="https://marketz.smartzees.com/docs/">All documents</a>
 <div class="masthead">
   <p class="eyebrow">Development walkthrough</p>
   <p class="title">Service Assistant: the booking platform</p>

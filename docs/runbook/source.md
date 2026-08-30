@@ -10,8 +10,8 @@ way. Every command was run against the live servers.
 Wherever a command appears, the line under it says what you should see when it
 worked. If you see something else, that is where to stop and look.
 
-**Product:** https://dev.agent.fordev.fun
-**Plumbing:** https://serviceagent.fordev.fun
+**Product:** https://marketz.smartzees.com
+**Plumbing:** https://servicez.smartzees.com
 
 ---
 
@@ -31,7 +31,7 @@ Four parts, one machine.
 | | Product | Plumbing |
 |---|---|---|
 | Machine | 54.255.130.57 | 52.25.174.57 |
-| Address | dev.agent.fordev.fun | serviceagent.fordev.fun |
+| Address | marketz.smartzees.com | servicez.smartzees.com |
 | Application port | 8000 | 8100 |
 | Service name | `aiorder` | `plumber` |
 | Website folder | `/var/www/ai-order/frontend-dist` | `/var/www/serviceagent` |
@@ -47,7 +47,7 @@ That index is built offline and shipped as JSON inside the application folder,
 so it needs nothing on the machine and no build step here. How it is routed,
 scoped and rebuilt, and the one hand maintained list that has to be updated when
 a new community is added, are in its own reference:
-https://serviceagent.fordev.fun/docs/community-rag/
+https://servicez.smartzees.com/docs/community-rag/
 
 ---
 
@@ -71,7 +71,7 @@ MySQL, Python, ffmpeg, the code, the settings and the data are all there, and
 the application is already running.
 
 The work is not building anything. The work is changing the handful of things
-that still say **serviceagent.fordev.fun**.
+that still say **servicez.smartzees.com**.
 
 ![What the copy brings with it](d07_carried.png)
 
@@ -132,7 +132,7 @@ Everything here is a copy of ours until you change it.
 sudo nano /etc/nginx/sites-available/serviceagent
 ```
 
-Change **every** `server_name serviceagent.fordev.fun;` to the new name. There
+Change **every** `server_name servicez.smartzees.com;` to the new name. There
 are two, one in each block.
 
 ```
@@ -154,7 +154,7 @@ sudo certbot --nginx -d newname.fordev.fun --agree-tos -m you@example.com --redi
 Then remove ours, which will never renew on this machine:
 
 ```
-sudo certbot delete --cert-name serviceagent.fordev.fun
+sudo certbot delete --cert-name servicez.smartzees.com
 ```
 
 **3 and 4. The two passwords.** The database password and the admin token are
@@ -620,7 +620,7 @@ it is copying into. Documents kept inside it would be erased on the next deploy.
 
 ```
 systemctl is-active plumber
-curl -s -o /dev/null -w "%{http_code}\n" https://serviceagent.fordev.fun/health
+curl -s -o /dev/null -w "%{http_code}\n" https://servicez.smartzees.com/health
 ```
 
 Then five things by hand, because these are the paths that fail quietly:

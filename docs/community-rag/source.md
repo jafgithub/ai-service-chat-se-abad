@@ -469,7 +469,7 @@ Before it, every document reached the assistant by being emailed to us and
 loaded by hand, which put a day between an association approving a rule and a
 resident being able to ask about it.
 
-**Where:** serviceagent.fordev.fun/admin, under Community documents.
+**Where:** servicez.smartzees.com/admin, under Community documents.
 
 ![Adding a document, and the associations that hold almost nothing](s03_admin_upload.png)
 

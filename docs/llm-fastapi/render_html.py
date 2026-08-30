@@ -334,7 +334,7 @@ def main() -> None:
 <style>{STYLE}</style>
 </head>
 <body>
-<a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
+<a class="back" href="https://marketz.smartzees.com/docs/">All documents</a>
 <div class="masthead">
   <p class="eyebrow">Installation</p>
   <p class="title">Installing the open model, and wiring it to FastAPI</p>

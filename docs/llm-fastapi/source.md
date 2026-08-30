@@ -161,7 +161,7 @@ All of them require the admin token or an admin login.
 
 ```bash
 curl -s -H "X-Admin-Token: $ADMIN_TOKEN" \
-  https://serviceagent.fordev.fun/api/v1/admin/ai/status | python3 -m json.tool
+  https://servicez.smartzees.com/api/v1/admin/ai/status | python3 -m json.tool
 ```
 
 The status response says two different things on purpose: which engine is

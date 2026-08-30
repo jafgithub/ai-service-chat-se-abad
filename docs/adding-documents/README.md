@@ -5,7 +5,7 @@ the five second test that decides whether a PDF can be used, what we do at our
 end, what is loaded today, and the four contradictions between the documents
 that need a decision from the client.
 
-**Live:** https://serviceagent.fordev.fun/docs/adding-documents/
+**Live:** https://servicez.smartzees.com/docs/adding-documents/
 
 ## Rebuilding
 

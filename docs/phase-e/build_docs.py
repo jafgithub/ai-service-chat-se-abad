@@ -334,7 +334,7 @@ def main() -> None:
         cover(doc, title, subtitle, [
             "**Prepared by:** Abad Naseer",
             "**Project:** AI-Order (SmartMarket) conversational shopping assistant",
-            "**Environment:** Development, dev.agent.fordev.fun",
+            "**Environment:** Development, marketz.smartzees.com",
             "**Catalog size at time of measurement:** 25,631 products",
         ])
         print(f"building {slug}.docx")

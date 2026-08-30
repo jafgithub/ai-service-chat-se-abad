@@ -4,7 +4,7 @@ The software half of running the AI ourselves. `../gpu-setup/` is the AWS half:
 quota, permissions, the instance, and keeping it from running up a bill. This
 one is for somebody with a machine in front of them and a terminal open.
 
-Live at `serviceagent.fordev.fun/docs/llm-fastapi/`.
+Live at `servicez.smartzees.com/docs/llm-fastapi/`.
 
 ## The section that earns its place
 

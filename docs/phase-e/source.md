@@ -6,7 +6,7 @@ Every screenshot in this document is the running system on the development serve
 
 | | |
 |---|---|
-| **Live** | dev.agent.fordev.fun/plumber |
+| **Live** | marketz.smartzees.com/plumber |
 | **Services in the catalogue** | 32, across 6 categories |
 | **Providers** | 8 seeded businesses, plus those who register |
 | **Automated tests** | 154 backend, 68 frontend |
@@ -101,7 +101,7 @@ All seven days, always, including the closed ones. A list of only the open days 
 | **Pages** | Singapore, 54.255.130.57, served by nginx from `/var/www/plumber` |
 | **API** | Oregon, 52.25.174.57, FastAPI on port 8100 under `plumber.service` |
 | **Database** | MySQL on the Oregon box |
-| **Address** | dev.agent.fordev.fun/plumber, with the API at /plumber-api |
+| **Address** | marketz.smartzees.com/plumber, with the API at /plumber-api |
 | **Releases** | The two are independent. The pages are a static build; the API is a restart. |
 
 ---

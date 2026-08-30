@@ -5,7 +5,7 @@ gate in the booking chat, retrieval and grounding, community detection and
 scoping, the Three Lakes OCR limitation, the contradictions, and the procedure
 for adding a new community.
 
-**Live:** https://serviceagent.fordev.fun/docs/community-rag/
+**Live:** https://servicez.smartzees.com/docs/community-rag/
 
 Written for whoever works on this next, not for the client. The client facing
 version of the same subject is `docs/adding-documents/`, which covers what to

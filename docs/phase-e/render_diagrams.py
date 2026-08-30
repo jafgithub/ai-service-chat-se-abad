@@ -252,7 +252,7 @@ def deployment():
     s.append('<rect x="20" y="40" width="250" height="120" rx="10" class="cust"/>')
     s.append('<text x="145" y="76" class="t">Browser</text>')
     s.append('<text x="145" y="98" class="s">phone, tablet or desktop</text>')
-    s.append('<text x="145" y="126" class="s">dev.agent.fordev.fun</text>')
+    s.append('<text x="145" y="126" class="s">marketz.smartzees.com</text>')
 
     # Singapore
     s.append('<rect x="330" y="20" width="440" height="400" rx="12" class="plain"/>')

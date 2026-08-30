@@ -4,7 +4,7 @@ Twelve sections. How the booking platform was built from the shop, what changed
 between them file by file, the procedure for standing either one up on a new
 machine, and the operational detail: verification, rollback, security notes.
 
-**Live:** https://serviceagent.fordev.fun/docs/runbook/
+**Live:** https://servicez.smartzees.com/docs/runbook/
 
 Written for the client to work from himself, so every step is a command he can
 paste, and every figure was taken from the live server rather than from memory.

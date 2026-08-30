@@ -7,8 +7,8 @@ guessing.
 So adding a document is how the assistant learns something new. This page is
 what to send, what cannot be used, and what happens next.
 
-**Where the assistant is:** https://serviceagent.fordev.fun
-**Where to add a document:** https://serviceagent.fordev.fun/admin, under
+**Where the assistant is:** https://servicez.smartzees.com
+**Where to add a document:** https://servicez.smartzees.com/admin, under
 Community documents. Pick the community, choose the file, and it is answering
 questions a minute later.
 **If you would rather not do it yourself:** reply to this email with the files
@@ -187,4 +187,4 @@ the step that is easy to forget.
 For whoever works on the software: how questions are routed, how a community is
 recognised, how retrieval is scoped, and the exact procedure for adding one.
 
-https://serviceagent.fordev.fun/docs/community-rag/
+https://servicez.smartzees.com/docs/community-rag/

@@ -3,7 +3,7 @@
 The pitch page. Our AI infrastructure under load, as something a person can
 drag rather than a claim they have to accept.
 
-Live at `serviceagent.fordev.fun/docs/lab/`, deployed 29 August 2026.
+Live at `servicez.smartzees.com/docs/lab/`, deployed 29 August 2026.
 
 Single self-contained `index.html`. No build step, no network calls, nothing
 that needs the live service to be up.

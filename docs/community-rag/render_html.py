@@ -334,7 +334,7 @@ def main() -> None:
 <style>{STYLE}</style>
 </head>
 <body>
-<a class="back" href="https://dev.agent.fordev.fun/docs/">All documents</a>
+<a class="back" href="https://marketz.smartzees.com/docs/">All documents</a>
 <div class="masthead">
   <p class="eyebrow">Technical reference</p>
   <p class="title">Community documents: how the assistant answers, and from whose rules</p>

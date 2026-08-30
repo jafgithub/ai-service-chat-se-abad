@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Documents</title>
+<style>
+:root {
+  --bg:#FFFFFF; --ink:#14130F; --muted:#77726A; --faint:#A8A29A;
+  --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#131211; --ink:#F0EDE7; --muted:#A29C93; --faint:#736D65;
+          --line:#2B2926; --sunk:#1B1917; --accent:#E8905A; --good:#71C295; }
+}
+:root[data-theme="dark"] {
+  --bg:#131211; --ink:#F0EDE7; --muted:#A29C93; --faint:#736D65;
+  --line:#2B2926; --sunk:#1B1917; --accent:#E8905A; --good:#71C295;
+}
+:root[data-theme="light"] {
+  --bg:#FFFFFF; --ink:#14130F; --muted:#77726A; --faint:#A8A29A;
+  --line:#E9E6E1; --sunk:#FAF8F5; --accent:#C25317; --good:#2F6B4C;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0 auto; max-width: 900px; padding: 60px 28px 120px;
+  background: var(--bg); color: var(--ink);
+  font: 17px/1.62 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.eyebrow {
+  font-size: 11.5px; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--accent); font-weight: 650; margin: 0 0 12px;
+}
+h1 {
+  font-size: clamp(30px, 4.2vw, 40px); line-height: 1.13; letter-spacing: -0.025em;
+  font-weight: 650; margin: 0 0 14px; text-wrap: balance;
+}
+.lede { color: var(--muted); font-size: 18px; margin: 0 0 26px; max-width: 62ch; }
+
+/* Jump to a section without scrolling past the other one. */
+.jump { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 34px; }
+.jump a {
+  text-decoration: none; color: var(--ink); background: var(--sunk);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 15px; font-size: 14.5px; font-weight: 600;
+}
+.jump a:hover { border-color: var(--accent); color: var(--accent); }
+
+.find {
+  width: 100%; padding: 12px 15px; margin: 0 0 8px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--sunk); color: var(--ink); font: inherit; font-size: 15.5px;
+}
+.find:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.count { color: var(--faint); font-size: 13.5px; margin: 0 0 30px; min-height: 20px; }
+
+section { margin: 0 0 54px; scroll-margin-top: 20px; }
+h2 {
+  font-size: 21px; font-weight: 650; letter-spacing: -0.012em;
+  margin: 0 0 6px; padding-top: 26px; border-top: 1px solid var(--line);
+}
+.blurb { color: var(--muted); font-size: 15.5px; margin: 0 0 20px; max-width: 66ch; }
+
+a.card {
+  display: block; text-decoration: none; color: inherit;
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 17px 19px; margin: 0 0 11px; background: var(--bg);
+}
+a.card:hover { border-color: var(--accent); background: var(--sunk); }
+.card .top { display: flex; align-items: baseline; gap: 11px; flex-wrap: wrap; }
+.card .name { font-size: 17.5px; font-weight: 650; letter-spacing: -0.01em; }
+.card .kind {
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  font-weight: 700; color: var(--accent); background: var(--sunk);
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px;
+  white-space: nowrap;
+}
+.card .desc { color: var(--muted); font-size: 15.5px; margin: 5px 0 0; }
+.card .when { color: var(--faint); font-size: 13px; margin: 7px 0 0; }
+
+.word { margin: 16px 0 0; padding: 15px 18px; background: var(--sunk);
+        border: 1px solid var(--line); border-radius: 12px; }
+.word p { margin: 0 0 9px; font-size: 13px; letter-spacing: 0.07em;
+          text-transform: uppercase; font-weight: 700; color: var(--faint); }
+.word ul { margin: 0; padding: 0; list-style: none;
+           display: flex; flex-wrap: wrap; gap: 8px 10px; }
+.word a { font-size: 14.5px; color: var(--ink); text-decoration: none;
+          border-bottom: 1px solid var(--line); }
+.word a:hover { color: var(--accent); border-color: var(--accent); }
+
+.empty { color: var(--faint); font-size: 15.5px; display: none; }
+footer { color: var(--faint); font-size: 14px; border-top: 1px solid var(--line);
+         padding-top: 22px; margin-top: 10px; }
+@media (max-width: 640px) {
+  body { padding: 40px 18px 80px; font-size: 16px; }
+}
+</style>
+</head>
+
+<body>
+<p class="eyebrow">Documentation</p>
+<h1>Everything we have written for you</h1>
+<p class="lede">19 documents, in four groups: one for each of the three assistants, and one for the hardware they share. Every one opens in your browser, and every one has its own contents list at the top so you can jump straight to a section.</p>
+<div class="jump"><a href="#smartmarket">SmartMarket</a><a href="#smartservice">SmartService</a><a href="#smartcommunity">SmartCommunity</a><a href="#hardware">The hardware underneath</a></div>
+<input class="find" id="find" type="search" placeholder="Type to find a document: parking, gpu, speed, setup, sourcing..." aria-label="Find a document">
+<p class="count" id="count"></p>
+<p class="empty" id="empty">Nothing matches that. Clear the box to see all 19 again.</p>
+<section id="smartmarket">
+<h2>SmartMarket, the grocery assistant</h2>
+<p class="blurb">Ordering a week&#x27;s shopping by describing it: search, cart, checkout, sourcing and delivery, and the machine it runs on.</p>
+<a class="card" href="https://servicez.smartzees.com/docs/market-srs/" data-find="smartmarket: specification what it does, and the two things it is actually judged on: how fast it finds something, and whether the money is right specification 31 august 2026 srs specification requirements grocery market search latency tip tax outbox sync money correctness scalability security observability catalogue">
+  <span class="top"><span class="name">SmartMarket: specification</span><span class="kind">Specification</span></span>
+  <p class="desc">What it does, and the two things it is actually judged on: how fast it finds something, and whether the money is right</p>
+  <p class="when">31 August 2026</p>
+</a>
+<a class="card" href="https://marketz.smartzees.com/docs/next-phase/" data-find="what it does, what holds it back, where it can go the brief: what the product does today, what makes it slow, what it would take to sell it, and what to build next brief 8 august 2026 brief roadmap future voice speed google api keys recommendations proposal next phase">
+  <span class="top"><span class="name">What it does, what holds it back, where it can go</span><span class="kind">Brief</span></span>
+  <p class="desc">The brief: what the product does today, what makes it slow, what it would take to sell it, and what to build next</p>
+  <p class="when">8 August 2026</p>
+</a>
+<a class="card" href="https://marketz.smartzees.com/docs/runbook/" data-find="setting up your own copy start a new machine from a snapshot, give it its own address, and check it in a browser. written for somebody who has never used a server setup guide 17 august 2026 install setup server snapshot lightsail nginx domain address deploy new machine copy">
+  <span class="top"><span class="name">Setting up your own copy</span><span class="kind">Setup guide</span></span>
+  <p class="desc">Start a new machine from a snapshot, give it its own address, and check it in a browser. Written for somebody who has never used a server</p>
+  <p class="when">17 August 2026</p>
+</a>
+<a class="card" href="https://marketz.smartzees.com/docs/milestone-search-cart/" data-find="product search and cart the search and cart milestone: what was asked for, what was built, and the result of every test milestone 10 august 2026 search cart basket checkout quantity milestone products">
+  <span class="top"><span class="name">Product search and cart</span><span class="kind">Milestone</span></span>
+  <p class="desc">The search and cart milestone: what was asked for, what was built, and the result of every test</p>
+  <p class="when">10 August 2026</p>
+</a>
+<a class="card" href="https://marketz.smartzees.com/docs/ui-redesign/" data-find="the interface redesign a redesign of the shopper&#x27;s screens, and the four faults it uncovered walkthrough 8 august 2026 design ui screens layout mobile look shopper redesign">
+  <span class="top"><span class="name">The interface redesign</span><span class="kind">Walkthrough</span></span>
+  <p class="desc">A redesign of the shopper&#x27;s screens, and the four faults it uncovered</p>
+  <p class="when">8 August 2026</p>
+</a>
+<a class="card" href="https://marketz.smartzees.com/docs/three-phases/" data-find="payment, sourcing and speed what was built across three phases, how it was done, and what each change did to the numbers walkthrough 8 august 2026 payment stripe paypal sourcing google shopping speed index phases">
+  <span class="top"><span class="name">Payment, sourcing and speed</span><span class="kind">Walkthrough</span></span>
+  <p class="desc">What was built across three phases, how it was done, and what each change did to the numbers</p>
+  <p class="when">8 August 2026</p>
+</a>
+<div class="word"><p>Word versions</p><ul><li><a href="https://marketz.smartzees.com/docs/AI_Order_Brief.docx">The brief</a></li><li><a href="https://marketz.smartzees.com/docs/AI_Order_Three_Phases.docx">Payment, sourcing and speed</a></li><li><a href="https://marketz.smartzees.com/docs/AI_Order_Interface_Redesign.docx">The interface redesign</a></li><li><a href="https://marketz.smartzees.com/docs/AI_Order_Search_And_Cart.docx">Product search and cart</a></li><li><a href="https://marketz.smartzees.com/docs/speed/01_Summary.docx">Speed, part 1: summary</a></li><li><a href="https://marketz.smartzees.com/docs/speed/02_How_It_Works.docx">Speed, part 2: how it works</a></li><li><a href="https://marketz.smartzees.com/docs/speed/03_What_We_Did.docx">Speed, part 3: what we did</a></li><li><a href="https://marketz.smartzees.com/docs/speed/04_Results.docx">Speed, part 4: results</a></li><li><a href="https://marketz.smartzees.com/docs/speed/05_Technical_Reference.docx">Speed, part 5: technical reference</a></li></ul></div>
+</section>
+<section id="smartservice">
+<h2>SmartService, the booking platform</h2>
+<p class="blurb">Describing a problem and ending up with a tradesperson booked, paid and confirmed. Also where parking passes and the hardware switch live.</p>
+<a class="card" href="https://servicez.smartzees.com/docs/srs/" data-find="the service assistant: specification what the system does, who uses it, and how it must behave under load and under failure, ending in a live console you can run specification 29 august 2026 srs specification requirements functional non functional scalability fallback availability security observability simulation stakeholders circuit breaker uptime">
+  <span class="top"><span class="name">The Service Assistant: specification</span><span class="kind">Specification</span></span>
+  <p class="desc">What the system does, who uses it, and how it must behave under load and under failure, ending in a live console you can run</p>
+  <p class="when">29 August 2026</p>
+</a>
+<a class="card" href="https://servicez.smartzees.com/docs/lab/" data-find="break the assistant our ai infrastructure under load, as something you can drag: turn the traffic past a million requests a day, starve the cache, kill a card, and watch what the design does about it interactive 29 august 2026 load scale throughput simulation gpu cards batching cache queue capacity million requests pitch demo infrastructure autoscale breaker">
+  <span class="top"><span class="name">Break the assistant</span><span class="kind">Interactive</span></span>
+  <p class="desc">Our AI infrastructure under load, as something you can drag: turn the traffic past a million requests a day, starve the cache, kill a card, and watch what the design does about it</p>
+  <p class="when">29 August 2026</p>
+</a>
+<a class="card" href="https://marketz.smartzees.com/docs/phase-e/" data-find="the booking platform describe a problem, see who can do it, pick a time, book it. what a customer does, what a provider does, and where it runs walkthrough 12 august 2026 booking appointment provider calendar slots payment customer journey plumber">
+  <span class="top"><span class="name">The booking platform</span><span class="kind">Walkthrough</span></span>
+  <p class="desc">Describe a problem, see who can do it, pick a time, book it. What a customer does, what a provider does, and where it runs</p>
+  <p class="when">12 August 2026</p>
+</a>
+<a class="card" href="https://marketz.smartzees.com/docs/plumber-system/" data-find="requirements, for approval what the booking assistant was going to be, before it was built. kept so the finished thing can be checked against it requirements 11 august 2026 requirements scope quote price approval plumber specification">
+  <span class="top"><span class="name">Requirements, for approval</span><span class="kind">Requirements</span></span>
+  <p class="desc">What the booking assistant was going to be, before it was built. Kept so the finished thing can be checked against it</p>
+  <p class="when">11 August 2026</p>
+</a>
+<a class="card" href="https://servicez.smartzees.com/docs/runbook/" data-find="spin-off and plumbing handover two applications from one codebase: what differs between them, and how to stand either one up on a new machine handover 14 august 2026 handover server setup snapshot deploy nginx rollback security spin off new instance">
+  <span class="top"><span class="name">Spin-off and plumbing handover</span><span class="kind">Handover</span></span>
+  <p class="desc">Two applications from one codebase: what differs between them, and how to stand either one up on a new machine</p>
+  <p class="when">14 August 2026</p>
+</a>
+<div class="word"><p>Word versions</p><ul><li><a href="https://marketz.smartzees.com/docs/Service_Assistant_Booking_Platform.docx">The booking platform</a></li><li><a href="https://marketz.smartzees.com/docs/Plumber_Assistant_Requirements.docx">Requirements, for approval</a></li></ul></div>
+</section>
+<section id="smartcommunity">
+<h2>SmartCommunity, the association assistant</h2>
+<p class="blurb">Answering a resident out of their own association&#x27;s documents, and naming the page it came from. Its own site since August 2026.</p>
+<a class="card" href="https://servicez.smartzees.com/docs/community-srs/" data-find="smartcommunity: specification what it answers, what it refuses, and how one association is never answered from another&#x27;s rules specification 31 august 2026 srs specification requirements community association hoa rules grounding refusal scoping citation retrieval threshold voice livz residents">
+  <span class="top"><span class="name">SmartCommunity: specification</span><span class="kind">Specification</span></span>
+  <p class="desc">What it answers, what it refuses, and how one association is never answered from another&#x27;s rules</p>
+  <p class="when">31 August 2026</p>
+</a>
+<a class="card" href="https://servicez.smartzees.com/docs/how-it-answers/" data-find="how the community assistant answers in plain language: where the answers come from, what happens between a question and the reply, and what it does when your documents do not cover it explainer 27 august 2026 how it works rag explain plain english answers documents refuse grounding trust board residents simple overview">
+  <span class="top"><span class="name">How the community assistant answers</span><span class="kind">Explainer</span></span>
+  <p class="desc">In plain language: where the answers come from, what happens between a question and the reply, and what it does when your documents do not cover it</p>
+  <p class="when">27 August 2026</p>
+</a>
+<a class="card" href="https://servicez.smartzees.com/docs/community-rag/" data-find="community documents: how the assistant answers uploading a document yourself, downloading one, parking passes, and how a resident&#x27;s question is routed so that one community is never answered from another&#x27;s rules technical reference 26 august 2026 rag rules quiet hours parking pets lease trash serenity lauderdale three lakes ocr scoping technical upload admin download qr visitor pass refresher picker">
+  <span class="top"><span class="name">Community documents: how the assistant answers</span><span class="kind">Technical reference</span></span>
+  <p class="desc">Uploading a document yourself, downloading one, parking passes, and how a resident&#x27;s question is routed so that one community is never answered from another&#x27;s rules</p>
+  <p class="when">26 August 2026</p>
+</a>
+<a class="card" href="https://servicez.smartzees.com/docs/adding-documents/" data-find="adding a community document how to add one yourself in a minute, what can and cannot be used, and what happens to a document once it is in how to 26 august 2026 documents pdf send upload rules association sop how to scanned ocr contradictions admin">
+  <span class="top"><span class="name">Adding a community document</span><span class="kind">How to</span></span>
+  <p class="desc">How to add one yourself in a minute, what can and cannot be used, and what happens to a document once it is in</p>
+  <p class="when">26 August 2026</p>
+</a>
+</section>
+<section id="hardware">
+<h2>The hardware underneath</h2>
+<p class="blurb">Running the model on a machine we control, what it costs, and how the applications carry on when it is switched off. Shared by all three agents.</p>
+<a class="card" href="https://servicez.smartzees.com/docs/gpu-spinup/" data-find="spinning up a gpu, and wiring it to fastapi from an empty aws account to a resident&#x27;s question answered by our own model, in nine steps. written from a real attempt, including the two things that stopped it step by step 31 august 2026 gpu spin up step by step guide aws ec2 g6 xlarge l4 ollama llama fastapi integration wiring quota free tier security group idle auto stop lambda cloud-init home panic ollama_url fallback checklist troubleshooting cost">
+  <span class="top"><span class="name">Spinning up a GPU, and wiring it to FastAPI</span><span class="kind">Step by step</span></span>
+  <p class="desc">From an empty AWS account to a resident&#x27;s question answered by our own model, in nine steps. Written from a real attempt, including the two things that stopped it</p>
+  <p class="when">31 August 2026</p>
+</a>
+<a class="card" href="https://servicez.smartzees.com/docs/our-own-gpu/" data-find="our own gpu, in plain words what it means to run the ai on hardware we control, what it costs when it is on and when it is off, and why forgetting to switch it off does not cost anything explainer 29 august 2026 gpu own hardware ollama open model gemini google switch cost saving instance off on plain english client seminar demo privacy">
+  <span class="top"><span class="name">Our own GPU, in plain words</span><span class="kind">Explainer</span></span>
+  <p class="desc">What it means to run the AI on hardware we control, what it costs when it is on and when it is off, and why forgetting to switch it off does not cost anything</p>
+  <p class="when">29 August 2026</p>
+</a>
+<a class="card" href="https://servicez.smartzees.com/docs/gpu-setup/" data-find="running the ai on our own gpu: setup creating the machine and wiring it to the service assistant: the quota that blocks everything else, the aws permissions, the two mechanisms that stop it when nobody is using it, and how to check each one works technical setup 29 august 2026 gpu setup aws ec2 g6 xlarge l4 ollama llama iam policy lambda cron idle auto stop quota security group cloud-init instance runbook boto3">
+  <span class="top"><span class="name">Running the AI on our own GPU: setup</span><span class="kind">Technical setup</span></span>
+  <p class="desc">Creating the machine and wiring it to the Service Assistant: the quota that blocks everything else, the AWS permissions, the two mechanisms that stop it when nobody is using it, and how to check each one works</p>
+  <p class="when">29 August 2026</p>
+</a>
+<a class="card" href="https://servicez.smartzees.com/docs/llm-fastapi/" data-find="installing the open model, and wiring it to fastapi the software half: installing ollama, choosing a model, making it reachable, the four modules that decide where a question goes, and how to run the whole thing with no gpu at all installation 29 august 2026 install ollama llama model fastapi integration wiring setup steps developer gpu engine switch localhost laptop troubleshooting keep alive">
+  <span class="top"><span class="name">Installing the open model, and wiring it to FastAPI</span><span class="kind">Installation</span></span>
+  <p class="desc">The software half: installing Ollama, choosing a model, making it reachable, the four modules that decide where a question goes, and how to run the whole thing with no GPU at all</p>
+  <p class="when">29 August 2026</p>
+</a>
+</section>
+<footer>Kept up to date as work is delivered. If something you were sent is not listed here, tell us and it will be added.</footer>
+<script>
+const find = document.getElementById('find');
+const cards = [...document.querySelectorAll('a.card')];
+const count = document.getElementById('count');
+const empty = document.getElementById('empty');
+find.addEventListener('input', () => {
+  const q = find.value.trim().toLowerCase();
+  let shown = 0;
+  for (const card of cards) {
+    const hit = !q || card.dataset.find.includes(q);
+    card.style.display = hit ? '' : 'none';
+    if (hit) shown++;
+  }
+  for (const section of document.querySelectorAll('section')) {
+    const any = [...section.querySelectorAll('a.card')].some(c => c.style.display !== 'none');
+    section.style.display = any ? '' : 'none';
+  }
+  count.textContent = q ? `${shown} of ${cards.length} documents` : '';
+  empty.style.display = shown ? 'none' : 'block';
+});
+</script>
+</body>
+</html>

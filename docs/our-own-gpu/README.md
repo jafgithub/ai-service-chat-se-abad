@@ -4,7 +4,7 @@ The client's half. What running the AI on our own hardware means, what it costs,
 and why forgetting to switch it off does not matter. No commands, no AWS, no
 jargon.
 
-Live at `serviceagent.fordev.fun/docs/our-own-gpu/`.
+Live at `servicez.smartzees.com/docs/our-own-gpu/`.
 
 The technical half is `../gpu-setup/`, which is the one to send to whoever
 builds it.

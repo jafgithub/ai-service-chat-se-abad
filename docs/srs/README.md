@@ -3,7 +3,7 @@
 A short SRS with a table of contents, ending in a live console that models the
 system under load, under failure and under attack.
 
-Live at `serviceagent.fordev.fun/docs/srs/`, deployed 29 August 2026.
+Live at `servicez.smartzees.com/docs/srs/`, deployed 29 August 2026.
 
 `index.html` is the whole document. There is no `source.md` and no build step,
 so the file in this directory is exactly the file on the server.
