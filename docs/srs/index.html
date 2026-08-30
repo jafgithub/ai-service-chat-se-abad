@@ -670,6 +670,7 @@ table.spec .num { font-variant-numeric: tabular-nums; }
           </p>
         </div>
         <a class="shows" href="#s8">Scenario: a hundred at once</a>
+        <a class="shows" href="https://serviceagent.fordev.fun/docs/lab/">The load lab: a million a day, and what it takes</a>
 
         <h3 class="sub" id="s52"><span class="n">5.2</span>Fallback</h3>
         <ol class="reqs">
@@ -1368,9 +1369,14 @@ table.spec .num { font-variant-numeric: tabular-nums; }
     // Arrivals, exponentially spaced so they clump the way real ones do.
     const lambda = (S.residents * S.rate) / 60;
     if (lambda > 0) {
-      while (S.t >= S.nextArrival) {
+      // Advance from the previous arrival, not from the tick. Setting this to
+      // S.t + gap restarts the clock at each tick, so the loop can only fire
+      // once per tick however high the rate is set: arrivals silently capped
+      // at ten a second, which is the tick rate and nothing to do with traffic.
+      if (S.nextArrival < S.t - 1) S.nextArrival = S.t;
+      while (S.nextArrival <= S.t) {
         arrive();
-        S.nextArrival = S.t + (-Math.log(1 - Math.random()) / lambda);
+        S.nextArrival += -Math.log(1 - Math.random()) / lambda;
       }
     } else {
       S.nextArrival = S.t + 0.5;

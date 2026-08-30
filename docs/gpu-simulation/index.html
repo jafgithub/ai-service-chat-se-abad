@@ -939,10 +939,16 @@ input[type="range"] {
     for (let i = 0; i < steps; i++) {
       S.simSecs += SIM_SPEED / 20;
       stepGpu();
-      if (S.rate > 0 && S.simSecs >= S.nextAsk) {
-        ask();
-        // Exponential gaps, so questions arrive in clumps the way real ones do.
-        S.nextAsk = S.simSecs + (-Math.log(1 - Math.random()) * 60) / S.rate;
+      if (S.rate > 0) {
+        // Exponential gaps, so questions arrive in clumps the way real ones do,
+        // advanced from the last question rather than from the tick. Written
+        // the other way round it fires at most once per step, which caps the
+        // rate at the step rate and ignores the slider.
+        if (S.nextAsk < S.simSecs - 60) S.nextAsk = S.simSecs;
+        while (S.nextAsk <= S.simSecs) {
+          ask();
+          S.nextAsk += (-Math.log(1 - Math.random()) * 60) / S.rate;
+        }
       }
     }
 

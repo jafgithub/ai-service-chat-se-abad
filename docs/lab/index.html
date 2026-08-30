@@ -1,0 +1,779 @@
+<title>Break the Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+
+<style>
+/* ── tokens ──────────────────────────────────────────────────────────────
+   Paper and ink, one rust accent, and a diagram drawn almost entirely in
+   hairlines. The restraint is the point: the boxes carry no text, so nothing
+   competes with the numbers, which are the only things that move.          */
+:root {
+  --paper:   #f5f4f0;
+  --panel:   #fbfaf7;
+  --ink:     #1a1a18;
+  --muted:   #6b6862;
+  --faint:   #9a968d;
+  --line:    #ddd9cf;
+  --hair:    #c4c0b5;
+  --accent:  #bf4722;
+  --accent-soft: #f2e2db;
+  --warn:    #a8791c;
+  --good:    #3f7d52;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:   #14140f;
+    --panel:   #1b1b16;
+    --ink:     #edeae2;
+    --muted:   #9c988e;
+    --faint:   #6e6a61;
+    --line:    #2e2d26;
+    --hair:    #47453c;
+    --accent:  #e2724a;
+    --accent-soft: #33201a;
+    --warn:    #cf9f3e;
+    --good:    #63a878;
+  }
+}
+:root[data-theme="dark"] {
+  --paper:   #14140f;
+  --panel:   #1b1b16;
+  --ink:     #edeae2;
+  --muted:   #9c988e;
+  --faint:   #6e6a61;
+  --line:    #2e2d26;
+  --hair:    #47453c;
+  --accent:  #e2724a;
+  --accent-soft: #33201a;
+  --warn:    #cf9f3e;
+  --good:    #63a878;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: clamp(26px,5vw,56px) clamp(16px,4vw,32px) 90px; }
+
+a { color: inherit; }
+.back { font-size: 12px; color: var(--muted); text-decoration: none; }
+.back::before { content: "\2190"; margin-right: 7px; }
+.back:hover { color: var(--accent); }
+
+.eyebrow {
+  margin: 26px 0 0; font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted); display: flex; align-items: center; gap: 9px;
+}
+.eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+h1 {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: clamp(38px, 6vw, 62px);
+  font-weight: 400; letter-spacing: -.02em; line-height: 1.02;
+  margin: 14px 0 0;
+}
+
+.standfirst {
+  margin: 20px 0 0; max-width: 66ch; font-size: 15px; line-height: 1.72; color: var(--muted);
+}
+.standfirst strong { color: var(--ink); font-weight: 500; }
+
+hr.rule { border: 0; border-top: 1px solid var(--line); margin: 34px 0 0; }
+
+/* ── the two columns ─────────────────────────────────────────────────── */
+.lab { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; margin-top: 34px; }
+@media (min-width: 980px) { .lab { grid-template-columns: minmax(0,1fr) 336px; } }
+
+.pane { border: 1px solid var(--line); background: var(--panel); }
+.pane > header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 15px; border-bottom: 1px solid var(--line);
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.livedot { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
+.livedot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+@media (prefers-reduced-motion: no-preference) { .livedot::before { animation: pulse 2.4s ease-in-out infinite; } }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+
+/* ── the figure ──────────────────────────────────────────────────────── */
+.stage { padding: 6px 4px 0; overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; min-width: 620px; }
+
+.nb { fill: none; stroke: var(--hair); stroke-width: 1; }
+.nb.on   { stroke: var(--accent); fill: var(--accent-soft); }
+.nb.dead { stroke: var(--hair); stroke-dasharray: 2 2; opacity: .45; }
+.nl { fill: var(--faint); font: 400 9.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+.ax { fill: var(--faint); font: 400 10px "IBM Plex Mono", monospace; text-anchor: middle; }
+.ed { stroke: var(--hair); stroke-width: .9; fill: none; }
+.ed.dash { stroke-dasharray: 3 3; opacity: .6; }
+.tick { stroke: var(--hair); stroke-width: 1.4; }
+.pip { fill: var(--accent); }
+.pip.cool { fill: var(--hair); }
+
+.strip {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+  padding: 10px 15px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted);
+}
+.strip .sq { width: 8px; height: 8px; background: var(--accent); display: inline-block; margin-right: 6px; }
+.strip b { color: var(--ink); font-weight: 500; }
+
+/* the legend: what each part is, under the picture rather than inside it */
+.legend {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr));
+  gap: 16px 22px; padding: 16px 15px; border-top: 1px solid var(--line);
+}
+.legend h4 { margin: 0 0 3px; font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); font-weight: 500; }
+.legend p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+
+/* ── numbers ─────────────────────────────────────────────────────────── */
+.meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px,1fr)); border-top: 1px solid var(--line); }
+.meter { padding: 13px 14px; border-right: 1px solid var(--line); }
+.meter:last-child { border-right: 0; }
+.meter .k { font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--faint); }
+.meter .v { margin-top: 4px; font-size: 26px; font-weight: 400; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.meter .v .u { font-size: 11px; color: var(--faint); margin-left: 2px; letter-spacing: 0; }
+.v.hero { color: var(--accent); }
+.v.good { color: var(--good); }
+
+/* the sentence that is the pitch */
+.verdict {
+  border-top: 1px solid var(--line); padding: 15px;
+  font-size: 14.5px; line-height: 1.6; color: var(--muted);
+}
+.verdict b { color: var(--ink); font-weight: 500; }
+.verdict .big { color: var(--accent); }
+
+/* ── controls ────────────────────────────────────────────────────────── */
+.group { padding: 15px; border-bottom: 1px solid var(--line); }
+.group:last-child { border-bottom: 0; }
+.group > h3 { margin: 0 0 8px; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.group > p { margin: 0 0 13px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12.5px; }
+.row .val { color: var(--accent); font-variant-numeric: tabular-nums; }
+.row.off, .row.off .val { color: var(--faint); }
+
+input[type="range"] { width: 100%; accent-color: var(--accent); height: 20px; margin: 3px 0 12px; cursor: pointer; }
+input[type="range"]:disabled { opacity: .4; cursor: not-allowed; }
+.group .row + input { margin-top: 2px; }
+
+.tgl {
+  appearance: none; width: 30px; height: 17px; border: 1px solid var(--hair);
+  background: var(--paper); position: relative; cursor: pointer; flex: 0 0 auto;
+}
+.tgl::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; background: var(--hair); transition: left .14s, background .14s; }
+.tgl:checked { border-color: var(--accent); }
+.tgl:checked::after { left: 15px; background: var(--accent); }
+
+.breakers { display: flex; flex-wrap: wrap; gap: 7px; }
+.breakers button {
+  flex: 1 1 auto; min-height: 34px; padding: 6px 11px; cursor: pointer;
+  border: 1px solid var(--hair); background: transparent; color: var(--ink);
+  font: 500 12px "IBM Plex Mono", monospace;
+}
+.breakers button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.breakers button:disabled { opacity: .35; cursor: not-allowed; }
+.breakers button.reset { color: var(--muted); }
+
+:where(a,button,input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.log { margin: 0; padding: 12px 15px; max-height: 168px; overflow-y: auto; list-style: none; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.75; }
+.log li { display: flex; gap: 11px; color: var(--muted); }
+.log li .t { color: var(--faint); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.log li.hot .m { color: var(--accent); }
+.log li.ok .m { color: var(--good); }
+
+.foot { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.7; color: var(--faint); max-width: 78ch; }
+</style>
+
+<div class="wrap">
+
+  <a class="back" href="https://serviceagent.fordev.fun/docs/">All documents</a>
+
+  <p class="eyebrow">Interactive</p>
+  <h1>Break the assistant.</h1>
+  <p class="standfirst">
+    This is the AI side of the Service Assistant, wired up and actually running.
+    Turn the traffic up past a million requests a day, starve the cache, kill a
+    graphics card mid answer. Poke it however you like and watch what the design
+    does about it. <strong>The interesting number is not how fast one card is.
+    It is how few requests ever reach one.</strong>
+  </p>
+
+  <hr class="rule">
+
+  <div class="lab">
+
+    <div>
+      <div class="pane">
+        <header>
+          <span>Fig. 1 &middot; our AI, under your control</span>
+          <span class="livedot">Live</span>
+        </header>
+
+        <div class="stage">
+          <svg viewBox="0 0 920 400" role="img"
+               aria-label="Requests arrive at an api tier, most are answered from cache, the rest are searched against the community documents. Questions the documents cannot answer are refused without a model. Only what is left is queued for the GPU cards. A dashed fallback path runs to a cloud engine.">
+
+            <g id="ticks"></g>
+
+            <path class="ed" d="M64 207 L138 175"></path>
+            <path class="ed" d="M64 207 L138 201"></path>
+            <path class="ed" d="M64 207 L138 227"></path>
+            <path class="ed" d="M162 175 L205 199"></path>
+            <path class="ed" d="M162 201 L205 201"></path>
+            <path class="ed" d="M162 227 L205 203"></path>
+            <path class="ed" d="M205 160 L205 244"></path>
+
+            <path class="ed" d="M205 195 L293 100"></path>
+            <path class="ed" d="M317 95 L843 192"></path>
+            <path class="ed" d="M205 203 L293 201"></path>
+            <path class="ed" d="M317 201 L383 201"></path>
+            <path class="ed" d="M407 197 L843 197"></path>
+            <path class="ed" d="M394 215 L458 296"></path>
+            <path class="ed" d="M598 296 L628 224"></path>
+            <path class="ed" d="M652 200 L843 200"></path>
+            <path class="ed dash" id="e-fb" d="M400 216 C 560 330, 700 300, 843 208"></path>
+
+            <text class="nl" x="305" y="82">cache</text>
+            <text class="nl" x="305" y="188">retrieval</text>
+            <text class="nl" x="395" y="188">gate</text>
+            <text class="nl" x="520" y="286">queue</text>
+            <text class="nl" x="641" y="136">gpu cards</text>
+            <text class="nl" x="854" y="188">out</text>
+            <text class="nl" x="540" y="330" id="l-fb">fallback</text>
+
+            <rect class="nb" id="n-api1" x="138" y="168" width="24" height="14"></rect>
+            <rect class="nb" id="n-api2" x="138" y="194" width="24" height="14"></rect>
+            <rect class="nb" id="n-api3" x="138" y="220" width="24" height="14"></rect>
+
+            <rect class="nb" id="n-cache" x="293" y="88" width="24" height="14"></rect>
+            <rect class="nb" id="n-retr" x="293" y="194" width="24" height="14"></rect>
+            <rect class="nb" id="n-gate" x="383" y="194" width="24" height="14"></rect>
+            <rect class="nb" id="n-out" x="843" y="194" width="24" height="14"></rect>
+
+            <g id="queue"></g>
+            <g id="cards"></g>
+            <g id="pips"></g>
+
+            <text class="ax" x="48" y="376">requests</text>
+            <text class="ax" x="150" y="376">api</text>
+            <text class="ax" x="330" y="376">cache &middot; retrieval</text>
+            <text class="ax" x="520" y="376">queue</text>
+            <text class="ax" x="641" y="376">gpu cards</text>
+            <text class="ax" x="854" y="376">out</text>
+          </svg>
+        </div>
+
+        <div class="strip">
+          <span><span class="sq"></span><b id="s-state">steady</b></span>
+          <span><b id="s-api">3</b> api</span>
+          <span><b id="s-cards">2</b> cards</span>
+          <span>queue <b id="s-queue">0</b></span>
+          <span>batch <b id="s-batch">6</b></span>
+        </div>
+
+        <div class="legend">
+          <div><h4>Api tier</h4><p>where a request lands first, and the only part that scales by adding cheap machines</p></div>
+          <div><h4>Cache</h4><p>a repeat question, answered without touching anything downstream</p></div>
+          <div><h4>Retrieval</h4><p>finds the passage in that community's documents; arithmetic, not a model</p></div>
+          <div><h4>Gate</h4><p>nothing close enough, so it is refused here and no card is ever asked</p></div>
+          <div><h4>Queue and cards</h4><p>what is left is batched; one card answers many questions per pass</p></div>
+          <div><h4>Fallback</h4><p>drawn alongside, taken whenever the cards cannot</p></div>
+        </div>
+
+        <div class="meters">
+          <div class="meter"><div class="k">Served</div><div class="v" id="m-served">0<span class="u">/s</span></div></div>
+          <div class="meter"><div class="k">That is per day</div><div class="v hero" id="m-day">0</div></div>
+          <div class="meter"><div class="k">Never reach a card</div><div class="v good" id="m-skip">0<span class="u">%</span></div></div>
+          <div class="meter"><div class="k">Queue</div><div class="v" id="m-queue">0</div></div>
+          <div class="meter"><div class="k">Response</div><div class="v" id="m-resp">0<span class="u">ms</span></div></div>
+          <div class="meter"><div class="k">Job wait</div><div class="v" id="m-wait">0<span class="u">ms</span></div></div>
+          <div class="meter"><div class="k">Cost / 1k</div><div class="v" id="m-cost">$0.00</div></div>
+        </div>
+
+        <p class="verdict" id="verdict"></p>
+
+        <ul class="log" id="log" aria-live="polite" aria-relevant="additions"></ul>
+      </div>
+    </div>
+
+    <div class="pane">
+      <header><span>Controls</span><span class="livedot" id="c-state">Running</span></header>
+
+      <div class="group">
+        <h3>Traffic</h3>
+        <p>A million requests a day is about twelve a second on average, and three
+           times that at the morning peak. Drag it past either.</p>
+        <div class="row"><span>arrival rate</span><span class="val"><span id="v-rate">12</span> req/s</span></div>
+        <input type="range" id="d-rate" min="0" max="90" step="1" value="12">
+        <div class="row"><span>burstiness</span><span class="val" id="v-burst">2.0x</span></div>
+        <input type="range" id="d-burst" min="10" max="50" step="1" value="20">
+      </div>
+
+      <div class="group">
+        <h3>Cache</h3>
+        <p>Residents ask the same twenty questions. A repeat is answered from
+           memory and never reaches retrieval, a queue, or a card.</p>
+        <div class="row"><span>cache enabled</span><input type="checkbox" class="tgl" id="d-cacheon" checked></div>
+        <div class="row" id="r-hit"><span>hit rate</span><span class="val"><span id="v-hit">60</span>%</span></div>
+        <input type="range" id="d-hit" min="0" max="90" step="5" value="60">
+      </div>
+
+      <div class="group">
+        <h3>The gate</h3>
+        <p>A question the documents cannot answer is refused here, with no model
+           called at all. That is honesty first, and capacity second.</p>
+        <div class="row"><span>refused here</span><span class="val"><span id="v-gate">18</span>%</span></div>
+        <input type="range" id="d-gate" min="0" max="40" step="1" value="18">
+      </div>
+
+      <div class="group">
+        <h3>Gpu cards</h3>
+        <p>A card does not answer one question at a time. It answers a batch each
+           pass, so throughput rises with batch size and so does the wait.
+           Autoscale is on: a burst buys a card and then gives it back.</p>
+        <div class="row"><span>cards</span><span class="val" id="v-cards">2</span></div>
+        <input type="range" id="d-cards" min="0" max="8" step="1" value="2">
+        <div class="row"><span>batch size</span><span class="val" id="v-batch">6</span></div>
+        <input type="range" id="d-batch" min="1" max="32" step="1" value="6">
+        <div class="row"><span>autoscale</span><input type="checkbox" class="tgl" id="d-auto" checked></div>
+        <div class="row" id="r-ceil"><span>ceiling</span><span class="val"><span id="v-ceil">6</span> cards</span></div>
+        <input type="range" id="d-ceil" min="1" max="8" step="1" value="6">
+      </div>
+
+      <div class="group">
+        <h3>Api tier</h3>
+        <p>Cheap machines. They do no thinking, so more of them costs almost
+           nothing and buys headroom at the front.</p>
+        <div class="row"><span>instances</span><span class="val" id="v-api">3</span></div>
+        <input type="range" id="d-api" min="0" max="6" step="1" value="3">
+      </div>
+
+      <div class="group">
+        <h3>Break it</h3>
+        <p>A slow dependency is worse than a dead one. The breaker turns slow into
+           fast and degraded, on purpose.</p>
+        <div class="breakers">
+          <button type="button" id="b-kill">kill a card</button>
+          <button type="button" id="b-trip">trip the breaker</button>
+          <button type="button" id="b-api">kill an api box</button>
+          <button type="button" class="reset" id="b-reset">reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot">
+    A model, not a measurement. Retrieval, the gate and the fallback behave as
+    the running system does, and the refusal rate is the one measured on real
+    questions. The card figures are modelled on an NVIDIA L4 running an 8B model
+    with continuous batching, where a pass costs roughly 900ms plus 115ms per
+    item in the batch. Nothing on this page connects to the live service.
+  </p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ── the model ─────────────────────────────────────────────────────────
+     One pass over a batch costs a fixed setup plus a per item cost, which is
+     why a bigger batch buys throughput and spends latency. Everything else
+     here is cheap by comparison, and that is the whole argument.            */
+  const PASS_FIXED_MS = 900;
+  const PASS_PER_ITEM = 115;
+  const API_CAPACITY  = 14;      // requests a second one api box can front
+  const CACHE_MS      = [4, 9];
+  const RETRIEVAL_MS  = [30, 58];
+  const GATE_MS       = [1, 3];
+  const CLOUD_MS      = [620, 1300];
+  const CARD_HOURLY   = 0.8048;  // g6.xlarge, us-west-2
+  const QUEUE_MAX     = 900;
+
+  const rand  = (lo, hi) => lo + Math.random() * (hi - lo);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const el    = (id) => document.getElementById(id);
+
+  const S = {
+    t: 0,
+    rate: 12, burst: 2.0,
+    cacheOn: true, hit: 0.60, gate: 0.18,
+    cards: 2, batch: 6, auto: true, ceiling: 6,
+    api: 3,
+    tripped: false, trippedAt: 0,
+    queue: [], passes: [],           // in flight batches
+    done: [], waits: [],
+    served: 0, skipped: 0, viaCard: 0, viaCloud: 0, dropped: 0,
+    thisSec: 0, perSec: [], lastSec: 0,
+    nextArrival: 0, burstUntil: 0, burstMul: 1,
+    pips: [],
+  };
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const svgNS = "http://www.w3.org/2000/svg";
+  const layer = { ticks: el("ticks"), queue: el("queue"), cards: el("cards"), pips: el("pips") };
+
+  const stamp = () => {
+    const m = Math.floor(S.t / 60), s = Math.floor(S.t % 60);
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  };
+  function say(msg, tone) {
+    const li = document.createElement("li");
+    if (tone) li.className = tone;
+    const a = document.createElement("span"); a.className = "t"; a.textContent = stamp();
+    const b = document.createElement("span"); b.className = "m"; b.textContent = msg;
+    li.append(a, b);
+    el("log").prepend(li);
+    while (el("log").children.length > 40) el("log").lastChild.remove();
+  }
+
+  /* ── static furniture: the incoming ticks ──────────────────────────── */
+  for (let i = 0; i < 8; i++) {
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("class", "tick");
+    l.setAttribute("x1", 36); l.setAttribute("x2", 60);
+    l.setAttribute("y1", 172 + i * 10); l.setAttribute("y2", 172 + i * 10);
+    layer.ticks.appendChild(l);
+  }
+
+  /* ── routes ────────────────────────────────────────────────────────── */
+  const ENTRY = [[50, 207], [150, 201], [205, 201]];
+  const ROUTE = {
+    cache:  [...ENTRY, [305, 95], [854, 197]],
+    refuse: [...ENTRY, [305, 201], [395, 201], [854, 199]],
+    card:   [...ENTRY, [305, 201], [395, 201], [520, 296], [641, 200], [854, 200]],
+    cloud:  [...ENTRY, [305, 201], [395, 201], [700, 300], [854, 203]],
+  };
+
+  /* ── per card throughput ───────────────────────────────────────────── */
+  const passMs = () => PASS_FIXED_MS + S.batch * PASS_PER_ITEM;
+  const cardRate = () => (S.cards * S.batch) / (passMs() / 1000);
+
+  function arrive() {
+    // The api tier is the first thing that can say no.
+    if (S.api === 0 || S.queue.length > QUEUE_MAX) { S.dropped += 1; return; }
+
+    const now = S.t;
+    if (S.cacheOn && Math.random() < S.hit) {
+      complete(rand(...CACHE_MS), 0, "cache"); S.skipped += 1; return;
+    }
+    const base = rand(...RETRIEVAL_MS);
+    if (Math.random() < S.gate) {
+      complete(base + rand(...GATE_MS), 0, "refuse"); S.skipped += 1; return;
+    }
+    // Everything left needs a card. If there are none, or the breaker is open,
+    // the cloud takes it: slower, but nobody waits for a machine that is not
+    // coming back.
+    if (S.cards === 0 || S.tripped) {
+      complete(base + rand(...CLOUD_MS), 0, "cloud"); S.viaCloud += 1; return;
+    }
+    S.queue.push({ at: now, base });
+  }
+
+  function drainQueue() {
+    const capacity = S.cards - S.passes.length;
+    for (let i = 0; i < capacity && S.queue.length; i++) {
+      const take = S.queue.splice(0, S.batch);
+      S.passes.push({ items: take, left: passMs() / 1000 });
+    }
+  }
+
+  function stepPasses(dt) {
+    for (let i = S.passes.length - 1; i >= 0; i--) {
+      const p = S.passes[i];
+      p.left -= dt;
+      if (p.left > 0) continue;
+      for (const it of p.items) {
+        const waited = (S.t - it.at) * 1000;
+        S.waits.push(waited);
+        if (S.waits.length > 200) S.waits.shift();
+        complete(it.base + passMs(), waited, "card");
+        S.viaCard += 1;
+      }
+      S.passes.splice(i, 1);
+    }
+  }
+
+  function complete(serviceMs, waitedMs, route) {
+    S.served += 1; S.thisSec += 1;
+    S.done.push(serviceMs + waitedMs);
+    if (S.done.length > 300) S.done.shift();
+    fire(route);
+  }
+
+  function fire(route) {
+    if (reduced || S.pips.length > 40) return;
+    const c = document.createElementNS(svgNS, "circle");
+    c.setAttribute("r", "2.6");
+    c.setAttribute("class", route === "card" ? "pip" : "pip cool");
+    layer.pips.appendChild(c);
+    S.pips.push({ node: c, path: ROUTE[route], at: 0 });
+  }
+
+  function movePips(dt) {
+    for (let i = S.pips.length - 1; i >= 0; i--) {
+      const p = S.pips[i];
+      p.at += dt * 0.62;
+      if (p.at >= 1) { p.node.remove(); S.pips.splice(i, 1); continue; }
+      const [x, y] = along(p.path, p.at);
+      p.node.setAttribute("cx", x); p.node.setAttribute("cy", y);
+    }
+  }
+  function along(path, t) {
+    const seg = []; let total = 0;
+    for (let i = 1; i < path.length; i++) {
+      const d = Math.hypot(path[i][0] - path[i-1][0], path[i][1] - path[i-1][1]);
+      seg.push(d); total += d;
+    }
+    let want = t * total;
+    for (let i = 0; i < seg.length; i++) {
+      if (want <= seg[i] || i === seg.length - 1) {
+        const f = seg[i] ? clamp(want / seg[i], 0, 1) : 0;
+        return [path[i][0] + (path[i+1][0]-path[i][0]) * f,
+                path[i][1] + (path[i+1][1]-path[i][1]) * f];
+      }
+      want -= seg[i];
+    }
+    return path[path.length - 1];
+  }
+
+  const pct = (arr, p) => {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a,b) => a-b);
+    return s[clamp(Math.floor(s.length * p), 0, s.length - 1)];
+  };
+
+  /* ── drawing the two things that change shape ──────────────────────── */
+  function drawQueue() {
+    const want = clamp(Math.ceil(S.queue.length / Math.max(S.batch, 1)), 0, 9);
+    while (layer.queue.childElementCount > want) layer.queue.lastChild.remove();
+    while (layer.queue.childElementCount < want) {
+      const r = document.createElementNS(svgNS, "rect");
+      r.setAttribute("class", "nb on");
+      r.setAttribute("width", 20); r.setAttribute("height", 12);
+      r.setAttribute("y", 292);
+      layer.queue.appendChild(r);
+    }
+    [...layer.queue.children].forEach((r, i) => r.setAttribute("x", 458 + i * 24));
+  }
+
+  function drawCards() {
+    const want = clamp(S.cards, 0, 8);
+    while (layer.cards.childElementCount > want) layer.cards.lastChild.remove();
+    while (layer.cards.childElementCount < want) {
+      const r = document.createElementNS(svgNS, "rect");
+      r.setAttribute("width", 24); r.setAttribute("height", 14);
+      r.setAttribute("x", 628);
+      layer.cards.appendChild(r);
+    }
+    const busy = S.passes.length;
+    [...layer.cards.children].forEach((r, i) => {
+      r.setAttribute("y", 146 + i * 22);
+      r.setAttribute("class", "nb" + (i < busy ? " on" : ""));
+    });
+  }
+
+  /* ── numbers ───────────────────────────────────────────────────────── */
+  const fmt = (n) =>
+    n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 2) + "M"
+    : n >= 1e3 ? Math.round(n / 1e3) + "k" : Math.round(n);
+
+  function paint() {
+    const w = S.perSec.slice(-10);
+    const served = w.length ? w.reduce((a,b)=>a+b,0) / w.length : 0;
+    const total = S.served + S.dropped;
+
+    el("m-served").innerHTML = served.toFixed(1) + '<span class="u">/s</span>';
+    el("m-day").textContent = fmt(served * 86400);
+    el("m-skip").innerHTML =
+      (S.served ? (S.skipped / S.served) * 100 : 0).toFixed(0) + '<span class="u">%</span>';
+    el("m-queue").textContent = S.queue.length;
+    el("m-resp").innerHTML = Math.round(pct(S.done, 0.95)) + '<span class="u">ms</span>';
+    el("m-wait").innerHTML = Math.round(pct(S.waits, 0.95)) + '<span class="u">ms</span>';
+    el("m-cost").textContent = served > 0.05
+      ? "$" + (((S.cards * CARD_HOURLY) / 3600 / served) * 1000).toFixed(3)
+      : "$0.000";
+
+    el("s-api").textContent = S.api;
+    el("s-cards").textContent = S.cards;
+    el("s-queue").textContent = S.queue.length;
+    el("s-batch").textContent = S.batch;
+
+    const behind = S.queue.length > S.batch * Math.max(S.cards, 1) * 2;
+    el("s-state").textContent =
+      S.api === 0 ? "no front door"
+      : S.tripped ? "breaker open, on the cloud"
+      : S.cards === 0 ? "no cards, on the cloud"
+      : behind ? "falling behind" : "steady";
+
+    // The api boxes present, and whether the tier is saturated.
+    const load = S.rate / Math.max(S.api * API_CAPACITY, 1);
+    ["n-api1","n-api2","n-api3"].forEach((id, i) => {
+      el(id).setAttribute("class", "nb" + (i >= S.api ? " dead" : (load > .8 ? " on" : "")));
+    });
+    el("n-cache").setAttribute("class", "nb" + (S.cacheOn ? "" : " dead"));
+    el("n-gate").setAttribute("class", "nb" + (S.gate > 0 ? "" : " dead"));
+    el("e-fb").style.opacity = (S.tripped || S.cards === 0) ? ".95" : ".28";
+    el("l-fb").style.fill = (S.tripped || S.cards === 0) ? "var(--accent)" : "var(--faint)";
+
+    drawQueue(); drawCards();
+
+    // The sentence that is the whole pitch.
+    const perDay = served * 86400;
+    const skip = S.served ? (S.skipped / S.served) * 100 : 0;
+    let v;
+    if (S.dropped > 0 && total) {
+      v = `<b>Shedding.</b> ${fmt(S.dropped)} refused at the door. Add an api box, or a card.`;
+    } else if (behind) {
+      v = `<b>The queue is growing.</b> ${S.queue.length} waiting. More cards, or a bigger batch, or fewer questions reaching one.`;
+    } else if (perDay >= 900000) {
+      v = `Holding <span class="big">${fmt(perDay)} a day</span> on <b>${S.cards} card${S.cards===1?"":"s"}</b>, because <b>${skip.toFixed(0)}%</b> of it never reaches one.`;
+    } else {
+      v = `<span class="big">${fmt(perDay)} a day</span> at this rate. <b>${skip.toFixed(0)}%</b> never reaches a card. Turn the traffic up.`;
+    }
+    el("verdict").innerHTML = v;
+  }
+
+  /* ── the clock: model on an interval, animation on frames ──────────── */
+  function step(dt) {
+    S.t += dt;
+
+    if (S.tripped && S.t - S.trippedAt > 12) {
+      S.tripped = false; say("breaker closed, cards taking work again", "ok");
+    }
+
+    // Bursts, so the traffic clumps the way a morning does.
+    if (S.t > S.burstUntil) {
+      const bursty = Math.random() < 0.18;
+      S.burstMul = bursty ? S.burst : 1;
+      S.burstUntil = S.t + rand(2, 6);
+    }
+
+    const lambda = S.rate * S.burstMul;
+    if (lambda > 0) {
+      // Advance from the previous arrival, not from the tick. Setting this to
+      // S.t + gap restarts the clock at each tick, so the loop can only fire
+      // once per tick however high the rate is set: arrivals silently capped
+      // at ten a second, which is the tick rate and nothing to do with traffic.
+      if (S.nextArrival < S.t - 1) S.nextArrival = S.t;   // resuming from zero
+      while (S.nextArrival <= S.t) {
+        arrive();
+        S.nextArrival += -Math.log(1 - Math.random()) / lambda;
+      }
+    } else S.nextArrival = S.t + 0.4;
+
+    drainQueue();
+    stepPasses(dt);
+
+    if (S.auto) {
+      const want = clamp(Math.ceil(S.queue.length / Math.max(S.batch, 1)), 1, S.ceiling);
+      if (want > S.cards) { S.cards = want; say(`autoscaled to ${S.cards} cards`, "ok"); sync(); }
+      else if (want < S.cards && S.queue.length === 0 && S.passes.length === 0) {
+        S.cards = Math.max(want, 1); sync();
+      }
+    }
+
+    if (Math.floor(S.t) !== S.lastSec) {
+      S.lastSec = Math.floor(S.t);
+      S.perSec.push(S.thisSec);
+      if (S.perSec.length > 120) S.perSec.shift();
+      S.thisSec = 0;
+    }
+    paint();
+  }
+
+  let lastTick = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    const dt = Math.min((now - lastTick) / 1000, 2);
+    lastTick = now;
+    if (dt > 0) step(dt);
+  }, 100);
+
+  let lastFrame = performance.now();
+  (function frame(now) {
+    const dt = Math.min((now - lastFrame) / 1000, .5);
+    lastFrame = now;
+    if (!reduced) movePips(dt);
+    requestAnimationFrame(frame);
+  })(performance.now());
+
+  /* ── controls ──────────────────────────────────────────────────────── */
+  function sync() {
+    el("d-rate").value = S.rate;   el("v-rate").textContent = S.rate;
+    el("d-burst").value = S.burst * 10; el("v-burst").textContent = S.burst.toFixed(1) + "x";
+    el("d-hit").value = S.hit * 100;    el("v-hit").textContent = Math.round(S.hit * 100);
+    el("d-gate").value = S.gate * 100;  el("v-gate").textContent = Math.round(S.gate * 100);
+    el("d-cards").value = S.cards; el("v-cards").textContent = S.cards;
+    el("d-batch").value = S.batch; el("v-batch").textContent = S.batch;
+    el("d-ceil").value = S.ceiling; el("v-ceil").textContent = S.ceiling;
+    el("d-api").value = S.api;     el("v-api").textContent = S.api;
+    el("d-cacheon").checked = S.cacheOn;
+    el("d-auto").checked = S.auto;
+    el("d-hit").disabled = !S.cacheOn;
+    el("d-ceil").disabled = !S.auto;
+    el("d-cards").disabled = S.auto;
+    el("r-hit").className = "row" + (S.cacheOn ? "" : " off");
+    el("r-ceil").className = "row" + (S.auto ? "" : " off");
+    el("b-kill").disabled = S.cards === 0;
+    el("b-api").disabled = S.api === 0;
+    el("b-trip").disabled = S.tripped;
+  }
+
+  const bind = (id, fn) => el(id).addEventListener("input", (e) => { fn(e.target); sync(); });
+  bind("d-rate",   (t) => S.rate = +t.value);
+  bind("d-burst",  (t) => S.burst = +t.value / 10);
+  bind("d-hit",    (t) => S.hit = +t.value / 100);
+  bind("d-gate",   (t) => S.gate = +t.value / 100);
+  bind("d-cards",  (t) => S.cards = +t.value);
+  bind("d-batch",  (t) => S.batch = +t.value);
+  bind("d-ceil",   (t) => S.ceiling = +t.value);
+  bind("d-api",    (t) => S.api = +t.value);
+  bind("d-cacheon",(t) => { S.cacheOn = t.checked;
+    say(t.checked ? "cache on" : "cache off, every question now reaches retrieval",
+        t.checked ? "ok" : "hot"); });
+  bind("d-auto",   (t) => { S.auto = t.checked; say(t.checked ? "autoscale on" : "autoscale off"); });
+
+  el("b-kill").addEventListener("click", () => {
+    S.cards = Math.max(0, S.cards - 1);
+    say(S.cards ? `a card died, ${S.cards} left` : "last card died, everything to the cloud", "hot");
+    sync();
+  });
+  el("b-trip").addEventListener("click", () => {
+    S.tripped = true; S.trippedAt = S.t;
+    say("breaker open, the cloud is taking every question", "hot"); sync();
+  });
+  el("b-api").addEventListener("click", () => {
+    S.api = Math.max(0, S.api - 1);
+    say(S.api ? `an api box died, ${S.api} left` : "no api boxes left, nothing can land", "hot");
+    sync();
+  });
+  el("b-reset").addEventListener("click", () => {
+    S.pips.forEach((p) => p.node.remove());
+    Object.assign(S, {
+      t: 0, rate: 12, burst: 2.0, cacheOn: true, hit: .60, gate: .18,
+      cards: 2, batch: 6, auto: true, ceiling: 6, api: 3,
+      tripped: false, queue: [], passes: [], done: [], waits: [],
+      served: 0, skipped: 0, viaCard: 0, viaCloud: 0, dropped: 0,
+      thisSec: 0, perSec: [], lastSec: 0, nextArrival: 0, burstUntil: 0, burstMul: 1, pips: [],
+    });
+    el("log").replaceChildren();
+    lastTick = performance.now();
+    sync(); say("reset");
+  });
+
+  sync();
+  say("running, two cards, cache warm", "ok");
+})();
+</script>
