@@ -66,10 +66,15 @@ def state() -> dict:
     """What the instance is doing, and where it is.
 
     Returns {"state", "ip", "since", "error"}. `state` is one of AWS's own
-    words (pending, running, stopping, stopped, ...) or "not-configured" when
-    there is no instance to ask about, or "unknown" when AWS could not be
-    reached.
+    words (pending, running, stopping, stopped, ...), or "manual" when the
+    address was pointed by hand, or "not-configured" when there is no instance
+    to ask about, or "unknown" when AWS could not be reached.
     """
+    # An address set by hand has no instance behind it. Saying "not-configured"
+    # here would be a lie on the panel next to an engine that is answering.
+    if settings.OLLAMA_URL:
+        return {"state": "manual", "ip": None, "since": None, "error": ""}
+
     if not is_configured():
         return {"state": "not-configured", "ip": None, "since": None, "error": ""}
 
@@ -119,6 +124,19 @@ def health(max_age: int = HEALTH_TTL_SECONDS) -> dict:
     age = time.time() - _health["checked_at"]
     if age < max_age:
         return dict(_health)
+
+    # Pointed by hand, at a machine somebody is running themselves. There is no
+    # instance to ask AWS about, so the only question that means anything is
+    # whether it answers.
+    #
+    # This is the path the installation guide's section 9 describes, and until
+    # now it could not work: readiness was gated on GPU_INSTANCE_ID and an AWS
+    # key, so an address set by hand was reported as "the GPU is not set up yet"
+    # and every question went to Gemini however well Ollama was running.
+    if settings.OLLAMA_URL:
+        if not ollama_service.is_up(settings.OLLAMA_URL.rstrip("/")):
+            return _record(False, "The model at OLLAMA_URL is not answering.")
+        return _record(True, "")
 
     if not is_configured():
         return _record(False, "The GPU is not set up yet.")

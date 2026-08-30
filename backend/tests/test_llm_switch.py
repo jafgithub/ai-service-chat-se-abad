@@ -180,3 +180,70 @@ def test_nothing_available_returns_none_rather_than_raising(monkeypatch):
     monkeypatch.setattr(gemini_service, "generate", lambda *a, **k: None)
 
     assert llm.generate("s", "u") is None
+
+
+# ── an address pointed by hand ───────────────────────────────────────────────
+#
+# The settings file offers OLLAMA_URL as "a manual override for pointing at a
+# box by hand", and the installation guide's section 9 tells somebody to use it
+# to test the whole arrangement with no AWS at all. That did not work: health()
+# gated readiness on GPU_INSTANCE_ID and an AWS key, so an address set by hand
+# reported "the GPU is not set up yet" and every question quietly went to
+# Gemini however well Ollama was answering. These four hold that shut.
+
+def test_a_hand_pointed_address_is_ready_when_it_answers(monkeypatch):
+    from app.services import gpu_instance, ollama_service
+
+    monkeypatch.setattr(gpu_instance.settings, "OLLAMA_URL", "http://10.0.0.9:11434")
+    monkeypatch.setattr(gpu_instance.settings, "GPU_INSTANCE_ID", "")
+    monkeypatch.setattr(ollama_service, "is_up", lambda base: True)
+
+    reading = gpu_instance.health(max_age=0)
+
+    assert reading["ready"] is True
+    assert reading["reason"] == ""
+
+
+def test_a_hand_pointed_address_that_is_silent_is_not_ready(monkeypatch):
+    from app.services import gpu_instance, ollama_service
+
+    monkeypatch.setattr(gpu_instance.settings, "OLLAMA_URL", "http://10.0.0.9:11434")
+    monkeypatch.setattr(gpu_instance.settings, "GPU_INSTANCE_ID", "")
+    monkeypatch.setattr(ollama_service, "is_up", lambda base: False)
+
+    reading = gpu_instance.health(max_age=0)
+
+    assert reading["ready"] is False
+    # Says which thing is not answering, because "the GPU is not set up" sent
+    # somebody looking at AWS for a problem that was on their own machine.
+    assert "OLLAMA_URL" in reading["reason"]
+
+
+def test_a_hand_pointed_address_never_calls_aws(monkeypatch):
+    """No instance id and no key, so reaching for boto3 would be a crash rather
+    than a fallback."""
+    from app.services import gpu_instance, ollama_service
+
+    monkeypatch.setattr(gpu_instance.settings, "OLLAMA_URL", "http://10.0.0.9:11434")
+    monkeypatch.setattr(gpu_instance.settings, "GPU_INSTANCE_ID", "")
+    monkeypatch.setattr(ollama_service, "is_up", lambda base: True)
+
+    def explode():
+        raise AssertionError("a hand pointed address must not describe an instance")
+
+    monkeypatch.setattr(gpu_instance, "_client", explode)
+
+    assert gpu_instance.health(max_age=0)["ready"] is True
+    assert gpu_instance.state()["state"] == "manual"
+
+
+def test_the_panel_does_not_call_a_hand_pointed_address_not_configured(monkeypatch):
+    """The word on the panel has to match what is happening. "not-configured"
+    beside an engine that is answering is the sentence that gets somebody to
+    demonstrate the wrong thing to a room."""
+    from app.services import gpu_instance
+
+    monkeypatch.setattr(gpu_instance.settings, "OLLAMA_URL", "http://10.0.0.9:11434")
+    monkeypatch.setattr(gpu_instance.settings, "GPU_INSTANCE_ID", "")
+
+    assert gpu_instance.state()["state"] == "manual"
