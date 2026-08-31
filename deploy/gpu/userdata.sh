@@ -60,6 +60,20 @@ set -uo pipefail
 IDLE_MINUTES=20
 STAMP=/var/tmp/ollama-last-busy
 
+# Never act inside the first IDLE_MINUTES of uptime.
+#
+# This is not politeness, it is the difference between a machine that works and
+# one that cannot be used at all. /var/tmp survives a stop, so the stamp on disk
+# belongs to the previous life of this instance. Without this floor the first
+# cron run after any start reads a stamp from days ago, computes an idle time
+# of days, and shuts the machine down again within five minutes. It did exactly
+# that: started 16:24, stopped by itself before 16:30, with no StopInstances
+# call anywhere in CloudTrail because the shutdown came from inside.
+uptime_seconds=$(cut -d. -f1 /proc/uptime)
+if [ "$uptime_seconds" -lt $(( IDLE_MINUTES * 60 )) ]; then
+  exit 0
+fi
+
 # The API, not the CLI, for the same $HOME reason as the pull above. This runs
 # from cron, where the environment is smaller still.
 loaded=$(curl -s -m 5 http://127.0.0.1:11434/api/ps | grep -o '"model"' | wc -l)
@@ -67,7 +81,13 @@ if [ "${loaded:-0}" -gt 0 ]; then
   date +%s > "$STAMP"
   exit 0
 fi
-[ -f "$STAMP" ] || { date +%s > "$STAMP"; exit 0; }
+
+# And never trust a stamp written before this boot, for the same reason.
+boot_epoch=$(( $(date +%s) - uptime_seconds ))
+if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" -lt "$boot_epoch" ]; then
+  date +%s > "$STAMP"
+  exit 0
+fi
 
 idle=$(( ( $(date +%s) - $(cat "$STAMP") ) / 60 ))
 if [ "$idle" -ge "$IDLE_MINUTES" ]; then
