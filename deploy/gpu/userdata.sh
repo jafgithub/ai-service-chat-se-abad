@@ -54,10 +54,10 @@ cat > /usr/local/bin/ollama-idle-off <<'IDLE'
 # Stop the machine once nothing has asked it anything for a while.
 #
 # "Busy" means a model is loaded, which is what /api/ps reports. KEEP_ALIVE is
-# 30m and this waits 20m of quiet, so a machine that has genuinely finished is
+# 30m and this waits 25m of quiet, so a machine that has genuinely finished is
 # switched off and one mid conversation is not.
 set -uo pipefail
-IDLE_MINUTES=20
+IDLE_MINUTES=25
 STAMP=/var/tmp/ollama-last-busy
 
 # Never act inside the first IDLE_MINUTES of uptime.

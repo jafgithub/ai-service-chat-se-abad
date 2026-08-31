@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgentSwitch } from "@/components/layout/AgentSwitch";
 
 import { ChatMessage } from "./ChatMessage";
 import { ServiceCard } from "@/components/booking/ServiceCard";
@@ -768,6 +769,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
               </span>
             </div>
           </div>
+
+          <AgentSwitch current="service" />
 
           {/* Where the cart used to be. */}
           <AccountMenu onBrand />
