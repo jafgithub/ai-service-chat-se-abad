@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     #: What the GPU's own shutdown timer is set to. Held here only so the admin
     #: panel can say when the machine will switch itself off; nothing in the
     #: application enforces it.
-    GPU_IDLE_MINUTES: int = 20
+    GPU_IDLE_MINUTES: int = 25
     AWS_REGION: str = "us-west-2"
     # A dedicated IAM user, not a role: this box is Lightsail and cannot be
     # given a custom instance profile. The policy allows start and stop on one
