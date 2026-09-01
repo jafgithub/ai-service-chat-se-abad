@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentSwitch } from "@/components/layout/AgentSwitch";
+import { JourneyPending, type RequestTrace } from "@/components/chat/RequestJourney";
 
 import { ChatMessage } from "./ChatMessage";
 import { ServiceCard } from "@/components/booking/ServiceCard";
@@ -61,19 +62,13 @@ type SortBy = (typeof SORT_OPTIONS)[number]["id"];
 
 function TypingIndicator() {
   return (
-    <div className="mb-4 flex gap-3" role="status" aria-label="Assistant is replying">
+    <div className="mb-4 flex gap-3">
       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-50 text-base">
         📅
       </div>
-      <div className="flex items-center gap-1.5 rounded-card rounded-tl-sm border border-line bg-surface px-4 py-3">
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="animate-rise h-1.5 w-1.5 rounded-full bg-ink-faint"
-            style={{ animationDelay: `${i * 0.15}s` }}
-          />
-        ))}
-      </div>
+      {/* The three dots said only "wait". This names the stages the question is
+          going through, which is what the client asked to be able to watch. */}
+      <JourneyPending />
     </div>
   );
 }
@@ -153,7 +148,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const addMessage = useCallback((
     role: "user" | "assistant",
     content: string,
-    extra?: Partial<Pick<ChatMessageType, "clarify" | "asked" | "variant">>,
+    extra?: Partial<Pick<ChatMessageType, "clarify" | "asked" | "variant" | "trace">>,
   ) => {
     setMessages((prev) => [...prev, {
       id: crypto.randomUUID(), role, content, timestamp: new Date(), ...extra,
@@ -322,6 +317,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
       services: ServiceResult[];
       total_services?: number;
       action: ChatAction | null;
+      trace?: RequestTrace;
     },
     said: string,
   ) => {
@@ -329,6 +325,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
       clarify: res.action?.type === "clarify" ? (res.action.question ?? said) : undefined,
       asked: res.action?.question ?? said,
       variant: res.services.length > 0 ? "services" : "plain",
+      trace: res.trace,
     });
 
     if (res.services.length > 0) {

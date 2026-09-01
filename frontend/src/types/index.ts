@@ -1,3 +1,5 @@
+import type { RequestTrace } from "@/components/chat/RequestJourney";
+
 import type { CommunityOption, DocumentResult } from "@/lib/api";
 
 export interface ServiceCategory {
@@ -24,6 +26,10 @@ export interface ChatMessage {
    *  specifications" is step one of a procedure, and drawing them the same way
    *  is what made a resident ask what "book item 1" meant. */
   variant?: "services" | "plain";
+  /** Where this answer came from and how long each stage took, measured on the
+   *  server. Absent on an older backend or a failed request, and the screen
+   *  simply shows nothing extra when it is. */
+  trace?: RequestTrace;
 }
 
 export interface Step {

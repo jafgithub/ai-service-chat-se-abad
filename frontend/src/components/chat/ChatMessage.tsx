@@ -2,6 +2,7 @@
 
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { cn } from "@/lib/utils";
+import { JourneyResult } from "./RequestJourney";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -180,6 +181,9 @@ export function ChatMessage({
             <>
               <FormattedText text={message.content} variant={message.variant} />
 
+              {/* Collapsed to one line. The answer is the point; the journey is
+                  there for somebody who wants to know where it came from. */}
+              <JourneyResult trace={message.trace} />
             </>
           )}
         </div>

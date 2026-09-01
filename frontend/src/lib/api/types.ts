@@ -1,3 +1,5 @@
+import type { RequestTrace } from "@/components/chat/RequestJourney";
+
 // The shapes the backend actually returns. Every one of these was read off
 // `backend/API.md` and the endpoint that serves it, not guessed: a field name
 // invented here becomes a blank space on screen with nothing to say it is wrong.
@@ -86,6 +88,8 @@ export interface ChatResponse {
   shelf: DocumentResult[];
   action: ChatAction | null;
   intent?: string | null;
+  /** The journey: stages, timings, and which engine wrote the reply. */
+  trace?: RequestTrace;
 }
 
 export interface VoiceResponse {
@@ -101,6 +105,8 @@ export interface VoiceResponse {
   shelf?: DocumentResult[];
   action: ChatAction | null;
   intent?: string | null;
+  /** The journey: stages, timings, and which engine wrote the reply. */
+  trace?: RequestTrace;
 }
 
 // ── who is signed in ─────────────────────────────────────────────────────────
