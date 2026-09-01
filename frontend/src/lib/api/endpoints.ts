@@ -265,24 +265,14 @@ export interface CommunityList {
   home: string;
 }
 
-export const docsApi = {
-  /** Opening line and the starter questions, all answerable from the documents. */
-  suggestions: (signal?: AbortSignal) =>
-    apiClient.get<DocsSuggestions>("/api/v1/docs/suggestions", signal),
-
-  /** Only the ones with documents behind them. A community that cannot answer
-   *  must not appear in a menu, whatever the registry knows about it. */
-  communities: (signal?: AbortSignal) =>
-    apiClient.get<CommunityList>("/api/v1/docs/communities", signal),
-
-  /** Everything a resident of this community may take away, newest first. */
-  documents: (community: string, signal?: AbortSignal) =>
-    apiClient.get<CommunityDocument[]>(
-      `/api/v1/documents/for/${encodeURIComponent(community)}`, signal),
-
-  ask: (question: string, community?: string, signal?: AbortSignal) =>
-    apiClient.post<DocsAnswer>("/api/v1/docs/ask",
-      { question, community: community ?? "" }, signal),
+/** The communities a parking pass can be issued for.
+ *
+ *  This used to be `docsApi`, which asked the community documents index. That
+ *  index is a separate product now, so the one thing parking still needs, a
+ *  list of names, comes from the parking API instead. */
+export const communitiesApi = {
+  list: (signal?: AbortSignal) =>
+    apiClient.get<CommunityList>("/api/v1/parking/communities", signal),
 };
 
 // ── parking ─────────────────────────────────────────────────────────────────

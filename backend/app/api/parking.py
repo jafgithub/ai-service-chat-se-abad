@@ -7,8 +7,10 @@ by email. The office can look any pass up and see who it belongs to. And the
 pass expires when the vehicle leaves.
 """
 
+import json
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
@@ -85,6 +87,29 @@ def _with_holder(pass_: ParkingPass) -> PassHolder:
         holder_email=getattr(account, "email", None) or getattr(customer, "email", None),
         visiting=pass_.visiting,
     )
+
+
+COMMUNITIES_PATH = Path(__file__).resolve().parent.parent / "data" / "communities.json"
+
+
+@router.get("/communities", summary="The communities a pass can be issued for")
+def communities() -> dict:
+    """The list the pass form offers.
+
+    It used to come from the community documents index, which has moved to its
+    own application. A parking pass still belongs to a community, so the small
+    registry stayed behind with the product that needs it. Nothing here reads a
+    document or an index: it is a list of names.
+    """
+    try:
+        data = json.loads(COMMUNITIES_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        # A missing registry must not take the parking form down with it.
+        logger.warning("[PARKING] the community registry could not be read")
+        return {"communities": [], "home": ""}
+
+    found = [{"key": c["key"], "label": c["label"]} for c in data.get("communities", [])]
+    return {"communities": found, "home": found[0]["key"] if found else ""}
 
 
 @router.post("", response_model=PassOut, status_code=status.HTTP_201_CREATED,

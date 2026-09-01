@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
 import { AiRuntime } from "@/components/admin/AiRuntime";
-import { DocumentLibrary } from "@/components/admin/DocumentLibrary";
 import { ParkingPasses } from "@/components/admin/ParkingPasses";
 
 /**
@@ -237,7 +236,6 @@ export default function AdminPage() {
         </div>
 
         <div className="mb-6">
-          <DocumentLibrary token={token} />
         </div>
 
         <div className="mb-6">

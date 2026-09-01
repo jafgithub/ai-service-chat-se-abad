@@ -17,7 +17,7 @@ from app.models import (  # noqa: F401 - imported so create_all registers every 
     Account, Session, ServiceRequest, ParkingPass,
 )
 from app.api import (
-    admin, ai_admin, ai_public, auth, booking, cart, chat, docs, documents, jobs, media,
+    admin, ai_admin, ai_public, auth, booking, cart, chat, jobs, media,
     parking, payments, providers, requests as service_requests, services, voice,
 )
 
@@ -134,8 +134,6 @@ app.include_router(booking.router,  prefix="/api/v1")
 app.include_router(auth.router,     prefix="/api/v1")
 app.include_router(providers.router, prefix="/api/v1")
 app.include_router(service_requests.router, prefix="/api/v1")
-app.include_router(docs.router,      prefix="/api/v1")
-app.include_router(documents.router, prefix="/api/v1")
 app.include_router(parking.router,  prefix="/api/v1")
 
 

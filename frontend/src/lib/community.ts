@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { docsApi, type CommunityOption } from "@/lib/api/endpoints";
+import { communitiesApi, type CommunityOption } from "@/lib/api/endpoints";
 
 /**
  * Which association the resident is asking as.
@@ -45,8 +45,8 @@ export function useCommunities() {
 
   useEffect(() => {
     const controller = new AbortController();
-    docsApi
-      .communities(controller.signal)
+    communitiesApi
+      .list(controller.signal)
       .then((list) => {
         setOptions(list.communities);
         setHome(list.home);

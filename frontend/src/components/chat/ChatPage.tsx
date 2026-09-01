@@ -7,15 +7,13 @@ import { ChatMessage } from "./ChatMessage";
 import { ServiceCard } from "@/components/booking/ServiceCard";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import { ParkingFlow } from "@/components/parking/ParkingFlow";
-import { DocumentResults } from "./DocumentResults";
 import { AccountMenu } from "@/components/layout/AccountMenu";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { getSessionId } from "@/lib/session";
-import { rememberCommunity, storedCommunity, useCommunities } from "@/lib/community";
 import { chatApi, requestsApi, voiceApi, ApiError } from "@/lib/api";
-import type { Booked, ChatAction, CommunityOption, DocumentResult, ServiceResult } from "@/lib/api";
+import type { Booked, ChatAction, ServiceResult } from "@/lib/api";
 import { BRAND_NAME, SERVICE_CATEGORIES } from "@/constants";
 import type { ChatMessage as ChatMessageType } from "@/types";
 import { cn } from "@/lib/utils";
@@ -106,11 +104,6 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   // What the results are answering, so the panel can say so.
   const [resultsFor, setResultsFor] = useState("");
-  /* The last reply came out of the community documents rather than the
-     catalogue. Both leave the results pane empty, and until this existed both
-     read the same on screen: an answer about the quiet hours sat beside
-     "Nobody on the platform lists anything like that", which is true of the
-     catalogue and beside the point of what was asked. */
   const [sortBy, setSortBy] = useState<SortBy>("relevance");
   const [totalMatches, setTotalMatches] = useState(0);
   const [inputValue, setInputValue] = useState("");
@@ -118,19 +111,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  /* Documents found by name, which fill the results pane the way services do.
-     Held separately rather than shoehorned into `services`: nothing here is
-     bookable, priced or scored, and a document drawn as a service card would
-     be offering to send somebody a tradesperson called "Site map". */
-  const [documents, setDocuments] = useState<DocumentResult[]>([]);
   /* The parking sheet, opened by the conversation rather than by a button. */
   const [parking, setParking] = useState(false);
-  /* The last reply came out of the community documents rather than the
-     catalogue. Both leave the services pane empty, and without this the two
-     read the same: an answer about the quiet hours sat beside "Nobody on the
-     platform lists anything like that", which is true of the catalogue and
-     beside the point of what was asked. */
-  const [docAnswered, setDocAnswered] = useState(false);
 
   // The service being booked, and the problem it answers. Both drive the sheet.
   const [booking, setBooking] = useState<ServiceResult | null>(null);
@@ -141,29 +123,9 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const [problem, setProblem] = useState("");
 
   const auth = useAuth();
-  /* Only for the label. The key itself is read straight out of storage on every
-     send, so a choice made in the floating assistant applies here without this
-     component having to hear about it. */
-  const { options: communityOptions } = useCommunities();
-  /* Read at click time rather than closed over: the list arrives from the
-     server after the first render, and "Change" may be pressed at any point
-     after that. */
-  const communityOptionsRef = useRef<CommunityOption[]>([]);
-  useEffect(() => { communityOptionsRef.current = communityOptions; }, [communityOptions]);
-  /* Same reason, the other way round: `pickCommunity` is defined above
-     `sendMessage` because the render needs it, and calling it through a ref
-     keeps the two from having to be declared in dependency order. */
+  /* `sendMessage` is declared below the render helpers that call it, so they
+     reach it through a ref rather than having to be ordered around it. */
   const sendMessageRef = useRef<(text: string) => void>(() => {});
-
-  /* The community's label, read at the moment a reply arrives rather than held
-     in state. Choosing one writes to storage, and a copy in React state is a
-     tick behind: the first answer after a change was being stamped with the
-     community they had just moved away from, and then flagged as "not your
-     usual community" when it was now exactly that. */
-  const homeLabel = useCallback(() => {
-    const key = storedCommunity();
-    return communityOptionsRef.current.find((c) => c.key === key)?.label;
-  }, []);
 
   // Voice loop plumbing
   const voiceActiveRef = useRef(false);   // continuous mode on/off (read inside async callbacks)
@@ -191,8 +153,7 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const addMessage = useCallback((
     role: "user" | "assistant",
     content: string,
-    extra?: Partial<Pick<ChatMessageType,
-      "documents" | "clarify" | "pick" | "asked" | "community" | "missedIn" | "variant">>,
+    extra?: Partial<Pick<ChatMessageType, "clarify" | "asked" | "variant">>,
   ) => {
     setMessages((prev) => [...prev, {
       id: crypto.randomUUID(), role, content, timestamp: new Date(), ...extra,
@@ -351,97 +312,27 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     recorder.start();
   }), []);
 
-  /** They picked a community, on first ask or from "Change".
-   *
-   *  Remembered before the question is asked again, because the next request
-   *  reads the choice straight out of storage. The question is re-sent rather
-   *  than answered from what we already have: the retrieval is scoped to the
-   *  community, so the earlier answer was to a different question than the one
-   *  they now mean. */
-  const pickCommunity = useCallback((key: string, question: string) => {
-    rememberCommunity(key);
-    if (question.trim()) void sendMessageRef.current(question);
-  }, []);
-
-  /** "See what it holds": the community's whole shelf, as a document list. */
-  const showLibrary = useCallback((community: string) => {
-    const label = communityOptionsRef.current.find((c) => c.key === community)?.label
-      ?? community;
-    void sendMessageRef.current(`show me the ${label} documents`);
-  }, []);
-
-  /** "Change" under an answer: offer the choice again for that same question. */
-  const changeCommunity = useCallback((question: string) => {
-    setMessages((prev) => [...prev, {
-      id: crypto.randomUUID(),
-      role: "assistant" as const,
-      content: "Which community should I answer from?",
-      timestamp: new Date(),
-      pick: communityOptionsRef.current,
-      asked: question,
-    }]);
-  }, []);
-
   /** One reply, applied to the screen.
    *
-   *  Shared by the typed path and the spoken one. They were two copies of the
-   *  same logic and had already drifted: the voice path never attached the
-   *  documents to a message, so a spoken question was answered with its
-   *  sources invisible.
-   *
-   *  The panel is drawn from `shelf`, which the server sends with any reply
-   *  about a community. That is what makes it stay put for a whole
-   *  conversation: it used to be cleared on every answer that cited a source,
-   *  which is why the client said downloading had stopped working. He was
-   *  looking at the panel, and the panel was empty. */
+   *  Shared by the typed path and the spoken one, so the two cannot drift. */
   const applyReply = useCallback((
     res: {
       reply: string;
       intent?: string | null;
-      documents: DocumentResult[];
-      shelf?: DocumentResult[];
       services: ServiceResult[];
       total_services?: number;
       action: ChatAction | null;
     },
     said: string,
   ) => {
-    const docsFamily = res.intent === "document"
-      || res.intent === "documents"
-      || res.intent === "documents_miss"
-      || res.intent === "pick_community";
-
     addMessage("assistant", res.reply, {
-      documents: res.documents.length > 0 ? res.documents : undefined,
       clarify: res.action?.type === "clarify" ? (res.action.question ?? said) : undefined,
-      pick: res.action?.type === "pick_community" ? communityOptionsRef.current : undefined,
-      missedIn: res.action?.type === "documents_miss"
-        ? (res.action.community || undefined) : undefined,
-      // On every answer, not only the ones with documents: "Change" needs the
-      // question, and so does the picker when it appears.
       asked: res.action?.question ?? said,
-      community: homeLabel(),
-      variant: docsFamily ? "documents" : res.services.length > 0 ? "services" : "plain",
+      variant: res.services.length > 0 ? "services" : "plain",
     });
 
-    const shelf = res.shelf ?? [];
-    if (shelf.length > 0) {
-      setDocuments(shelf);
-      setServices([]);
-      setTotalMatches(0);
-      setDocAnswered(res.intent !== "document");
-      setResultsFor(said);
-    } else if (docsFamily) {
-      // A community reply with no shelf: leave the panel exactly as it is
-      // rather than emptying it behind the answer.
-      setDocAnswered(true);
-      setServices([]);
-      setTotalMatches(0);
-      setResultsFor(said);
-    } else if (res.services.length > 0) {
-      setDocAnswered(false);
+    if (res.services.length > 0) {
       setProblem(said);
-      setDocuments([]);
       setServices(res.services);
       setTotalMatches(res.total_services ?? res.services.length);
       setVisibleCount(PAGE_SIZE);
@@ -450,14 +341,12 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
       // A search that found nothing must clear the last one, or the assistant
       // says "I couldn't find anything" beside a panel still listing the
       // previous question's results.
-      setDocAnswered(false);
-      setDocuments([]);
       setServices([]);
       setTotalMatches(0);
       setVisibleCount(PAGE_SIZE);
       setResultsFor(said);
     }
-  }, [addMessage, homeLabel]);
+  }, [addMessage]);
 
   /** What the assistant did, applied to the screen.
    *
@@ -475,9 +364,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
     // Asking for a pass opens the form, the same way asking to check out opens
     // the checkout on the shop. The conversation stops there and hands over.
     if (action.type === "parking") { setParking(true); return; }
-    // The documents themselves travel in `documents`, not in the action, so
-    // there is nothing to do here beyond not treating it as a booking.
-    if (action.type === "documents" || action.type === "clarify") return;
+    // Nothing to do beyond not treating it as a booking.
+    if (action.type === "clarify") return;
 
     if (action.type !== "added" && action.type !== "checkout") return;
 
@@ -521,9 +409,8 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
       }
       addMessage("user", heard);
       // The same handler as the typed path, which is the whole point: these
-      // were two copies and the spoken one had quietly stopped attaching the
-      // documents to its answers.
-      applyReply({ ...res, documents: res.documents ?? [] }, heard);
+      // were two copies once and drifted apart.
+      applyReply(res, heard);
       applyAction(res.action, res.services.length > 0 ? res.services : services);
       // Speak the short version: long lists are shown, not read out.
       await speak(res.audio ?? "", res.speech || res.reply);
@@ -603,14 +490,9 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   }, [services]);
 
   // ── Text chat ──────────────────────────────────────────────────
-  const sendMessage = useCallback(async (
-    text: string,
-    route?: "documents" | "services",
-  ) => {
+  const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
-    // A route means they tapped a button rather than typed, and the question is
-    // already in the transcript above. Repeating it reads as a stutter.
-    if (!route) addMessage("user", text.trim());
+    addMessage("user", text.trim());
     setInputValue("");
     setIsLoading(true);
 
@@ -621,8 +503,6 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
         category_filter: scope ?? undefined,
         latitude: geo.position?.latitude,
         longitude: geo.position?.longitude,
-        community: storedCommunity() || undefined,
-        route,
       });
       applyReply(response, text.trim());
       applyAction(response.action, response.services.length > 0 ? response.services : services);
@@ -667,11 +547,11 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
   const hasMore = sortedServices.length > visibleCount;
   // A search ran and matched nothing, as opposed to nobody having asked yet.
   // The two look identical in state and must not read the same on screen.
-  const searchedAndFoundNothing = services.length === 0 && resultsFor !== "" && !docAnswered;
+  const searchedAndFoundNothing = services.length === 0 && resultsFor !== "";
 
   /* Defined once, rendered twice: pinned under the conversation on a wide
      screen, and as a shared footer on a phone. */
-  // Now that `sendMessage` exists, let the community buttons reach it.
+  // Now that `sendMessage` exists, let the render helpers reach it.
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
 
   const composer = (
@@ -841,10 +721,6 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                 key={msg.id}
                 message={msg}
                 large
-                onClarify={(question, route) => sendMessage(question, route)}
-                onPickCommunity={pickCommunity}
-                onChangeCommunity={changeCommunity}
-                onShowLibrary={showLibrary}
               />
             ))}
             {isLoading && <TypingIndicator />}
@@ -874,34 +750,26 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
           <div className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-6 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">
-                {documents.length > 0
-                  ? "Documents"
-                  : docAnswered
-                  ? "Your community"
-                  : services.length > 0
-                    ? resultsFor
-                      ? `For “${resultsFor}”`
-                      : "Services"
-                    : searchedAndFoundNothing
-                      ? `Nothing matches “${resultsFor}”`
-                      : "Services"}
+                {services.length > 0
+                  ? resultsFor
+                    ? `For “${resultsFor}”`
+                    : "Services"
+                  : searchedAndFoundNothing
+                    ? `Nothing matches “${resultsFor}”`
+                    : "Services"}
               </p>
               <p className="mt-0.5 text-xs text-ink-muted">
-                {documents.length > 0
-                  ? `${documents.length} document${documents.length === 1 ? "" : "s"} to download`
-                  : docAnswered
-                  ? "Answered from your documents, in the conversation"
-                  : services.length > 0
-                    ? totalMatches > services.length
-                      ? `${totalMatches} match, showing the closest ${services.length}`
-                      : `${services.length} service${services.length === 1 ? "" : "s"} could cover this`
-                    : searchedAndFoundNothing
-                      ? "Nobody on the platform lists anything like that"
-                      : "Describe the problem, or start from a category"}
+                {services.length > 0
+                  ? totalMatches > services.length
+                    ? `${totalMatches} match, showing the closest ${services.length}`
+                    : `${services.length} service${services.length === 1 ? "" : "s"} could cover this`
+                  : searchedAndFoundNothing
+                    ? "Nobody on the platform lists anything like that"
+                    : "Describe the problem, or start from a category"}
               </p>
             </div>
 
-            {services.length > 1 && documents.length === 0 && (
+            {services.length > 1 && (
               <div className="flex flex-shrink-0 items-center gap-1 rounded-control border border-line p-0.5">
                 {SORT_OPTIONS.map((opt) => (
                   <button
@@ -936,8 +804,6 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   </div>
                 ))}
               </div>
-            ) : documents.length > 0 ? (
-              <DocumentResults documents={documents} />
             ) : services.length > 0 ? (
               <>
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
@@ -965,18 +831,14 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
               <div className={cn("flex h-full flex-col justify-center")}>
                 <div className="mx-auto w-full max-w-2xl">
                   <h2 className="text-base font-semibold text-ink">
-                    {docAnswered
-                        ? "Answered from your community documents"
-                        : searchedAndFoundNothing
-                          ? `Nothing here matches “${resultsFor}”`
-                          : "What needs doing?"}
+                    {searchedAndFoundNothing
+                      ? `Nothing here matches “${resultsFor}”`
+                      : "What needs doing?"}
                   </h2>
                   <p className="mt-1 text-sm text-ink-muted">
-                    {docAnswered
-                        ? "The answer and the documents behind it are in the conversation. If you need somebody to come out instead, start here."
-                        : searchedAndFoundNothing
-                          ? "Try describing it differently, or start from a category."
-                          : "Describe it in your own words, or start from a category."}
+                    {searchedAndFoundNothing
+                      ? "Try describing it differently, or start from a category."
+                      : "Describe it in your own words, or start from a category."}
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1000,8 +862,12 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                   {/* Parking sits with the categories rather than under "or
                       try", because it is a thing the product does, not an
                       example of something to type. The client asked for it to
-                      be offered at start up alongside the services. */}
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      be offered at start up alongside the services.
+
+                      It used to share this row with a "Community documents"
+                      tile. The documents are a different product now, with
+                      their own site, so this is one tile wide. */}
+                  <div className="mt-3 grid grid-cols-1 gap-3">
                     <button
                       onClick={() => setParking(true)}
                       className="group flex items-center gap-3 rounded-card border border-line bg-surface p-4 text-left transition-shadow hover:shadow-card-hover"
@@ -1017,20 +883,6 @@ export function ChatPage({ scope, onBack }: ChatPageProps) {
                       </span>
                     </button>
 
-                    <button
-                      onClick={() => sendMessage("get me my community documents")}
-                      className="group flex items-center gap-3 rounded-card border border-line bg-surface p-4 text-left transition-shadow hover:shadow-card-hover"
-                    >
-                      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control bg-brand-50 text-2xl">
-                        📄
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-ink">Community documents</span>
-                        <span className="block text-xs leading-relaxed text-ink-muted">
-                          Ask for one by name and I will find it
-                        </span>
-                      </span>
-                    </button>
                   </div>
 
                   <div className="mt-6">

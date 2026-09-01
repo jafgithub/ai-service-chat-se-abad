@@ -1,19 +1,16 @@
-"""Keep what is held in memory in step with what is on disk and in the database.
+"""Keep what is held in memory in step with what is in the database.
 
-Two indexes are built once and then kept in memory: the service catalog, read
-out of MySQL at start up, and the document index behind the community
-assistant. Both are correct the moment they are built and slowly stop being
-correct afterwards. A service added to the catalog, or a document index rebuilt
-from the source files, is invisible until the next restart.
+The service catalog is read out of MySQL at start up and kept in memory. It is
+correct the moment it is built and slowly stops being correct afterwards: a
+service added to the catalog is invisible until the next restart.
 
-So this checks, on a timer, whether either has moved, and rebuilds only the one
-that did. The check itself is deliberately cheap: one COUNT and one MAX over an
-indexed column, and two file timestamps. Rebuilding costs real time and memory,
-which is why nothing is rebuilt on a hunch.
+So this checks, on a timer, whether it has moved, and rebuilds only if it has.
+The check itself is deliberately cheap, one COUNT and one MAX over an indexed
+column, because rebuilding costs real time and memory and nothing should be
+rebuilt on a hunch.
 
-Documents uploaded through the admin screen do not need this. They go into the
-live index as part of the upload, and a resident can ask about them a second
-later. This is for every other way the data changes.
+It used to watch the community document index as well. That moved to its own
+application on its own machine, so there is one index here now.
 """
 
 from __future__ import annotations
@@ -27,7 +24,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.database import engine
-from app.services import catalog_index, docs_index
+from app.services import catalog_index
 
 logger = logging.getLogger("rag")
 
@@ -45,7 +42,6 @@ _PROBE_SQL = """
 
 _thread: Optional[threading.Thread] = None
 _catalog_seen: tuple | None = None
-_docs_seen: tuple | None = None
 _last_run: float = 0.0
 
 
@@ -67,9 +63,9 @@ def _catalog_stamp() -> tuple | None:
 
 def refresh_once() -> dict:
     """One pass. Returns what was rebuilt, which is usually nothing."""
-    global _catalog_seen, _docs_seen, _last_run
+    global _catalog_seen, _last_run
 
-    did = {"catalog": False, "documents": False}
+    did = {"catalog": False}
     _last_run = time.time()
 
     stamp = _catalog_stamp()
@@ -85,16 +81,6 @@ def refresh_once() -> dict:
             catalog_index.build()
             _catalog_seen = stamp
             did["catalog"] = True
-
-    stamp = docs_index.stamps()
-    if _docs_seen is None:
-        _docs_seen = stamp
-    elif stamp != _docs_seen:
-        logger.info("[REFRESH] the document index changed on disk, reading it again")
-        docs_index.reload_index()
-        docs_index.reload_registry()
-        _docs_seen = stamp
-        did["documents"] = True
 
     return did
 

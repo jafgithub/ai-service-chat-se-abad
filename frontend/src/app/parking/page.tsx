@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, getAuthToken } from "@/lib/api";
-import { parkingApi, docsApi, type ParkingPass, type CommunityOption } from "@/lib/api";
+import { parkingApi, communitiesApi, type ParkingPass, type CommunityOption } from "@/lib/api";
 import { storedCommunity } from "@/lib/community";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +45,7 @@ export default function ParkingPage() {
 
   const load = useCallback(async () => {
     try {
-      const [mine, list] = await Promise.all([parkingApi.mine(), docsApi.communities()]);
+      const [mine, list] = await Promise.all([parkingApi.mine(), communitiesApi.list()]);
       setPasses(mine);
       setCommunities(list.communities);
       setCommunity((c) => c || storedCommunity() || list.home || list.communities[0]?.key || "");

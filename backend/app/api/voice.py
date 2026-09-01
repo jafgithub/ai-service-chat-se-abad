@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.schemas.voice import VoiceResponse
-from app.schemas.chat import DocumentResult, ServiceResult
+from app.schemas.chat import ServiceResult
 from app.services import cart_service, conversation, voice_service
 
 logger = logging.getLogger("voice")
@@ -60,8 +60,6 @@ async def voice_endpoint(
         services=[ServiceResult(**p) for p in result["services"]],
         total_services=result.get("total_services", 0),
         cart=result["cart"],
-        documents=[DocumentResult(**d) for d in result.get("documents", [])],
-        shelf=[DocumentResult(**d) for d in result.get("shelf", [])],
         action=result["action"],
         intent=result.get("intent"),
     )

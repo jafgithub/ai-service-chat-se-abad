@@ -1,22 +1,11 @@
 "use client";
 
 import type { ChatMessage as ChatMessageType } from "@/types";
-import { CommunityChooser } from "./CommunityChooser";
-import { DocumentList } from "./DocumentList";
 import { cn } from "@/lib/utils";
 
 interface ChatMessageProps {
   message: ChatMessageType;
   large?: boolean;
-  /** Tapping one of the "community or a service?" buttons. */
-  onClarify?: (question: string, route: "documents" | "services") => void;
-  /** Choosing a community, either on first ask or from "Change". Both remember
-   *  it and ask the original question again against it. */
-  onPickCommunity?: (key: string, question: string) => void;
-  /** "Change" under an answer: offer the choice again for that question. */
-  onChangeCommunity?: (question: string) => void;
-  /** The community had nothing on it: show what it does hold. */
-  onShowLibrary?: (community: string) => void;
 }
 
 /**
@@ -56,7 +45,7 @@ function FormattedText({
   variant = "plain",
 }: {
   text: string;
-  variant?: "services" | "documents" | "plain";
+  variant?: "services" | "plain";
 }) {
   const lines = text.split(/\n+/).filter((l) => l.trim() !== "");
 
@@ -147,7 +136,7 @@ function formatProductLine(text: string): React.ReactNode {
 }
 
 export function ChatMessage({
-  message, large = false, onClarify, onPickCommunity, onChangeCommunity, onShowLibrary,
+  message, large = false,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
 
@@ -191,67 +180,6 @@ export function ChatMessage({
             <>
               <FormattedText text={message.content} variant={message.variant} />
 
-              {message.documents && message.documents.length > 0 && (
-                <DocumentList
-                  documents={message.documents}
-                  heading="From your documents"
-                  home={message.community}
-                  onChange={message.asked && onChangeCommunity
-                    ? () => onChangeCommunity(message.asked!)
-                    : undefined}
-                />
-              )}
-
-              {message.pick && message.pick.length > 0 && onPickCommunity && (
-                <CommunityChooser
-                  options={message.pick}
-                  onChoose={(key) => onPickCommunity(key, message.asked ?? "")}
-                />
-              )}
-
-              {/* Told "not here" and left there is what turned one question
-                  into five identical retries. Both of these are a next step. */}
-              {message.missedIn && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {onShowLibrary && (
-                    <button
-                      type="button"
-                      onClick={() => onShowLibrary(message.missedIn!)}
-                      className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                    >
-                      See what it holds
-                    </button>
-                  )}
-                  {onChangeCommunity && message.asked && (
-                    <button
-                      type="button"
-                      onClick={() => onChangeCommunity(message.asked!)}
-                      className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                    >
-                      Try another community
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {message.clarify && onClarify && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onClarify(message.clarify!, "documents")}
-                    className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                  >
-                    About my community
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onClarify(message.clarify!, "services")}
-                    className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                  >
-                    I need a service
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>
