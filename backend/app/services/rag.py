@@ -34,7 +34,7 @@ _DEAL_INTENT = re.compile(
 
 from app.core.config import settings
 from app.models.service import Service
-from app.services import phrase_index
+from app.services import phrase_index, tracing
 from app.services import catalog_index
 from app.services.media import serialized_image
 
@@ -222,11 +222,22 @@ def search_products(
     if len(results) > _LOG_RESULT_LIMIT:
         logger.info(f"[RAG]   ... and {len(results) - _LOG_RESULT_LIMIT} more")
 
+    took_ms = (time.perf_counter() - t0) * 1000
     scanned_txt = f"scanned={scanned:,} " if scanned is not None else ""
     logger.info(
         f"[RAG] SEARCH \"{query}\" via={via} {scanned_txt}hits={len(results)} "
-        f"deal={is_deal_query} took={(time.perf_counter() - t0) * 1000:.0f}ms"
+        f"deal={is_deal_query} took={took_ms:.0f}ms"
     )
+    # Counts and the score floor, never the query. See services/tracing.py on
+    # why a trace carries nothing anybody typed.
+    # Naming the path matters as much as the count. The in-memory index answers
+    # in single digit milliseconds and the database path takes over a second,
+    # so a slow leg here is explained by which one served it rather than
+    # looking like an unexplained stall.
+    scope = (f"{scanned:,} services in memory" if scanned is not None
+             else "scored in the database")
+    tracing.record("retrieve", "Searching the catalogue", round(took_ms),
+                   f"{scope}, {len(results)} above {min_similarity}")
     return results
 
 

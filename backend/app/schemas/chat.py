@@ -32,6 +32,11 @@ class ServiceResult(BaseModel):
 
 class ChatResponse(BaseModel):
     session_id: str
+    #: How this request was answered: the legs it went through, what each one
+    #: took, and which engine wrote the reply. Carries counts and model names
+    #: only, never anything anybody typed. None when tracing failed, which must
+    #: not stop a reply going out.
+    trace: Optional[dict[str, Any]] = None
     reply: str
     speech: str = ""          # short text for voice (long lists aren't read aloud)
     services: list[ServiceResult]

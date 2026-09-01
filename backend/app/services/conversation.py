@@ -10,7 +10,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.services import rag, ai, intent as intent_svc, cart_service, response
+from app.services import rag, ai, intent as intent_svc, cart_service, response, tracing
 
 logger = logging.getLogger("chat")
 
@@ -43,7 +43,9 @@ def process(message: str, session, db: Session, category_filter: str | None = No
     association's documents and the service catalogue. Community moved to its
     own application, so there is one job here and nothing to route between.
     """
-    intent = intent_svc.parse(message, session, db)
+    with tracing.stage("understand", "Working out what was asked") as leg:
+        intent = intent_svc.parse(message, session, db)
+        leg.detail = f"read as {intent.type}"
 
     logger.info("[CHAT] intent=%s refs=%s", intent.type,
                 [(r.item_id, r.quantity) for r in intent.refs])

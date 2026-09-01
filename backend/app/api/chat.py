@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse, ServiceResult
-from app.services import cart_service, conversation
+from app.services import ai_runtime, cart_service, conversation, tracing
 
 logger = logging.getLogger("chat")
 
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
     t_start = time.perf_counter()
+    tracing.start()
     logger.info(f"[CHAT] session={payload.session_id} message=\"{payload.message}\"")
 
     session = cart_service.get_or_create_session(db, payload.session_id, payload.latitude, payload.longitude)
@@ -39,6 +40,7 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
         return ChatResponse(
             session_id=session.id, reply=msg, speech=msg,
             services=[], cart=cart, action=None,
+            trace=tracing.finish(ai_runtime.current()),
         )
 
     logger.info(f"[CHAT] done in {(time.perf_counter() - t_start) * 1000:.0f}ms")
@@ -52,4 +54,7 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
         cart=result["cart"],
         action=result["action"],
         intent=result.get("intent"),
+        # A local file read, not a network call: nothing may put a timeout on
+        # the end of a reply that has already been written.
+        trace=tracing.finish(ai_runtime.current()),
     )
