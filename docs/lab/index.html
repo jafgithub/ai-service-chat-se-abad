@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Break the Assistant</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -194,6 +195,178 @@ input[type="range"]:disabled { opacity: .4; cursor: not-allowed; }
 .log li.ok .m { color: var(--good); }
 
 .foot { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.7; color: var(--faint); max-width: 78ch; }
+
+/* ══ the live view ═══════════════════════════════════════════════════════
+   Everything below is the real system rather than a model of it. The colour
+   rule is carried over from the diagram above and is the point of the page:
+
+     green  our own hardware answered
+     blue   the cloud engine answered
+     rust   something was turned away, or diverted
+     grey   an honest refusal, with no engine called at all
+
+   Nothing here invents a number. Every millisecond drawn was measured on the
+   request it is drawn under, and where there is no data the panel says so
+   rather than filling the space.                                            */
+
+/* ── mode ─────────────────────────────────────────────────────────────── */
+.modes { display: flex; gap: 0; margin: 26px 0 0; border: 1px solid var(--line); width: fit-content; }
+.modes button {
+  padding: 9px 20px; cursor: pointer; border: 0; background: transparent; color: var(--muted);
+  font: 500 12px "IBM Plex Mono", monospace; letter-spacing: .1em; text-transform: uppercase;
+}
+.modes button + button { border-left: 1px solid var(--line); }
+.modes button[aria-pressed="true"] { background: var(--accent); color: var(--paper); }
+.modes button:hover:not([aria-pressed="true"]) { color: var(--accent); }
+
+.modenote { margin: 11px 0 0; font-size: 12.5px; color: var(--faint); max-width: 74ch; }
+
+/* ── the switch banner ────────────────────────────────────────────────── */
+.switchbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+  border: 1px solid var(--line); background: var(--panel);
+  padding: 13px 15px; margin: 22px 0 0; font-size: 12.5px;
+}
+.switchbar .lbl { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 11px; border: 1px solid var(--hair); font-size: 12px; color: var(--muted);
+}
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--hair); }
+.chip.gpu    { border-color: var(--good); color: var(--good); }
+.chip.gpu::before { background: var(--good); }
+.chip.cloud  { border-color: var(--cloud, #2258d4); color: var(--cloud, #2258d4); }
+.chip.cloud::before { background: var(--cloud, #2258d4); }
+.chip.warnc  { border-color: var(--warn); color: var(--warn); }
+.chip.warnc::before { background: var(--warn); }
+.switchbar .pausebtn {
+  margin-left: auto; padding: 6px 13px; cursor: pointer;
+  border: 1px solid var(--hair); background: transparent; color: var(--ink);
+  font: 500 12px "IBM Plex Mono", monospace;
+}
+.switchbar .pausebtn:hover { border-color: var(--accent); color: var(--accent); }
+
+:root { --cloud: #2258d4; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --cloud: #6f9df0; } }
+:root[data-theme="dark"] { --cloud: #6f9df0; }
+
+/* ── three lanes ──────────────────────────────────────────────────────── */
+.lanes { display: grid; grid-template-columns: minmax(0,1fr); gap: 18px; margin-top: 18px; }
+@media (min-width: 900px)  { .lanes { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+
+.lane { border: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
+.lane > header {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 11px 14px; border-bottom: 1px solid var(--line);
+}
+.lane h3 { margin: 0; font-size: 12.5px; font-weight: 500; letter-spacing: .04em; }
+.lane .count { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.lane.sel { border-color: var(--accent); }
+
+.tlist { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.tlist li { border-bottom: 1px solid var(--line); }
+.tlist li:last-child { border-bottom: 0; }
+.tlist button {
+  width: 100%; text-align: left; cursor: pointer; border: 0; background: transparent;
+  padding: 9px 14px; color: var(--ink); font: 400 12px "IBM Plex Mono", monospace;
+  display: flex; align-items: center; gap: 9px;
+}
+.tlist button:hover { background: var(--accent-soft); }
+.tlist button[aria-current="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.tlist .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--hair); }
+.tlist .dot.gpu   { background: var(--good); }
+.tlist .dot.cloud { background: var(--cloud); }
+.tlist .dot.fell  { background: var(--warn); }
+.tlist .dot.none  { background: var(--hair); }
+.tlist .ms { margin-left: auto; color: var(--faint); font-variant-numeric: tabular-nums; }
+.tlist .ago { color: var(--faint); font-size: 11px; }
+
+.empty { padding: 18px 14px; font-size: 12.5px; color: var(--muted); line-height: 1.65; }
+.empty b { color: var(--ink); font-weight: 500; }
+.empty button {
+  margin-top: 10px; padding: 6px 12px; cursor: pointer;
+  border: 1px solid var(--hair); background: transparent; color: var(--ink);
+  font: 500 12px "IBM Plex Mono", monospace;
+}
+.empty button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── the journey ──────────────────────────────────────────────────────── */
+.journey { border: 1px solid var(--line); background: var(--panel); margin-top: 18px; }
+.journey > header {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 11px 15px; border-bottom: 1px solid var(--line);
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.journey .who { color: var(--ink); letter-spacing: .04em; text-transform: none; font-size: 13px; }
+
+.track { padding: 20px 15px 6px; overflow-x: auto; }
+.track-inner { min-width: 560px; }
+
+/* Each stage is a block whose width is its share of the real total time, so a
+   slow model call is literally wider than a fast retrieval. */
+.bars { display: flex; align-items: stretch; gap: 3px; width: 100%; }
+.bar { position: relative; min-width: 26px; }
+.bar .fill {
+  height: 34px; border: 1px solid var(--hair); background: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums;
+  overflow: hidden; white-space: nowrap;
+}
+.bar.on .fill { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.bar.eng-gpu .fill   { border-color: var(--good);  background: color-mix(in srgb, var(--good) 12%, transparent);  color: var(--good); }
+.bar.eng-cloud .fill { border-color: var(--cloud); background: color-mix(in srgb, var(--cloud) 12%, transparent); color: var(--cloud); }
+.bar.eng-none .fill  { border-style: dashed; opacity: .65; }
+.bar .cap {
+  margin-top: 7px; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--faint); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bar.done .fill { opacity: 1; }
+.bar.pending .fill { opacity: .28; }
+
+.detail {
+  padding: 4px 15px 16px; font-size: 12px; color: var(--faint); min-height: 20px;
+}
+
+/* The engine decision, drawn as two destinations with the taken one lit. */
+.engine { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 0 15px 16px; }
+@media (min-width: 620px) { .engine { grid-template-columns: 1fr 1fr; } }
+.dest { border: 1px solid var(--hair); padding: 11px 13px; opacity: .38; }
+.dest h4 { margin: 0 0 3px; font-size: 12px; font-weight: 500; }
+.dest p { margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.dest.taken { opacity: 1; }
+.dest.taken.ours  { border-color: var(--good);  }
+.dest.taken.ours h4  { color: var(--good); }
+.dest.taken.cloud { border-color: var(--cloud); }
+.dest.taken.cloud h4 { color: var(--cloud); }
+.dest.diverted { border-color: var(--warn); border-style: dashed; opacity: .85; }
+.dest.diverted h4 { color: var(--warn); }
+
+.reason {
+  margin: 0 15px 16px; padding: 10px 13px;
+  border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 9%, transparent);
+  font-size: 12.5px; color: var(--ink); line-height: 1.55;
+}
+.reason b { color: var(--warn); font-weight: 500; }
+
+/* ── narration ────────────────────────────────────────────────────────── */
+.narr {
+  border-top: 1px solid var(--line); padding: 15px;
+  font-family: "Newsreader", Georgia, serif; font-size: 17px; line-height: 1.6;
+  color: var(--ink); min-height: 58px;
+}
+.narr .said { color: var(--muted); }
+
+.provenance {
+  display: flex; align-items: center; gap: 8px;
+  border-top: 1px solid var(--line); padding: 10px 15px;
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint);
+}
+.provenance .tag { border: 1px solid var(--hair); padding: 2px 8px; letter-spacing: .12em; }
+.provenance .tag.measured { border-color: var(--good); color: var(--good); }
+.provenance .tag.modelled { border-color: var(--warn); color: var(--warn); }
+
+.hidden { display: none !important; }
+
 </style>
 
 <div class="wrap">
@@ -201,16 +374,90 @@ input[type="range"]:disabled { opacity: .4; cursor: not-allowed; }
   <a class="back" href="https://servicez.smartzees.com/docs/">All documents</a>
 
   <p class="eyebrow">Interactive</p>
-  <h1>Break the assistant.</h1>
+  <h1>Watch a question travel.</h1>
   <p class="standfirst">
-    This is the AI side of the Service Assistant, wired up and actually running.
-    Turn the traffic up past a million requests a day, starve the cache, kill a
-    graphics card mid answer. Poke it however you like and watch what the design
-    does about it. <strong>The interesting number is not how fast one card is.
-    It is how few requests ever reach one.</strong>
+    Every question asked of any of the three assistants leaves a trail: what it
+    understood, what it looked up, which engine wrote the answer, and how long
+    each of those actually took. This page draws that trail as it happens.
+    <strong>The one thing worth watching is the engine. When our own hardware
+    answers you will see it go there. When it cannot, you will see it diverted,
+    and you will be told why.</strong>
+  </p>
+
+  <div class="modes" role="group" aria-label="What this page is showing">
+    <button type="button" id="m-live" aria-pressed="true">Live</button>
+    <button type="button" id="m-model" aria-pressed="false">Modelled</button>
+  </div>
+  <p class="modenote" id="modenote">
+    Live: real requests, real milliseconds, nothing invented. Thin when nobody is
+    using the system, which is honest rather than a fault.
   </p>
 
   <hr class="rule">
+
+  <section id="livepane">
+
+    <div class="switchbar">
+      <span class="lbl">Engine switch</span>
+      <span class="chip" id="sw-chip">reading...</span>
+      <span class="lbl">Agents reporting</span>
+      <span class="chip" id="sw-agents">0 of 3</span>
+      <button type="button" class="pausebtn" id="b-pause">Pause</button>
+    </div>
+
+    <div class="lanes" id="lanes">
+      <div class="lane" data-agent="market">
+        <header><h3>SmartMarket</h3><span class="count" id="c-market">...</span></header>
+        <ul class="tlist" id="l-market"></ul>
+        <div class="empty hidden" id="e-market"></div>
+      </div>
+      <div class="lane" data-agent="service">
+        <header><h3>SmartService</h3><span class="count" id="c-service">...</span></header>
+        <ul class="tlist" id="l-service"></ul>
+        <div class="empty hidden" id="e-service"></div>
+      </div>
+      <div class="lane" data-agent="community">
+        <header><h3>SmartCommunity</h3><span class="count" id="c-community">...</span></header>
+        <ul class="tlist" id="l-community"></ul>
+        <div class="empty hidden" id="e-community"></div>
+      </div>
+    </div>
+
+    <div class="journey" id="journey">
+      <header>
+        <span class="who" id="j-who">No request selected</span>
+        <span id="j-when"></span>
+      </header>
+
+      <div class="track"><div class="track-inner">
+        <div class="bars" id="j-bars"></div>
+      </div></div>
+      <p class="detail" id="j-detail"></p>
+
+      <div class="engine">
+        <div class="dest ours" id="j-ours">
+          <h4>Our own hardware</h4>
+          <p>The open model, on the machine we control. Answers cost us nothing per question once it is running.</p>
+        </div>
+        <div class="dest cloud" id="j-cloud">
+          <h4>Gemini</h4>
+          <p>Google's hosted model. Always up, a fraction of a cent a question, and the floor everything falls back to.</p>
+        </div>
+      </div>
+
+      <p class="reason hidden" id="j-reason"></p>
+
+      <p class="narr" id="j-narr" aria-live="polite"></p>
+
+      <div class="provenance">
+        <span class="tag measured">Measured</span>
+        <span>every number on this panel was timed on the request above</span>
+      </div>
+    </div>
+
+  </section>
+
+  <section id="modelpane" class="hidden">
 
   <div class="lab">
 
@@ -379,8 +626,9 @@ input[type="range"]:disabled { opacity: .4; cursor: not-allowed; }
     the running system does, and the refusal rate is the one measured on real
     questions. The card figures are modelled on an NVIDIA L4 running an 8B model
     with continuous batching, where a pass costs roughly 900ms plus 115ms per
-    item in the batch. Nothing on this page connects to the live service.
+    item in the batch. Nothing in this modelled view connects to the live service. The Live view above does, and every number there is measured.
   </p>
+  </section>
 </div>
 
 <script>
@@ -777,3 +1025,338 @@ input[type="range"]:disabled { opacity: .4; cursor: not-allowed; }
   say("running, two cards, cache warm", "ok");
 })();
 </script>
+
+<script>
+/* ══ the live view ═══════════════════════════════════════════════════════
+   Reads the three agents' trace endpoints and draws the last requests each
+   one served. Nothing here models anything: if an endpoint is silent the
+   panel says so, because an empty lane is information and a made up one is
+   not.
+
+   Same origin on purpose. The page is served from servicez, and the other two
+   agents are on other names in other places, so their answers are proxied by
+   this box under /docs/lab-api/. Fetching them directly from the browser fails
+   on the cross origin check, silently, which is the worst way for a dashboard
+   to be wrong.                                                              */
+(() => {
+  "use strict";
+
+  const SOURCES = [
+    { key: "market",    name: "SmartMarket",    url: "/docs/lab-api/market/api/v1/ai/trace?limit=12" },
+    { key: "service",   name: "SmartService",   url: "/api/v1/ai/trace?limit=12" },
+    { key: "community", name: "SmartCommunity", url: "/docs/lab-api/community/api/v1/ai/trace?limit=12" },
+  ];
+  const SWITCH_URL = "/api/v1/ai/provider";
+
+  const POLL_MS      = 5000;   // how often to ask each agent for new traces
+  const STEP_MS      = 1100;   // how long each stage is held while narrating
+  const ADVANCE_MS   = 2600;   // pause on a finished trace before the next one
+
+  const el = (id) => document.getElementById(id);
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const S = {
+    traces: { market: [], service: [], community: [] },
+    reporting: 0,
+    selected: null,      // the trace being drawn
+    pinned: false,       // the reader chose it, so stop auto advancing
+    paused: false,
+    step: -1,            // which stage is lit
+    timer: null,
+    seen: new Set(),
+  };
+
+  /* ── words ───────────────────────────────────────────────────────────
+     One plain sentence per stage. The page is meant to be left on screen and
+     explain itself, so this is the part that has to read like a person wrote
+     it rather than a log line.                                             */
+  function narrate(trace, i) {
+    if (!trace) return "";
+    const st = trace.stages[i];
+    const eng = trace.engine || {};
+    if (!st) return finalWord(trace);
+
+    const ms = st.ms == null ? "" : ` It took ${fmtMs(st.ms)}.`;
+    switch (st.name) {
+      case "understand":
+        return `First it works out what was actually being asked.${ms}`;
+      case "retrieve":
+        return `Then it looks, in this agent's own data rather than in a model's memory.${ms}`;
+      case "engine": {
+        if (eng.used === "none") {
+          return "Nothing cleared the bar, so no model was called at all. That is a refusal, and it is the cheapest and most honest answer there is.";
+        }
+        if (eng.fell_back) {
+          return `It set off for our own hardware and could not get there, so Gemini answered instead.${ms} Nobody waiting saw an error.`;
+        }
+        if (eng.used === "gpu") {
+          return `Our own model wrote the answer, on hardware we control.${ms}`;
+        }
+        return `Gemini wrote the answer.${ms}`;
+      }
+      case "compose":
+        return `Last it assembles the reply and whatever it is citing.${ms}`;
+      default:
+        return `${st.label || st.name}.${ms}`;
+    }
+  }
+
+  function finalWord(trace) {
+    const eng = trace.engine || {};
+    const total = fmtMs(trace.total_ms);
+    if (eng.used === "none") return `Answered without calling a model, in ${total}.`;
+    if (eng.fell_back)       return `Answered in ${total}, by Gemini, after our own hardware could not.`;
+    if (eng.used === "gpu")  return `Answered in ${total}, entirely on our own hardware.`;
+    return `Answered in ${total}, by Gemini.`;
+  }
+
+  const fmtMs = (ms) => (ms == null ? "?" : ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : Math.round(ms) + "ms");
+
+  function ago(at) {
+    const s = Math.max(0, Math.round(Date.now() / 1000 - at));
+    if (s < 60) return s + "s ago";
+    if (s < 3600) return Math.round(s / 60) + "m ago";
+    return Math.round(s / 3600) + "h ago";
+  }
+
+  const engClass = (eng) => {
+    if (!eng) return "none";
+    if (eng.used === "none") return "none";
+    if (eng.fell_back) return "fell";
+    return eng.used === "gpu" ? "gpu" : "cloud";
+  };
+
+  /* ── fetching ────────────────────────────────────────────────────────
+     Each agent is asked independently and a failure is per agent. One box
+     being down must not blank the other two.                               */
+  async function poll() {
+    let reporting = 0;
+    await Promise.all(SOURCES.map(async (src) => {
+      try {
+        const r = await fetch(src.url, { cache: "no-store" });
+        if (!r.ok) throw new Error(String(r.status));
+        const data = await r.json();
+        const list = Array.isArray(data.traces) ? data.traces : [];
+        S.traces[src.key] = list;
+        if (list.length) reporting++;
+        else reporting += 0.0001;          // answered, but had nothing to say
+      } catch {
+        S.traces[src.key] = null;          // null means we could not ask
+      }
+    }));
+    S.reporting = reporting;
+    renderLanes();
+    if (!S.pinned && !S.selected) pickNewest();
+  }
+
+  async function pollSwitch() {
+    const chip = el("sw-chip");
+    try {
+      const r = await fetch(SWITCH_URL, { cache: "no-store" });
+      const d = await r.json();
+      if (d.provider === "gpu") {
+        chip.textContent = "Our own GPU";
+        chip.className = "chip gpu";
+      } else {
+        chip.textContent = "Gemini";
+        chip.className = "chip cloud";
+      }
+    } catch {
+      chip.textContent = "unreadable";
+      chip.className = "chip warnc";
+    }
+  }
+
+  /* ── the lanes ───────────────────────────────────────────────────────── */
+  function renderLanes() {
+    let live = 0;
+    for (const src of SOURCES) {
+      const list = S.traces[src.key];
+      const ul = el("l-" + src.key);
+      const emptyBox = el("e-" + src.key);
+      const count = el("c-" + src.key);
+
+      if (list === null) {
+        ul.innerHTML = "";
+        emptyBox.classList.remove("hidden");
+        emptyBox.innerHTML = "<b>Not answering.</b><br>This agent did not respond, so nothing is shown for it. Nothing is guessed in its place.";
+        count.textContent = "silent";
+        continue;
+      }
+      live++;
+      count.textContent = list.length ? list.length + " recent" : "quiet";
+
+      if (!list.length) {
+        ul.innerHTML = "";
+        emptyBox.classList.remove("hidden");
+        emptyBox.innerHTML =
+          "<b>No requests yet.</b><br>Ask this assistant something and it will appear here within a few seconds. " +
+          "Or see the modelled version, which shows the same design under load nobody is generating right now." +
+          '<br><button type="button" class="tomodel">Show the modelled view</button>';
+        continue;
+      }
+      emptyBox.classList.add("hidden");
+      ul.innerHTML = list.map((t) => {
+        const cls = engClass(t.engine);
+        const cur = S.selected && S.selected.id === t.id ? ' aria-current="true"' : "";
+        return `<li><button type="button" data-agent="${src.key}" data-id="${esc(t.id)}"${cur}>
+          <span class="dot ${cls}"></span>
+          <span class="ago">${ago(t.at)}</span>
+          <span class="ms">${fmtMs(t.total_ms)}</span>
+        </button></li>`;
+      }).join("");
+    }
+    el("sw-agents").textContent = live + " of 3";
+  }
+
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  /* ── the journey ─────────────────────────────────────────────────────── */
+  function drawTrace(trace, upto) {
+    const eng = trace.engine || {};
+    const agent = SOURCES.find((s) => s.key === trace.agent);
+    el("j-who").textContent = (agent ? agent.name : trace.agent) + ", one request";
+    el("j-when").textContent = ago(trace.at) + " · " + fmtMs(trace.total_ms) + " end to end";
+
+    const total = trace.stages.reduce((a, s) => a + (s.ms || 0), 0) || 1;
+    el("j-bars").innerHTML = trace.stages.map((st, i) => {
+      const pct = Math.max(6, ((st.ms || 0) / total) * 100);
+      const shown = i <= upto;
+      let cls = "bar " + (shown ? "done" : "pending");
+      if (i === upto) cls += " on";
+      if (st.name === "engine") {
+        cls += eng.used === "none" ? " eng-none" : eng.used === "gpu" && !eng.fell_back ? " eng-gpu" : " eng-cloud";
+      }
+      // The caption is clipped on a narrow stage, so the full label and its
+      // detail are on the element itself for anyone who hovers.
+      const tip = esc((st.label || st.name) + (st.detail ? ": " + st.detail : "") + " (" + fmtMs(st.ms) + ")");
+      return `<div class="${cls}" style="flex:1 1 ${pct.toFixed(2)}%" title="${tip}">
+        <div class="fill">${fmtMs(st.ms)}</div>
+        <div class="cap">${esc(st.label || st.name)}</div>
+      </div>`;
+    }).join("");
+
+    const st = trace.stages[upto];
+    el("j-detail").textContent = st && st.detail ? st.detail : "";
+
+    // The two destinations. Exactly one is lit, and a diverted run shows the
+    // hardware it set off for as dashed rather than simply dark, because
+    // "we tried and could not" is a different fact from "we never tried".
+    const ours = el("j-ours"), cloud = el("j-cloud");
+    ours.className = "dest ours";
+    cloud.className = "dest cloud";
+    // A refused request has no engine stage at all, and findIndex returns -1,
+    // which every index is greater than. Without this the refusal note showed
+    // on the very first frame, before the request had visibly gone anywhere.
+    const engIdx = trace.stages.findIndex((s) => s.name === "engine");
+    const reached = engIdx >= 0 ? upto >= engIdx : upto >= trace.stages.length - 1;
+    if (reached && eng.used !== "none") {
+      if (eng.fell_back) { ours.className = "dest ours diverted"; cloud.className = "dest cloud taken"; }
+      else if (eng.used === "gpu") ours.className = "dest ours taken";
+      else cloud.className = "dest cloud taken";
+    }
+
+    const reason = el("j-reason");
+    if (reached && eng.fell_back && eng.reason) {
+      reason.classList.remove("hidden");
+      reason.innerHTML = "<b>Diverted.</b> " + esc(eng.reason) +
+        " The question was still answered, and the panel says who answered it.";
+    } else if (reached && eng.used === "none") {
+      reason.classList.remove("hidden");
+      reason.innerHTML = "<b>No model was called.</b> Nothing in this agent's own data was close enough to ground an answer on, so it declined instead of guessing.";
+    } else {
+      reason.classList.add("hidden");
+    }
+
+    el("j-narr").textContent = narrate(trace, upto);
+  }
+
+  /* ── the loop that makes it explain itself ───────────────────────────── */
+  function tick() {
+    if (S.paused || !S.selected) return schedule(STEP_MS);
+    const t = S.selected;
+    if (S.step < t.stages.length - 1) {
+      S.step++;
+      drawTrace(t, S.step);
+      return schedule(reduced ? STEP_MS * 2 : STEP_MS);
+    }
+    // Finished this one. Hold the last frame, then move on unless pinned.
+    drawTrace(t, S.step);
+    el("j-narr").textContent = finalWord(t);
+    if (S.pinned) return schedule(ADVANCE_MS);
+    schedule(ADVANCE_MS, () => { pickNext(); });
+  }
+
+  function schedule(ms, after) {
+    clearTimeout(S.timer);
+    S.timer = setTimeout(() => { if (after) after(); tick(); }, ms);
+  }
+
+  function allTraces() {
+    return SOURCES.flatMap((s) => (S.traces[s.key] || []));
+  }
+
+  function pickNewest() {
+    const all = allTraces().sort((a, b) => b.at - a.at);
+    if (!all.length) return;
+    select(all[0], false);
+  }
+
+  function pickNext() {
+    const all = allTraces().sort((a, b) => b.at - a.at);
+    if (!all.length) { S.selected = null; return; }
+    // Prefer one nobody has watched yet, so leaving it running shows variety
+    // rather than the same request forever.
+    const unseen = all.find((t) => !S.seen.has(t.id));
+    select(unseen || all[Math.floor(Math.random() * all.length)], false);
+  }
+
+  function select(trace, pin) {
+    S.selected = trace;
+    S.step = -1;
+    if (pin) S.pinned = true;
+    S.seen.add(trace.id);
+    if (S.seen.size > 400) S.seen = new Set([trace.id]);
+    renderLanes();
+    drawTrace(trace, -1);
+  }
+
+  /* ── wiring ──────────────────────────────────────────────────────────── */
+  el("lanes").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-id]");
+    if (btn) {
+      const list = S.traces[btn.dataset.agent] || [];
+      const t = list.find((x) => String(x.id) === btn.dataset.id);
+      if (t) select(t, true);
+      return;
+    }
+    if (ev.target.closest(".tomodel")) setMode("model");
+  });
+
+  el("b-pause").addEventListener("click", () => {
+    S.paused = !S.paused;
+    el("b-pause").textContent = S.paused ? "Resume" : "Pause";
+    if (!S.paused) tick();
+  });
+
+  function setMode(which) {
+    const live = which === "live";
+    el("livepane").classList.toggle("hidden", !live);
+    el("modelpane").classList.toggle("hidden", live);
+    el("m-live").setAttribute("aria-pressed", String(live));
+    el("m-model").setAttribute("aria-pressed", String(!live));
+    el("modenote").textContent = live
+      ? "Live: real requests, real milliseconds, nothing invented. Thin when nobody is using the system, which is honest rather than a fault."
+      : "Modelled: a simulation of the same design under load nobody is generating. Every number below is calculated, not measured, and none of it comes from the running service.";
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  }
+  el("m-live").addEventListener("click", () => setMode("live"));
+  el("m-model").addEventListener("click", () => setMode("model"));
+
+  poll(); pollSwitch(); tick();
+  setInterval(poll, POLL_MS);
+  setInterval(pollSwitch, POLL_MS * 3);
+})();
+</script>
+
