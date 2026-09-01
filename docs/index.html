@@ -103,11 +103,11 @@ footer { color: var(--faint); font-size: 14px; border-top: 1px solid var(--line)
 <body>
 <p class="eyebrow">Documentation</p>
 <h1>Everything we have written for you</h1>
-<p class="lede">19 documents, in four groups: one for each of the three assistants, and one for the hardware they share. Every one opens in your browser, and every one has its own contents list at the top so you can jump straight to a section.</p>
+<p class="lede">20 documents, in four groups: one for each of the three assistants, and one for the hardware they share. Every one opens in your browser, and every one has its own contents list at the top so you can jump straight to a section.</p>
 <div class="jump"><a href="#smartmarket">SmartMarket</a><a href="#smartservice">SmartService</a><a href="#smartcommunity">SmartCommunity</a><a href="#hardware">The hardware underneath</a></div>
 <input class="find" id="find" type="search" placeholder="Type to find a document: parking, gpu, speed, setup, sourcing..." aria-label="Find a document">
 <p class="count" id="count"></p>
-<p class="empty" id="empty">Nothing matches that. Clear the box to see all 19 again.</p>
+<p class="empty" id="empty">Nothing matches that. Clear the box to see all 20 again.</p>
 <section id="smartmarket">
 <h2>SmartMarket, the grocery assistant</h2>
 <p class="blurb">Ordering a week&#x27;s shopping by describing it: search, cart, checkout, sourcing and delivery, and the machine it runs on.</p>
@@ -200,6 +200,11 @@ footer { color: var(--faint); font-size: 14px; border-top: 1px solid var(--line)
 <section id="hardware">
 <h2>The hardware underneath</h2>
 <p class="blurb">Running the model on a machine we control, what it costs, and how the applications carry on when it is switched off. Shared by all three agents.</p>
+<a class="card" href="https://servicez.smartzees.com/docs/deployment/" data-find="deployment and handover where every part of the platform lives, the command that puts it there, and what each piece of the code is for handover 1 september 2026 deploy deployment handover where does it live paths commands rsync systemd units nginx repositories repos branches build frontend backend restart servicez marketz livz landing docs ssh boxes machines code files purpose sync outbox rules leftovers checking a deploy">
+  <span class="top"><span class="name">Deployment and handover</span><span class="kind">Handover</span></span>
+  <p class="desc">Where every part of the platform lives, the command that puts it there, and what each piece of the code is for</p>
+  <p class="when">1 September 2026</p>
+</a>
 <a class="card" href="https://servicez.smartzees.com/docs/gpu-spinup/" data-find="spinning up a gpu, and wiring it to fastapi from an empty aws account to a resident&#x27;s question answered by our own model, in nine steps. written from a real attempt, including the two things that stopped it step by step 31 august 2026 gpu spin up step by step guide aws ec2 g6 xlarge l4 ollama llama fastapi integration wiring quota free tier security group idle auto stop lambda cloud-init home panic ollama_url fallback checklist troubleshooting cost">
   <span class="top"><span class="name">Spinning up a GPU, and wiring it to FastAPI</span><span class="kind">Step by step</span></span>
   <p class="desc">From an empty AWS account to a resident&#x27;s question answered by our own model, in nine steps. Written from a real attempt, including the two things that stopped it</p>

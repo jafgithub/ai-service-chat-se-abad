@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Deployment and Handover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+/* ── tokens ───────────────────────────────────────────────────────────────
+   The palette is the one the other five documents in this set already use:
+   rust badge, deep navy ink, and the blue / green / amber semantic trio from
+   render_diagrams.py. Continuity with the house style, not a sixth identity.
+
+   In the console those colours carry meaning rather than decoration. Green is
+   our own hardware, blue is the cloud engine that catches it, grey is an
+   honest refusal, rust is something being turned away at the gate.           */
+:root {
+  --paper:      #f6f7f9;
+  --card:       #ffffff;
+  --sunken:     #eef1f5;
+  --rule:       #dde3ea;
+  --rule-soft:  #e8edf2;
+
+  --ink:        #14213a;
+  --muted:      #5b6b86;
+  --faint:      #8494ab;
+
+  --brand:      #c2451b;
+  --brand-soft: #fdf1ec;
+
+  --ours:       #2f6b4c;
+  --ours-soft:  #eaf6ef;
+  --cloud:      #2258d4;
+  --cloud-soft: #eef3fd;
+  --refuse:     #5b6b86;
+  --refuse-soft:#eef1f5;
+  --warn:       #b1791a;
+  --warn-soft:  #fffaf0;
+
+  --shadow: 0 1px 2px rgba(20,33,58,.05), 0 10px 28px rgba(20,33,58,.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #0e1420;
+    --card:       #151d2c;
+    --sunken:     #1b2534;
+    --rule:       #263143;
+    --rule-soft:  #1f2a39;
+
+    --ink:        #e7edf5;
+    --muted:      #9fb0c6;
+    --faint:      #71829a;
+
+    --brand:      #ef7a4d;
+    --brand-soft: #331a12;
+
+    --ours:       #57b98a;
+    --ours-soft:  #12301f;
+    --cloud:      #6f9df0;
+    --cloud-soft: #131f38;
+    --refuse:     #8fa0b8;
+    --refuse-soft:#1b2534;
+    --warn:       #d8a441;
+    --warn-soft:  #2e2410;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:      #0e1420;
+  --card:       #151d2c;
+  --sunken:     #1b2534;
+  --rule:       #263143;
+  --rule-soft:  #1f2a39;
+
+  --ink:        #e7edf5;
+  --muted:      #9fb0c6;
+  --faint:      #71829a;
+
+  --brand:      #ef7a4d;
+  --brand-soft: #331a12;
+
+  --ours:       #57b98a;
+  --ours-soft:  #12301f;
+  --cloud:      #6f9df0;
+  --cloud-soft: #131f38;
+  --refuse:     #8fa0b8;
+  --refuse-soft:#1b2534;
+  --warn:       #d8a441;
+  --warn-soft:  #2e2410;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16.5px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono, .id, .num {
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+.shell {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 60px) clamp(16px, 4vw, 34px) 96px;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 20px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.back::before { content: "\2190"; margin-right: 7px; }
+.back:hover { color: var(--brand); }
+
+/* ── masthead, in the manner of a document of record ──────────────────── */
+.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 22px; margin-bottom: 34px; }
+
+.badge {
+  display: inline-block;
+  background: var(--brand);
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 4px 11px;
+  border-radius: 4px;
+}
+
+h1 {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: clamp(32px, 5vw, 50px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -.015em;
+  margin: 16px 0 0;
+  text-wrap: balance;
+}
+
+.standfirst {
+  margin: 14px 0 0;
+  max-width: 60ch;
+  font-size: clamp(16.5px, 1.6vw, 18.5px);
+  color: var(--muted);
+}
+
+.docmeta {
+  margin: 22px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px 24px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+}
+.docmeta dt { color: var(--faint); text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; }
+.docmeta dd { margin: 3px 0 0; color: var(--ink); font-weight: 500; }
+
+/* ── layout: sticky contents beside the text at wide widths ───────────── */
+.layout { display: block; }
+@media (min-width: 1040px) {
+  .layout { display: grid; grid-template-columns: 218px minmax(0, 1fr); gap: 52px; align-items: start; }
+  .toc { position: sticky; top: 28px; }
+}
+
+.toc { margin-bottom: 40px; }
+.toc h2 {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.toc ol ol { margin: 3px 0 6px 16px; }
+.toc a {
+  display: flex;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 13.5px;
+  padding: 3px 0;
+  border-radius: 3px;
+}
+.toc a:hover { color: var(--brand); }
+.toc a .n { color: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; flex: 0 0 auto; padding-top: 1px; }
+
+/* ── prose ────────────────────────────────────────────────────────────── */
+.body > section { margin-bottom: 52px; scroll-margin-top: 24px; }
+
+h2.sec {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: clamp(24px, 2.6vw, 31px);
+  font-weight: 500;
+  letter-spacing: -.01em;
+  margin: 0 0 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  text-wrap: balance;
+}
+h2.sec .n { color: var(--brand); font-family: "IBM Plex Mono", monospace; font-size: .62em; margin-right: 12px; }
+
+h3.sub {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 30px 0 8px;
+  letter-spacing: -.005em;
+}
+h3.sub .n { color: var(--brand); font-family: "IBM Plex Mono", monospace; font-size: .82em; margin-right: 9px; font-weight: 500; }
+
+p { margin: 0 0 14px; max-width: 66ch; }
+p:last-child { margin-bottom: 0; }
+.body strong { font-weight: 700; }
+
+.lede { font-size: 17.5px; color: var(--muted); max-width: 62ch; }
+
+/* requirement lists */
+.reqs { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.reqs li {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  align-items: baseline;
+}
+.reqs li:nth-child(odd) { background: var(--sunken); }
+.reqs .id {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  letter-spacing: .02em;
+}
+.reqs .txt { max-width: 60ch; }
+
+.callout {
+  border-left: 3px solid var(--brand);
+  background: var(--brand-soft);
+  padding: 13px 0 13px 17px;
+  margin: 18px 0;
+  border-radius: 0 6px 6px 0;
+}
+.callout p { margin: 0; max-width: 62ch; }
+
+.shows {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 4px 13px;
+  text-decoration: none;
+}
+.shows:hover { border-color: var(--brand); color: var(--brand); }
+.shows::before { content: "▸"; color: var(--brand); }
+
+.scroller { overflow-x: auto; margin: 20px 0; }
+table.spec { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14.5px; }
+table.spec th, table.spec td { text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+table.spec th { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+table.spec td:first-child { font-weight: 600; white-space: nowrap; }
+table.spec .num { font-variant-numeric: tabular-nums; }
+
+.figure { margin: 22px 0 0; }
+.figure .scroller { border: 1px solid var(--rule); border-radius: 10px; background: var(--card); padding: 14px 12px 8px; }
+.figcap { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--faint); margin-top: 9px; }
+
+/* ── the static flow diagram ──────────────────────────────────────────── */
+.flow { display: block; width: 100%; height: auto; min-width: 880px; }
+.fbox { fill: var(--sunken); stroke: var(--rule); stroke-width: 1.5; }
+.fbox.gate { fill: var(--brand-soft); stroke: var(--brand); }
+.fbox.you  { fill: var(--warn-soft); stroke: var(--warn); }
+.fbox.ours { fill: var(--ours-soft); stroke: var(--ours); }
+.fbox.cloud{ fill: var(--cloud-soft); stroke: var(--cloud); }
+.ft { fill: var(--ink); font: 600 13px "Public Sans", sans-serif; text-anchor: middle; }
+.fs { fill: var(--muted); font: 400 11px "IBM Plex Mono", monospace; text-anchor: middle; }
+.fl { stroke: var(--faint); stroke-width: 1.6; fill: none; }
+.flab { fill: var(--faint); font: 500 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+
+/* ── the console ──────────────────────────────────────────────────────── */
+.console { border: 1px solid var(--rule); border-radius: 12px; background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+.console > header {
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--rule);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px;
+}
+.console > header h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.console .modelled {
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--faint);
+  margin-left: auto;
+}
+
+.stage { padding: 10px 12px 2px; overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; min-width: 900px; }
+
+.nbox { fill: var(--sunken); stroke: var(--rule); stroke-width: 1.6; transition: fill .16s, stroke .16s; }
+.nbox.hot   { fill: var(--cloud-soft); stroke: var(--cloud); }
+.nbox.ours  { fill: var(--ours-soft);  stroke: var(--ours); }
+.nbox.cloud { fill: var(--cloud-soft); stroke: var(--cloud); }
+.nbox.stop  { fill: var(--brand-soft); stroke: var(--brand); stroke-dasharray: 6 4; }
+.nbox.dead  { fill: var(--brand-soft); stroke: var(--brand); stroke-dasharray: 6 4; }
+.nt { fill: var(--ink); font: 600 13px "Public Sans", sans-serif; text-anchor: middle; }
+.ns { fill: var(--muted); font: 400 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+.edge { stroke: var(--rule); stroke-width: 2; fill: none; transition: stroke .16s; }
+.elab { fill: var(--faint); font: 500 10.5px "IBM Plex Mono", monospace; text-anchor: middle; }
+.p-ours { fill: var(--ours); } .p-cloud { fill: var(--cloud); }
+.p-refuse { fill: var(--refuse); } .p-block { fill: var(--brand); }
+
+.scenarios { display: flex; flex-wrap: wrap; gap: 8px; padding: 15px 18px; border-top: 1px solid var(--rule); }
+.scenarios button {
+  min-height: 40px; padding: 7px 15px; border-radius: 7px;
+  border: 1px solid var(--rule); background: var(--sunken); color: var(--ink);
+  font: 600 13px "Public Sans", sans-serif; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.scenarios button:hover { border-color: var(--faint); }
+.scenarios button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.scenarios button.quiet { margin-left: auto; background: transparent; }
+
+.dials { display: flex; flex-wrap: wrap; gap: 20px 28px; padding: 0 18px 16px; }
+.dial { flex: 1 1 190px; display: flex; flex-direction: column; gap: 5px; }
+.dial label {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.dial label b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dial input[type="range"] { width: 100%; accent-color: var(--brand); height: 20px; cursor: pointer; }
+
+.tiles {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 1px; background: var(--rule-soft); border-top: 1px solid var(--rule);
+}
+.tile { background: var(--card); padding: 13px 15px; }
+.tile .k {
+  font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint);
+}
+.tile .v {
+  margin-top: 3px; font-family: "IBM Plex Mono", monospace; font-size: 22px;
+  font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+.tile .v .u { font-size: 11.5px; color: var(--faint); margin-left: 2px; }
+.v.ours { color: var(--ours); } .v.cloud { color: var(--cloud); }
+.v.refuse { color: var(--refuse); } .v.block { color: var(--brand); }
+.v.good { color: var(--ours); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px; font-weight: 500;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.closed  { background: var(--ours-soft);  color: var(--ours); }
+.pill.open    { background: var(--brand-soft); color: var(--brand); }
+.pill.probing { background: var(--warn-soft);  color: var(--warn); }
+
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: var(--rule-soft); border-top: 1px solid var(--rule); }
+.chart { background: var(--card); padding: 13px 15px 8px; }
+.chart .k { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.chart svg { display: block; width: 100%; height: 58px; }
+
+.log {
+  margin: 0; padding: 11px 18px 16px; max-height: 210px; overflow-y: auto;
+  font-family: "IBM Plex Mono", monospace; font-size: 12.5px; line-height: 1.7; list-style: none;
+  border-top: 1px solid var(--rule);
+}
+.log li { display: flex; gap: 12px; color: var(--muted); }
+.log li .t { color: var(--faint); flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.log li.ours .m   { color: var(--ours); }
+.log li.cloud .m  { color: var(--cloud); }
+.log li.block .m  { color: var(--brand); }
+.log li.warn .m   { color: var(--warn); }
+
+:where(a, button, input):focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 13.5px; }
+.foot p { max-width: 68ch; }
+/* ── added for the hand written documents that came after the SRS ──────────
+   The SRS had no code in it, so it had no rule for a block of it. `.block` was
+   already taken by a colour in the log widget above, hence `.code`.          */
+.code {
+  margin: 16px 0;
+  padding: 13px 15px;
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--brand);
+  border-radius: 0 8px 8px 0;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre;
+}
+.code code { font: inherit; color: inherit; }
+
+/* A step's headline, inside the numbered list the requirement rows also use. */
+.reqs .txt strong { color: var(--ink); font-weight: 600; }
+.reqs .txt em { color: var(--muted); font-style: italic; }
+
+/* Inline monospace inside prose, which the SRS only ever needed for numbers. */
+p .mono, td .mono, li .mono, dd .mono {
+  font-size: .92em;
+  background: var(--sunken);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <a class="back" href="../">All documents</a>
+
+  <div class="masthead">
+    <span class="badge">Handover</span>
+    <h1>Deployment and handover</h1>
+    <p class="standfirst">
+      Where every part of the platform lives, the command that puts it there, and what each piece of the code is for. Written to be followed by somebody who did not build it.
+    </p>
+    <dl class="docmeta">
+      <div><dt>Document</dt><dd>OPS-DEP-1</dd></div>
+      <div><dt>Version</dt><dd>1.0</dd></div>
+      <div><dt>Date</dt><dd>1 September 2026</dd></div>
+      <div><dt>Status</dt><dd>Current</dd></div>
+      <div><dt>Author</dt><dd>Abad Naseer</dd></div>
+    </dl>
+  </div>
+
+  <div class="layout">
+
+    <nav class="toc" aria-label="Contents">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#s1"><span class="n">1</span> The map</a></li>
+        <li><a href="#s2"><span class="n">2</span> The four repositories</a></li>
+        <li><a href="#s3"><span class="n">3</span> Deploying each one</a>
+          <ol>
+        <li><a href="#s31"><span class="n">3.1</span> SmartService</a></li>
+        <li><a href="#s32"><span class="n">3.2</span> SmartMarket</a></li>
+        <li><a href="#s33"><span class="n">3.3</span> SmartCommunity</a></li>
+        <li><a href="#s34"><span class="n">3.4</span> The landing page</a></li>
+        <li><a href="#s35"><span class="n">3.5</span> The documents</a></li>
+          </ol></li>
+        <li><a href="#s4"><span class="n">4</span> What the code files do</a></li>
+        <li><a href="#s5"><span class="n">5</span> The model, and the switch</a></li>
+        <li><a href="#s6"><span class="n">6</span> Rules that are not optional</a></li>
+        <li><a href="#s7"><span class="n">7</span> Checking a deploy worked</a></li>
+        <li><a href="#s8"><span class="n">8</span> Leftovers on the machines</a></li>
+      </ol>
+    </nav>
+
+    <div class="body">
+
+      <section id="s1">
+        <h2 class="sec"><span class="n">1</span>The map</h2>
+        <p class="lede">
+          Three products, four repositories, four machines. Everything below was
+          read off the running systems rather than remembered, so where this
+          document and your memory disagree, believe this document and then
+          check the machine.
+        </p>
+        <table class="spec"><thead><tr><th>What</th><th>Address</th><th>Machine</th><th>Region</th></tr></thead><tbody><tr><td>SmartMarket</td><td>marketz.smartzees.com</td><td>54.254.25.0</td><td>ap-southeast-1</td></tr><tr><td>SmartService</td><td>servicez.smartzees.com</td><td>35.91.251.211</td><td>us-west-2</td></tr><tr><td>SmartCommunity</td><td>livz.smartzees.com</td><td>54.188.207.85</td><td>us-west-2</td></tr><tr><td>The landing page</td><td>smartzees.com</td><td>35.91.251.211</td><td>shares the Service box</td></tr><tr><td>The documents</td><td>servicez.smartzees.com/docs/</td><td>35.91.251.211</td><td>and mirrored on Market</td></tr><tr><td>The open model</td><td>184.34.122.122</td><td>i-0c9e7a485d54e4e92</td><td>us-west-2, another AWS account</td></tr></tbody></table>
+        <div class="callout">
+          <p>
+            The three application machines are Lightsail, in AWS account
+            952427475294. The model is plain EC2 in the client's own account,
+            253918336085. That is why it is reached over the public internet and
+            why a security group, not a private network, is the only thing in
+            front of it.
+          </p>
+        </div>
+        <p>Getting in:</p>
+        <pre class="code"><code>ssh -i ~/Downloads/sailagentecsdevkey.pem ubuntu@35.91.251.211   # Service, landing, docs
+ssh -i ~/Downloads/sailagentecsdevkey.pem ubuntu@54.254.25.0    # Market
+ssh -i ~/Downloads/sailagentecsdevkey.pem ubuntu@54.188.207.85  # Community</code></pre>
+        <p>
+          The model machine has its own key and is normally reached from the AWS
+          console instead, through EC2 Instance Connect, so nobody has to be
+          sent a private key.
+        </p>
+      </section>
+
+      <section id="s2">
+        <h2 class="sec"><span class="n">2</span>The four repositories</h2>
+        <table class="spec"><thead><tr><th>Local folder</th><th>Remote</th><th>Branch</th><th>Product</th></tr></thead><tbody><tr><td><span class='mono'>plumber-assistant</span></td><td>jafgithub/ai-service-chat-se-abad</td><td>master</td><td>SmartService</td></tr><tr><td><span class='mono'>AI-Orders-main</span></td><td>jafgithub/aichat-v2-abad</td><td>main</td><td>SmartMarket</td></tr><tr><td><span class='mono'>community-assistant</span></td><td>AbadNaseer/ai-agent-smartcommunity</td><td>master</td><td>SmartCommunity</td></tr><tr><td><span class='mono'>smartzees-landing</span></td><td>AbadNaseer/ai-agent-landingpage-smartzees</td><td>master</td><td>smartzees.com</td></tr></tbody></table>
+        <p>
+          The last two are staged under a personal account because write access
+          on the organisation copies has not been granted yet. When it is, the
+          remote changes and nothing else does.
+        </p>
+        <p>
+          Each repository has the same shape: <span class="mono">backend/</span>
+          is FastAPI, <span class="mono">frontend/</span> is Next.js exported to
+          static files, and <span class="mono">docs/</span> holds the written
+          documents. The landing page has only a frontend.
+        </p>
+        <p>
+          Node is not on the system path on the build machine. Every frontend
+          command below needs this first:
+        </p>
+        <pre class="code"><code>export PATH="$HOME/.local/node/bin:$PATH"</code></pre>
+      </section>
+
+      <section id="s3">
+        <h2 class="sec"><span class="n">3</span>Deploying each one</h2>
+        <p>
+          The pattern is the same everywhere and it is deliberate. Build locally,
+          rsync to a staging directory in the deploy user's home, then move it
+          into place with sudo. Never build on the server: these machines have
+          under 2GB of memory and a Next.js build will take one down.
+        </p>
+
+        <h3 class="sub" id="s31"><span class="n">3.1</span>SmartService</h3>
+        <p><strong>Backend</strong>, at <span class="mono">/home/ubuntu/plumber/backend</span>, unit <span class="mono">plumber</span>, port 8100.</p>
+        <pre class="code"><code>rsync -az --exclude '__pycache__' --exclude '.venv' --exclude '.env' \
+  plumber-assistant/backend/app/ ubuntu@35.91.251.211:/home/ubuntu/plumber/backend/app/
+ssh ubuntu@35.91.251.211 'sudo systemctl restart plumber'</code></pre>
+        <p><strong>Frontend</strong>, served from <span class="mono">/var/www/serviceagent</span>.</p>
+        <pre class="code"><code>cd plumber-assistant/frontend && npm run build:serviceagent
+rsync -az --delete out/ ubuntu@35.91.251.211:/home/ubuntu/deploy-serviceagent/
+ssh ubuntu@35.91.251.211 \
+  'sudo rsync -a --delete /home/ubuntu/deploy-serviceagent/ /var/www/serviceagent/'</code></pre>
+        <p>
+          <span class="mono">build:serviceagent</span> rather than
+          <span class="mono">build</span>: it sets an empty base path and an
+          empty API url, because the app sits at the root of its own subdomain
+          and the API is same origin.
+        </p>
+
+        <h3 class="sub" id="s32"><span class="n">3.2</span>SmartMarket</h3>
+        <p><strong>Backend</strong>, at <span class="mono">/var/www/ai-order/backend</span>, unit <span class="mono">aiorder</span>.</p>
+        <pre class="code"><code>rsync -az --exclude '__pycache__' --exclude '.env' \
+  AI-Orders-main/backend/app/ ubuntu@54.254.25.0:/home/ubuntu/deploy-market-app/
+ssh ubuntu@54.254.25.0 \
+  'sudo rsync -a /home/ubuntu/deploy-market-app/ /var/www/ai-order/backend/app/ && sudo systemctl restart aiorder'</code></pre>
+        <p><strong>Frontend</strong>, served from <span class="mono">/var/www/ai-order/frontend-dist</span>.</p>
+        <pre class="code"><code>cd AI-Orders-main/ai-order && npm run build:deploy
+rsync -az --delete out/ ubuntu@54.254.25.0:/home/ubuntu/deploy-market/
+ssh ubuntu@54.254.25.0 \
+  'sudo rsync -a --delete /home/ubuntu/deploy-market/ /var/www/ai-order/frontend-dist/'</code></pre>
+        <div class="callout">
+          <p>
+            The web root is <span class="mono">frontend-dist</span>, not
+            <span class="mono">frontend</span>. There is a
+            <span class="mono">frontend</span> directory beside it that is not
+            served. Deploying into it looks like a successful deploy that
+            changes nothing, and it has cost an afternoon before.
+          </p>
+        </div>
+
+        <h3 class="sub" id="s33"><span class="n">3.3</span>SmartCommunity</h3>
+        <p><strong>Backend</strong>, at <span class="mono">/home/ubuntu/community/backend</span>, unit <span class="mono">community</span>, port 8200.</p>
+        <pre class="code"><code>rsync -az --exclude '__pycache__' --exclude '.venv' --exclude '.env' \
+  community-assistant/backend/app/ ubuntu@54.188.207.85:/home/ubuntu/community/backend/app/
+ssh ubuntu@54.188.207.85 'sudo systemctl restart community'</code></pre>
+        <p><strong>Frontend</strong>, served from <span class="mono">/var/www/community</span>.</p>
+        <pre class="code"><code>cd community-assistant/frontend && npm run build
+rsync -az --delete out/ ubuntu@54.188.207.85:/home/ubuntu/deploy-community/
+ssh ubuntu@54.188.207.85 \
+  'sudo rsync -a --delete /home/ubuntu/deploy-community/ /var/www/community/ && sudo chown -R www-data:www-data /var/www/community'</code></pre>
+        <p>
+          Port 8200 rather than 8100 is deliberate. This machine was cloned from
+          the Service Assistant, and a stray request meant for that product must
+          not find something listening here and be answered by it.
+        </p>
+
+        <h3 class="sub" id="s34"><span class="n">3.4</span>The landing page</h3>
+        <p>Static only, served from <span class="mono">/var/www/smartzees</span> on the Service machine.</p>
+        <pre class="code"><code>cd smartzees-landing/app && npm run build
+rsync -az --delete out/ ubuntu@35.91.251.211:/home/ubuntu/deploy-smartzees/
+ssh ubuntu@35.91.251.211 \
+  'sudo rsync -a --delete /home/ubuntu/deploy-smartzees/ /var/www/smartzees/'</code></pre>
+
+        <h3 class="sub" id="s35"><span class="n">3.5</span>The documents</h3>
+        <p>
+          Served from <span class="mono">/var/www/serviceagent-docs</span>, which
+          is outside the site root on purpose: the frontend deploy above uses
+          <span class="mono">--delete</span> and would otherwise remove them.
+        </p>
+        <pre class="code"><code>python3 docs/_house/hub.py            # rebuilds docs/index.html from its list
+python3 docs/deployment/build.py      # this document
+rsync -az docs/<name>/ ubuntu@35.91.251.211:/home/ubuntu/deploy-docs/<name>/
+ssh ubuntu@35.91.251.211 \
+  'sudo rsync -a /home/ubuntu/deploy-docs/ /var/www/serviceagent-docs/'</code></pre>
+        <p>
+          Generated document sets (<span class="mono">source.md</span> plus the
+          <span class="mono">render_*.py</span> scripts) deploy their
+          <span class="mono">build/web/</span> directory. Hand written ones
+          (<span class="mono">srs</span>, <span class="mono">lab</span>,
+          <span class="mono">deployment</span>, the two specifications) deploy the
+          <span class="mono">index.html</span> beside the builder.
+        </p>
+      </section>
+
+      <section id="s4">
+        <h2 class="sec"><span class="n">4</span>What the code files do</h2>
+        <p>
+          Only the ones somebody unfamiliar would otherwise have to read to
+          understand. The rest are named for what they do.
+        </p>
+
+        <h3 class="sub">Shared by all three products</h3>
+        <table class="spec"><thead><tr><th>File</th><th>What it is for</th></tr></thead><tbody><tr><td><span class='mono'>services/llm.py</span> (Market: <span class='mono'>services/ai.py</span>)</td><td>The router. Everything wanting a sentence written asks this, and it decides whether our own model or Gemini answers, and falls back when the first cannot</td></tr><tr><td><span class='mono'>services/gemini_service.py</span></td><td>Google's model. Also does speech to text and text to speech</td></tr><tr><td><span class='mono'>services/ollama_service.py</span></td><td>Our own model over HTTP</td></tr><tr><td><span class='mono'>services/tracing.py</span></td><td>Measures each stage of a request and keeps the last 50, which is what the live diagram reads</td></tr><tr><td><span class='mono'>api/ai_public.py</span></td><td>Two read only routes with no token: which engine is switched on, and the recent traces. No question or reply text ever appears here</td></tr><tr><td><span class='mono'>services/rag.py</span></td><td>The embedding model, all-MiniLM-L6-v2, 384 dimensions, loaded once</td></tr></tbody></table>
+
+        <h3 class="sub">SmartService only</h3>
+        <table class="spec"><thead><tr><th>File</th><th>What it is for</th></tr></thead><tbody><tr><td><span class='mono'>services/ai_runtime.py</span></td><td>The engine switch itself, a small JSON file. This machine owns it for the whole platform</td></tr><tr><td><span class='mono'>services/gpu_instance.py</span></td><td>Finds, starts and stops the model machine. Needs boto3 and AWS keys</td></tr><tr><td><span class='mono'>api/ai_admin.py</span></td><td>The admin panel's engine controls, including start and stop</td></tr><tr><td><span class='mono'>services/conversation.py</span></td><td>Turns what somebody said into a search, a booking step or a parking request</td></tr><tr><td><span class='mono'>services/catalog_index.py</span>, <span class='mono'>phrase_index.py</span></td><td>The service catalogue, held in memory so a search is a matrix multiply</td></tr><tr><td><span class='mono'>services/parking.py</span>, <span class='mono'>api/parking.py</span></td><td>Visitor passes and the QR code the gate reads</td></tr><tr><td><span class='mono'>services/booking_service.py</span>, <span class='mono'>booking_emails.py</span></td><td>Appointments, and the confirmations that go with them</td></tr></tbody></table>
+
+        <h3 class="sub">SmartCommunity only</h3>
+        <table class="spec"><thead><tr><th>File</th><th>What it is for</th></tr></thead><tbody><tr><td><span class='mono'>services/community_chat.py</span></td><td>The whole pipeline: scope to one association, retrieve, answer or refuse</td></tr><tr><td><span class='mono'>services/docs_index.py</span></td><td>209 passages in memory, and the 0.30 threshold under which no model is called at all</td></tr><tr><td><span class='mono'>services/doc_library.py</span>, <span class='mono'>doc_chunker.py</span></td><td>Which documents exist, and cutting a PDF into passages</td></tr><tr><td><span class='mono'>services/platform_switch.py</span></td><td>Reads the engine switch from SmartService. This agent never writes it</td></tr><tr><td><span class='mono'>api/documents.py</span></td><td>Upload, list, withdraw, download. The office screen talks to this</td></tr></tbody></table>
+
+        <h3 class="sub">SmartMarket only</h3>
+        <table class="spec"><thead><tr><th>File</th><th>What it is for</th></tr></thead><tbody><tr><td><span class='mono'>services/catalog_index.py</span></td><td>About 25,600 products in memory. This is the 787x search improvement</td></tr><tr><td><span class='mono'>sync_to_remote.py</span></td><td>Drains <span class='mono'>sync_outbox</span> into the client's own database. See section 6</td></tr><tr><td><span class='mono'>services/shopping/</span></td><td>Sourcing items the shop does not stock, through a provider interface</td></tr><tr><td><span class='mono'>services/order_service.py</span></td><td>Totals, tax and tips. Tax is computed on the goods and the tip on the goods before tax</td></tr></tbody></table>
+      </section>
+
+      <section id="s5">
+        <h2 class="sec"><span class="n">5</span>The model, and the switch</h2>
+        <p>
+          One switch decides which engine answers, for all three products, and it
+          lives on <span class="mono">servicez.smartzees.com/admin</span> under
+          AI runtime. The other two read it over HTTP and never write it.
+        </p>
+        <p>Settings on the Service machine, in <span class="mono">.env</span>:</p>
+        <pre class="code"><code>GPU_INSTANCE_ID=i-0c9e7a485d54e4e92
+AWS_REGION=us-west-2
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+OLLAMA_MODEL=llama3.2:3b
+OLLAMA_TIMEOUT_SECONDS=45</code></pre>
+        <p>
+          The other two only need <span class="mono">OLLAMA_URL</span> and
+          <span class="mono">OLLAMA_MODEL</span>, because they never start or stop
+          anything.
+        </p>
+        <div class="callout">
+          <p>
+            <span class="mono">OLLAMA_URL</span> and
+            <span class="mono">GPU_INSTANCE_ID</span> are two different modes and
+            the first one wins. Set both on the Service machine and the panel
+            will show a healthy engine it cannot stop. It also needs
+            <span class="mono">boto3</span> installed in its virtual environment,
+            or every AWS call fails and the panel says the machine is unknown.
+          </p>
+        </div>
+      </section>
+
+      <section id="s6">
+        <h2 class="sec"><span class="n">6</span>Rules that are not optional</h2>
+        <table class="spec"><thead><tr><th>Rule</th><th>Why</th></tr></thead><tbody><tr><td><strong>Exactly one machine may run <span class='mono'>aiorder-sync</span></strong>, and it is 54.254.25.0. The same for <span class='mono'>plumber-sync</span> on 35.91.251.211.</td><td>These push rows into the client's live database. Cloned machines come up with the sync running, and two machines writing the same rows has happened three times</td></tr><tr><td><strong>Stop <span class='mono'>aiorder-sync</span> before any test that creates a customer or an order.</strong></td><td>Test data reaches the client's production system otherwise. Start it again afterwards</td></tr><tr><td><strong>Never widen port 11434 beyond the three application addresses.</strong></td><td>Ollama has no authentication of any kind. The security group is the whole of its protection</td></tr><tr><td><strong>Never build on a server.</strong></td><td>Under 2GB of memory. A Next.js build will take the machine down</td></tr><tr><td><strong>The model machine's shutdown behaviour must stay <span class='mono'>stop</span>.</strong></td><td>It switches itself off when idle. Set to terminate, the idle timer deletes it</td></tr></tbody></table>
+        <p>Checking the first rule takes one command and belongs in every handover:</p>
+        <pre class="code"><code>for h in 35.91.251.211 54.254.25.0 54.188.207.85; do
+  echo -n "$h "
+  ssh ubuntu@$h 'systemctl is-active plumber-sync aiorder-sync | tr "\n" " "'
+  echo
+done</code></pre>
+      </section>
+
+      <section id="s7">
+        <h2 class="sec"><span class="n">7</span>Checking a deploy worked</h2>
+        <p>Not "it returned 200", which a stale page also does. Ask it something.</p>
+        <pre class="code"><code>curl -s -X POST https://servicez.smartzees.com/api/v1/chat \
+  -H 'Content-Type: application/json' \
+  -d '{{"message":"my boiler is leaking","session_id":"check"}}'
+
+curl -s -X POST https://marketz.smartzees.com/api/v1/chat \
+  -H 'Content-Type: application/json' \
+  -d '{{"message":"milk","session_id":"check"}}'
+
+curl -s -X POST https://livz.smartzees.com/api/v1/chat \
+  -H 'Content-Type: application/json' \
+  -d '{{"message":"quiet hours","session_id":"check","community":"serenity"}}'</code></pre>
+        <p>
+          A good answer from the third names a document. If it does not, the
+          index did not load, whatever the status code said.
+        </p>
+        <p>And the platform switch, which the other two agents depend on:</p>
+        <pre class="code"><code>curl -s https://servicez.smartzees.com/api/v1/ai/provider</code></pre>
+      </section>
+
+      <section id="s8">
+        <h2 class="sec"><span class="n">8</span>Leftovers on the machines</h2>
+        <p>
+          Written down because they look important and are not. Every one is a
+          copy left behind when a machine was cloned.
+        </p>
+        <table class="spec"><thead><tr><th>Machine</th><th>Leftover</th><th>Status</th></tr></thead><tbody><tr><td>54.188.207.85</td><td><span class='mono'>/var/www/serviceagent</span>, <span class='mono'>/var/www/ai-order</span></td><td>Not served. From the clone this machine was made from</td></tr><tr><td>54.254.25.0</td><td><span class='mono'>/var/www/plumber</span>, <span class='mono'>/var/www/plumber.prev</span></td><td>Not served</td></tr><tr><td>35.91.251.211</td><td><span class='mono'>/var/www/ai-order</span></td><td>Serves the documents mirror only, not the shop</td></tr><tr><td>Both app machines</td><td><span class='mono'>plumber_assistant</span> and <span class='mono'>ai_order</span> databases where the product does not run</td><td>Unused. Left rather than dropped, because dropping a database to reclaim nothing is a bad trade</td></tr></tbody></table>
+        <p>
+          None of these are served by nginx. If you are editing something and
+          nothing changes, check you are on the right machine before you check
+          anything else.
+        </p>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>
+      Written by Abad Naseer. Every measured number in this document is cited
+      from the running system or from the code, and every target says that it
+      is a target. Where the two disagree, the document says so rather than
+      choosing the flattering one.
+    </p>
+  </div>
+</div>
+</body>
+</html>

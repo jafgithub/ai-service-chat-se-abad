@@ -149,6 +149,14 @@ SECTIONS = [
         "blurb": "Running the model on a machine we control, what it costs, and how "
                  "the applications carry on when it is switched off. Shared by all three agents.",
         "docs": [
+            ("Deployment and handover", "Handover",
+             "Where every part of the platform lives, the command that puts it there, and "
+             "what each piece of the code is for",
+             "1 September 2026", f"{SERVICE}/docs/deployment/",
+             "deploy deployment handover where does it live paths commands rsync systemd "
+             "units nginx repositories repos branches build frontend backend restart "
+             "servicez marketz livz landing docs ssh boxes machines code files purpose "
+             "sync outbox rules leftovers checking a deploy"),
             ("Spinning up a GPU, and wiring it to FastAPI", "Step by step",
              "From an empty AWS account to a resident's question answered by our own "
              "model, in nine steps. Written from a real attempt, including the two "
